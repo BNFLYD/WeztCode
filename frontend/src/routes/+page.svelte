@@ -1,6 +1,6 @@
 <script>
-  import { invoke } from "@tauri-apps/api/core";
-  import { getCurrentWindow } from "@tauri-apps/api/window";
+  import { onMount } from 'svelte';
+  import '../lib/bridge.js';
 
   let termMsg = $state("WezTerm iniciando...");
   let isExpanded = $state(true);
@@ -9,28 +9,42 @@
   const EXPANDED_WIDTH = 350;
   const COLLAPSED_WIDTH = 50;
 
+  // Referencia al bridge (se inicializa en onMount)
+  let bridge = $state(null);
+
+  onMount(() => {
+    bridge = window.weztcode;
+  });
+
   async function toggleSidebar() {
-    const window = getCurrentWindow();
+    if (!bridge) return;
     isExpanded = !isExpanded;
     const newWidth = isExpanded ? EXPANDED_WIDTH : COLLAPSED_WIDTH;
-    await window.setSize({ width: newWidth, height: 800 });
+    await bridge.setSize(newWidth, 800);
   }
 
   async function spawnTerm() {
-    termMsg = await invoke("spawn_term");
+    if (!bridge) return;
+    try {
+      termMsg = await bridge.spawnTerm();
+    } catch (e) {
+      termMsg = "Error: " + e;
+    }
   }
 
   async function listPanes() {
+    if (!bridge) return;
     try {
-      paneList = await invoke("wezterm_list");
+      paneList = await bridge.listPanes();
     } catch (e) {
       paneList = "Error: " + e;
     }
   }
 
   async function sendCommand() {
+    if (!bridge) return;
     try {
-      termMsg = await invoke("wezterm_send_text", { text: commandText + "\n" });
+      termMsg = await bridge.sendText(commandText + "\n");
     } catch (e) {
       termMsg = "Error: " + e;
     }
