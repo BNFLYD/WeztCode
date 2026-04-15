@@ -1,0 +1,24 @@
+packages:
+  - 'frontend'
+
+# ==================== Reglas de Seguridad ====================
+
+# 1. Evita instalar paquetes con vulnerabilidades conocidas
+strict-peer-dependencies: true
+ignore-workspace-cycles: false
+
+# 2. Reglas contra paquetes maliciosos / supply chain attacks
+# Solo permite paquetes que tengan "provenance" (pnpm 9+)
+verify-store-integrity: true
+resolution-mode: "highest"
+
+# 3. Configuración anti zero-day (lo más importante)
+minimumReleaseAge: 2880          # 2 días (2880 minutos)
+minimumReleaseAgeExclude: []
+
+# 4. Otras configuraciones recomendadas de seguridad
+public-hoist-pattern: []
+shamefully-hoist: false
+node-linker: "hoisted"
+dedupe-peer-dependents: true
+ignore-scripts: true
