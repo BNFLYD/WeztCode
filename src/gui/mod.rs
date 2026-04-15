@@ -1,0 +1,1 @@
+// Trait GuiPlatform (abstracción)
