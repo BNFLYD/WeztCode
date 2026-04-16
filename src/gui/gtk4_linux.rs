@@ -7,6 +7,7 @@ use webkit6::prelude::*;
 use webkit6::{UserContentManager, WebView};
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::borrow::BorrowMut;
 use std::process::Child;
 
 #[derive(serde::Deserialize)]
@@ -103,7 +104,7 @@ impl Gtk4Platform {
             serde_json::to_string(&error_str).unwrap_or_default()
         );
 
-        webview.evaluate_javascript(&js, None::<&gtk4::gio::Cancellable>, None, |_result| {});
+        webview.evaluate_javascript(&js, None::<&str>, None::<&gtk4::gio::Cancellable>, None, |_result| {});
     }
 }
 
@@ -144,40 +145,39 @@ impl GuiPlatform for Gtk4Platform {
 
             // Connect to script message received signal
             let webview_ref = webview.clone();
-            content_manager.connect_script_message_received(Some("weztcode"), move |_, result| {
-                if let Some(js_result) = result.js_result() {
-                    if let Some(msg_str) = js_result.to_str() {
-                        let msg = msg_str.to_string();
-                        let webview = webview_ref.clone();
+            content_manager.connect_script_message_received(Some("weztcode"), move |_, value| {
+                // Convert JavaScript value to string
+                if let Some(msg_str) = value.to_string() {
+                    let msg = msg_str;
+                    let webview = webview_ref.clone();
 
-                        // Parse command and handle
-                        if let Ok(cmd) = serde_json::from_str::<JsCommand>(&msg) {
-                            let response = match cmd.command.as_str() {
-                                "spawn_term" => Ok("Term spawned".to_string()),
-                                "list_panes" => Ok("Pane list placeholder".to_string()),
-                                "send_text" => Ok("Text sent".to_string()),
-                                "set_size" => {
-                                    let w = cmd.args.get("width").and_then(|v| v.as_i64()).unwrap_or(350) as i32;
-                                    let h = cmd.args.get("height").and_then(|v| v.as_i64()).unwrap_or(600) as i32;
-                                    Ok(format!("Size: {}x{}", w, h))
-                                }
-                                _ => Err("Unknown command".to_string()),
-                            };
+                    // Parse command and handle
+                    if let Ok(cmd) = serde_json::from_str::<JsCommand>(&msg) {
+                        let response = match cmd.command.as_str() {
+                            "spawn_term" => Ok("Term spawned".to_string()),
+                            "list_panes" => Ok("Pane list placeholder".to_string()),
+                            "send_text" => Ok("Text sent".to_string()),
+                            "set_size" => {
+                                let w = cmd.args.get("width").and_then(|v| v.as_i64()).unwrap_or(350) as i32;
+                                let h = cmd.args.get("height").and_then(|v| v.as_i64()).unwrap_or(600) as i32;
+                                Ok(format!("Size: {}x{}", w, h))
+                            }
+                            _ => Err("Unknown command".to_string()),
+                        };
 
-                            // Send response back to JS
-                            let (res, err) = match response {
-                                Ok(r) => (r, "".to_string()),
-                                Err(e) => ("".to_string(), e),
-                            };
+                        // Send response back to JS
+                        let (res, err) = match response {
+                            Ok(r) => (r, "".to_string()),
+                            Err(e) => ("".to_string(), e),
+                        };
 
-                            let js = format!("window.weztcodeResponse({}, {}, {})",
-                                cmd.id,
-                                serde_json::to_string(&res).unwrap_or_default(),
-                                serde_json::to_string(&err).unwrap_or_default()
-                            );
+                        let js = format!("window.weztcodeResponse({}, {}, {})",
+                            cmd.id,
+                            serde_json::to_string(&res).unwrap_or_default(),
+                            serde_json::to_string(&err).unwrap_or_default()
+                        );
 
-                            webview.evaluate_javascript(&js, None::<&gtk4::gio::Cancellable>, None, |_result| {});
-                        }
+                        webview.evaluate_javascript(&js, None::<&str>, None::<&gtk4::gio::Cancellable>, None, |_result| {});
                     }
                 }
             });
@@ -217,12 +217,12 @@ impl GuiPlatform for Gtk4Platform {
                             window.weztcodeResponse = window.weztcode.response.bind(window.weztcode);
                         }
                     "#;
-                    webview.evaluate_javascript(bridge_script, None, None, None, |_result| {});
+                    webview.evaluate_javascript(bridge_script, None::<&str>, None::<&gtk4::gio::Cancellable>, None, |_result| {});
                 }
             });
 
             *window_ref.borrow_mut() = Some(window.clone());
-            *webview_ref.borrow_mut() = Some(webview);
+            webview_ref.borrow_mut().replace(webview);
 
             window.present();
         });
