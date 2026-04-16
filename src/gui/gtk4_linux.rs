@@ -165,7 +165,7 @@ impl GuiPlatform for Gtk4Platform {
                             _ => Err("Unknown command".to_string()),
                         };
 
-                        // Send response back to JS
+                        // Send response back to JS with proper error handling
                         let (res, err) = match response {
                             Ok(r) => (r, "".to_string()),
                             Err(e) => ("".to_string(), e),
