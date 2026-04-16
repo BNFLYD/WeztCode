@@ -2,7 +2,7 @@ use crate::gui::GuiPlatform;
 use crate::terminal::{TerminalProtocol, WeztermProtocol};
 use gtk4::prelude::*;
 use gtk4::{Application, ApplicationWindow};
-use gtk4_layer_shell::{Layer, LayerShell};
+use gtk4_layer_shell::{Edge, Layer, LayerShell};
 use webkit6::prelude::*;
 use webkit6::{UserContentManager, WebView};
 use std::cell::RefCell;
@@ -103,7 +103,7 @@ impl Gtk4Platform {
             serde_json::to_string(&error_str).unwrap_or_default()
         );
 
-        webview.evaluate_javascript(&js, None, None, None, |_result| {});
+        webview.evaluate_javascript(&js, None::<&gtk4::gio::Cancellable>, None, |_result| {});
     }
 }
 
@@ -125,9 +125,9 @@ impl GuiPlatform for Gtk4Platform {
 
             window.init_layer_shell();
             window.set_layer(Layer::Overlay);
-            window.set_anchor(gtk4_layer_shell::Edge::Right, true);
-            window.set_anchor(gtk4_layer_shell::Edge::Top, true);
-            window.set_anchor(gtk4_layer_shell::Edge::Bottom, true);
+            window.set_anchor(Edge::Right, true);
+            window.set_anchor(Edge::Top, true);
+            window.set_anchor(Edge::Bottom, true);
             window.set_exclusive_zone(-1);
 
             // Setup message handler for JS bridge
@@ -140,17 +140,43 @@ impl GuiPlatform for Gtk4Platform {
             window.set_child(Some(&webview));
 
             // Register script message handler
-            let webview_weak = webview.downgrade();
-            content_manager.register_script_message_handler("weztcode", None, move |result| {
-                if let Some(webview) = webview_weak.upgrade() {
-                    if let Some(message) = result.js_result() {
-                        if let Some(message_str) = message.to_string() {
-                            if let Ok(cmd) = serde_json::from_str::<JsCommand>(&message_str) {
-                                // Handle command and send response
-                                let platform = Gtk4Platform::new(); // Simplified - in real impl use shared state
-                                let result = platform.handle_command(cmd);
-                                // Response handling would need proper state sharing
-                            }
+            content_manager.register_script_message_handler("weztcode", None);
+
+            // Connect to script message received signal
+            let webview_ref = webview.clone();
+            content_manager.connect_script_message_received(Some("weztcode"), move |_, result| {
+                if let Some(js_result) = result.js_result() {
+                    if let Some(msg_str) = js_result.to_str() {
+                        let msg = msg_str.to_string();
+                        let webview = webview_ref.clone();
+
+                        // Parse command and handle
+                        if let Ok(cmd) = serde_json::from_str::<JsCommand>(&msg) {
+                            let response = match cmd.command.as_str() {
+                                "spawn_term" => Ok("Term spawned".to_string()),
+                                "list_panes" => Ok("Pane list placeholder".to_string()),
+                                "send_text" => Ok("Text sent".to_string()),
+                                "set_size" => {
+                                    let w = cmd.args.get("width").and_then(|v| v.as_i64()).unwrap_or(350) as i32;
+                                    let h = cmd.args.get("height").and_then(|v| v.as_i64()).unwrap_or(600) as i32;
+                                    Ok(format!("Size: {}x{}", w, h))
+                                }
+                                _ => Err("Unknown command".to_string()),
+                            };
+
+                            // Send response back to JS
+                            let (res, err) = match response {
+                                Ok(r) => (r, "".to_string()),
+                                Err(e) => ("".to_string(), e),
+                            };
+
+                            let js = format!("window.weztcodeResponse({}, {}, {})",
+                                cmd.id,
+                                serde_json::to_string(&res).unwrap_or_default(),
+                                serde_json::to_string(&err).unwrap_or_default()
+                            );
+
+                            webview.evaluate_javascript(&js, None::<&gtk4::gio::Cancellable>, None, |_result| {});
                         }
                     }
                 }
@@ -207,8 +233,8 @@ impl GuiPlatform for Gtk4Platform {
     fn set_geometry(&self, x: i32, y: i32, width: u32, height: u32) {
         if let Some(ref window) = *self.window.borrow() {
             window.set_default_size(width as i32, height as i32);
-            window.set_margin(gtk4_layer_shell::Edge::Top, y);
-            window.set_margin(gtk4_layer_shell::Edge::Right, x);
+            window.set_margin(Edge::Top, y);
+            window.set_margin(Edge::Right, x);
         }
     }
 
@@ -220,7 +246,7 @@ impl GuiPlatform for Gtk4Platform {
 
     fn hide(&self) {
         if let Some(ref window) = *self.window.borrow() {
-            window.hide();
+            window.set_visible(false);
         }
     }
 
