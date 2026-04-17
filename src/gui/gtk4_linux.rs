@@ -8,7 +8,6 @@ use webkit6::{UserContentManager, WebView};
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::process::Child;
-use std::ops::DerefMut;
 
 #[derive(serde::Deserialize)]
 struct JsCommand {
@@ -104,7 +103,7 @@ impl Gtk4Platform {
             serde_json::to_string(&error_str).unwrap_or_default()
         );
 
-        webview.evaluate_javascript(&js, None::<&str>, None::<&gtk4::gio::Cancellable>, |_result| {});
+        webview.evaluate_javascript(&js, None::<&str>, None::<&str>, None::<&gtk4::gio::Cancellable>, |_result| {});
     }
 }
 
@@ -176,7 +175,7 @@ impl GuiPlatform for Gtk4Platform {
                         serde_json::to_string(&err).unwrap_or_default()
                     );
 
-                    webview.evaluate_javascript(&js, None::<&str>, None::<&gtk4::gio::Cancellable>, |_result| {});
+                    webview.evaluate_javascript(&js, None::<&str>, None::<&str>, None::<&gtk4::gio::Cancellable>, |_result| {});
                 }
             });
 
@@ -215,12 +214,12 @@ impl GuiPlatform for Gtk4Platform {
                             window.weztcodeResponse = window.weztcode.response.bind(window.weztcode);
                         }
                     "#;
-                    webview.evaluate_javascript(bridge_script, None::<&str>, None::<&gtk4::gio::Cancellable>, |_result| {});
+                    webview.evaluate_javascript(bridge_script, None::<&str>, None::<&str>, None::<&gtk4::gio::Cancellable>, |_result| {});
                 }
             });
 
             *window_ref.borrow_mut() = Some(window.clone());
-            webview_ref.borrow_mut().deref_mut().replace(webview);
+            (*webview_ref).borrow_mut().replace(webview);
 
             window.present();
         });
