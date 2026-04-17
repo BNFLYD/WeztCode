@@ -143,11 +143,11 @@ impl GuiPlatform for Gtk4Platform {
             content_manager.register_script_message_handler("weztcode", None);
 
             // Connect to script message received signal
-            let webview_ref = webview.clone();
+            let webview_msg_ref = webview.clone();
             content_manager.connect_script_message_received(Some("weztcode"), move |_, value| {
                 // Convert JavaScript value to string
                 let msg = value.to_string();
-                let webview = webview_ref.clone();
+                let webview = webview_msg_ref.clone();
 
                 // Parse command and handle
                 if let Ok(cmd) = serde_json::from_str::<JsCommand>(&msg) {
@@ -219,7 +219,7 @@ impl GuiPlatform for Gtk4Platform {
             });
 
             *window_ref.borrow_mut() = Some(window.clone());
-            *std::cell::RefCell::borrow_mut(&*webview_ref) = Some(webview);
+            *webview_ref.borrow_mut() = Some(webview);
 
             window.present();
         });
