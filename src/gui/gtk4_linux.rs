@@ -219,7 +219,7 @@ impl GuiPlatform for Gtk4Platform {
             });
 
             *window_ref.borrow_mut() = Some(window.clone());
-            (*webview_ref).borrow_mut().replace(webview);
+            webview_ref.borrow_mut().replace(webview);
 
             window.present();
         });
