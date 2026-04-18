@@ -136,6 +136,10 @@ impl GuiPlatform for Gtk4Platform {
                 .user_content_manager(&content_manager)
                 .build();
 
+            // Enable developer tools for debugging
+            webview.set_enable_developer_extras(true);
+            webview.set_enable_inspector(true);
+
             webview.load_uri(&url);
             window.set_child(Some(&webview));
 
