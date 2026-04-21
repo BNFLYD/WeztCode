@@ -2,15 +2,15 @@
   import { onMount } from 'svelte';
   import '../lib/bridge.js';
 
-  let termMsg = $state("WezTerm iniciando...");
-  let isExpanded = $state(true);
-  let paneList = $state("");
-  let commandText = $state("ls -la");
+  let termMsg = "WezTerm iniciando...";
+  let isExpanded = true;
+  let paneList = "";
+  let commandText = "ls -la";
   const EXPANDED_WIDTH = 350;
   const COLLAPSED_WIDTH = 50;
 
   // Referencia al bridge (se inicializa en onMount)
-  let bridge = $state(null);
+  let bridge = null;
 
   onMount(() => {
     bridge = window.weztcode;
