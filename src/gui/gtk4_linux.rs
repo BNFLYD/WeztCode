@@ -149,7 +149,7 @@ impl GuiPlatform for Gtk4Platform {
 
             // Capture JavaScript console messages
             webview.connect_script_dialog(move |_, dialog| {
-                let message = dialog.message();
+                let message = dialog.message().map(|m| m.to_string()).unwrap_or_default();
                 match dialog.dialog_type() {
                     webkit6::ScriptDialogType::Alert => println!("[JS Alert] {}", message),
                     webkit6::ScriptDialogType::Confirm => println!("[JS Confirm] {}", message),
