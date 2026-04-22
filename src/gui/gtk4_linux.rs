@@ -147,6 +147,19 @@ impl GuiPlatform for Gtk4Platform {
                 }
             });
 
+            // Capture JavaScript console messages
+            webview.connect_script_dialog(move |_, dialog| {
+                let message = dialog.message();
+                match dialog.dialog_type() {
+                    webkit6::ScriptDialogType::Alert => println!("[JS Alert] {}", message),
+                    webkit6::ScriptDialogType::Confirm => println!("[JS Confirm] {}", message),
+                    webkit6::ScriptDialogType::Prompt => println!("[JS Prompt] {}", message),
+                    webkit6::ScriptDialogType::BeforeUnloadConfirm => println!("[JS BeforeUnload] {}", message),
+                    _ => println!("[JS Dialog] {}", message),
+                }
+                false // Let default handler run
+            });
+
             webview.connect_load_failed(move |_, event, url, error| {
                 eprintln!("WebView load failed!");
                 eprintln!("  Event: {:?}", event);
