@@ -9,7 +9,14 @@ const config = {
 			fallback: 'index.html',
 			precompress: false,
 			strict: true
-		})
+		}),
+		prerender: {
+			handleHttpError: ({ path, referrer, message }) => {
+				// Ignorar errores de favicon y otros recursos no críticos
+				if (path.includes('favicon')) return;
+				throw new Error(message);
+			}
+		}
 	}
 };
 
