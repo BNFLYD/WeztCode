@@ -130,12 +130,46 @@ impl GuiPlatform for Gtk4Platform {
             window.set_anchor(Edge::Bottom, true);
             window.set_exclusive_zone(-1);
 
+            // Setup WebKit context to allow local files
+            let context = webkit6::WebContext::default();
+            let security_manager = context.security_manager().ok_or("No security manager")?;
+            security_manager.set_allowed_uri_scheme("file", true);
+
             // Setup message handler for JS bridge
             let content_manager = UserContentManager::new();
             let webview = WebView::builder()
                 .user_content_manager(&content_manager)
+                .web_context(&context)
                 .build();
 
+            // Enable developer extras for debugging
+            let settings = webview.settings().ok_or("No settings")?;
+            settings.set_enable_developer_extras(true);
+
+            // Connect load signals for debugging
+            webview.connect_load_changed(move |_, event| {
+                match event {
+                    webkit6::LoadEvent::Started => println!("WebView: Load started"),
+                    webkit6::LoadEvent::Redirected => println!("WebView: Load redirected"),
+                    webkit6::LoadEvent::Committed => println!("WebView: Load committed"),
+                    webkit6::LoadEvent::Finished => println!("WebView: Load finished"),
+                    _ => println!("WebView: Other load event: {:?}", event),
+                }
+            });
+
+            webview.connect_load_failed(move |_, event, url, error| {
+                eprintln!("WebView load failed!");
+                eprintln!("  Event: {:?}", event);
+                eprintln!("  URL: {}", url);
+                eprintln!("  Error: {:?}", error);
+                false // Let default handler run
+            });
+
+            webview.connect_web_process_terminated(move |_, reason| {
+                eprintln!("WebView process terminated: {:?}", reason);
+            });
+
+            println!("Loading URL: {}", &url);
             webview.load_uri(&url);
             window.set_child(Some(&webview));
 
