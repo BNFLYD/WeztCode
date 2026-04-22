@@ -1,0 +1,29 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Colores retrofuturistas personalizados */
+@layer base {
+  :root {
+    --background: 0 0% 5%;
+    --foreground: 168 58% 40%;
+    --card: 0 0% 12%;
+    --card-foreground: 168 58% 40%;
+    --primary: 168 58% 40%;
+    --primary-foreground: 0 0% 5%;
+    --muted: 0 0% 20%;
+    --muted-foreground: 168 58% 60%;
+    --accent: 0 0% 82%;
+    --border: 168 58% 40%;
+    --ring: 168 58% 40%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-[#2ca798]/30;
+  }
+  body {
+    @apply bg-[#0d0d0d] text-[#2ca798];
+  }
+}
