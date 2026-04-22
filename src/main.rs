@@ -22,7 +22,7 @@ fn main() {
     match term.spawn(class) {
         Ok(_) => println!("WezTerm iniciado"),
         Err(e) => {
-            eprintln!("Error al iniciar WezTerm: {}", e);
+            eprintln!("Error al iniciar terminal: {}", e);
             std::process::exit(1);
         }
     }
@@ -31,6 +31,8 @@ fn main() {
 
     let platform = Gtk4Platform::new();
     let frontend_url = config::get_config().frontend_path;
+
+    println!("Frontend URL: {}", frontend_url);
 
     if let Err(e) = platform.create_overlay(&frontend_url) {
         eprintln!("Error al crear overlay: {}", e);
