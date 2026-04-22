@@ -47,7 +47,9 @@
   let bridge = null;
 
   onMount(() => {
+    console.log('[Svelte] onMount ejecutado');
     bridge = window.weztcode;
+    console.log('[Svelte] Bridge asignado:', bridge);
   });
 </script>
 

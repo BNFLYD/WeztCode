@@ -159,10 +159,8 @@ impl GuiPlatform for Gtk4Platform {
                 eprintln!("WebView process terminated: {:?}", reason);
             });
 
-            // TEST: Cargar HTML simple rojo para verificar renderizado
-            let test_html = "data:text/html,<html><head><meta charset='utf-8'></head><body style='background:red; color:white; font-size:24px; margin:40px;'><h1>TEST - WebView funciona!</h1><p>Si ves esto en ROJO, el WebView renderiza OK.</p></body></html>";
-            println!("Loading TEST HTML (rojo)");
-            webview.load_uri(test_html);
+            println!("Loading URL: {}", &url);
+            webview.load_uri(&url);
             window.set_child(Some(&webview));
 
             // Register script message handler
