@@ -48,7 +48,7 @@
 </script>
 
   <!-- Sidebar Retrofuturista -->
-  <div class="flex flex-col bg-[#1e1e1e] border-l-2 border-[#2ca798] rounded-l-3xl overflow-hidden">
+  <div class="h-[100vh] flex flex-col bg-[#1e1e1e] border-l-2 border-[#2ca798] rounded-l-3xl overflow-hidden">
     <!-- Section Header -->
     <div class="px-5 py-4 border-b border-[#2ca798]/30 bg-[#1e1e1e]/80">
       <h2 class="text-sm font-bold uppercase tracking-[3px] text-[#d0d0d0]">
