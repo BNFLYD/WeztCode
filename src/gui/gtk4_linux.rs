@@ -49,7 +49,7 @@ impl GuiPlatform for Gtk4Platform {
             window.set_anchor(Edge::Bottom, true);
             // Margen superior para respetar la waybar (~30px)
             window.set_margin(Edge::Top, 0);
-            window.set_margin(Edge::Bottom, 30);
+            window.set_margin(Edge::Bottom, 0);
             // Exclusive zone 0 = se comporta bien con otras ventanas
             window.set_exclusive_zone(0);
 
