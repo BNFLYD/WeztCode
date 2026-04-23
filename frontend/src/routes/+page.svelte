@@ -47,19 +47,8 @@
   });
 </script>
 
-<div class="flex h-screen w-full bg-[#0d0d0d] text-[#2ca798]">
-  <!-- Main Content Area -->
-  <div class="flex-1 flex flex-col items-center justify-center border-r border-[#2ca798]/30 bg-gradient-to-br from-[#0d0d0d] via-[#1a1a2e] to-[#16213e]">
-    <div class="text-center flex flex-col gap-4">
-      <div class="text-6xl font-bold text-[#d0d0d0] uppercase tracking-[8px] drop-shadow-[0_0_20px_rgba(44,167,152,0.5)]">
-        WeztCode
-      </div>
-      <p class="text-sm text-[#2ca798]/70 tracking-wider">Selecciona una sección en la sidebar</p>
-    </div>
-  </div>
-
   <!-- Sidebar Retrofuturista -->
-  <div class="w-[30%] min-w-[300px] max-w-[400px] flex flex-col bg-[#1e1e1e] border-l-2 border-[#2ca798] rounded-l-3xl overflow-hidden">
+  <div class="flex flex-col bg-[#1e1e1e] border-l-2 border-[#2ca798] rounded-l-3xl overflow-hidden">
     <!-- Section Header -->
     <div class="px-5 py-4 border-b border-[#2ca798]/30 bg-[#1e1e1e]/80">
       <h2 class="text-sm font-bold uppercase tracking-[3px] text-[#d0d0d0]">
