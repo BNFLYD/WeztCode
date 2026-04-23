@@ -45,11 +45,11 @@ impl GuiPlatform for Gtk4Platform {
             window.set_layer(Layer::Top);
             window.set_anchor(Edge::Right, true);
             // No anclar a top/bottom para no estirarse
-            window.set_anchor(Edge::Top, false);
-            window.set_anchor(Edge::Bottom, false);
+            window.set_anchor(Edge::Top, true);
+            window.set_anchor(Edge::Bottom, true);
             // Margen superior para respetar la waybar (~30px)
-            window.set_margin(Edge::Top, 30);
-            window.set_margin(Edge::Bottom, 0);
+            window.set_margin(Edge::Top, 0);
+            window.set_margin(Edge::Bottom, 30);
             // Exclusive zone 0 = se comporta bien con otras ventanas
             window.set_exclusive_zone(0);
 
