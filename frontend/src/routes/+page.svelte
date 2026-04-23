@@ -46,8 +46,7 @@
     console.log('[Svelte] onMount ejecutado');
   });
 </script>
-
-  <!-- Sidebar Retrofuturista -->
+  <!-- Sidebar -->
   <div class="h-[100vh] flex flex-col bg-[#1e1e1e] border-l-2 border-[#2ca798] rounded-l-3xl overflow-hidden">
     <!-- Section Header -->
     <div class="px-5 py-4 border-b border-[#2ca798]/30 bg-[#1e1e1e]/80">

@@ -42,11 +42,16 @@ impl GuiPlatform for Gtk4Platform {
                 .build();
 
             window.init_layer_shell();
-            window.set_layer(Layer::Overlay);
+            window.set_layer(Layer::Top);
             window.set_anchor(Edge::Right, true);
-            window.set_anchor(Edge::Top, true);
-            window.set_anchor(Edge::Bottom, true);
-            window.set_exclusive_zone(-1);
+            // No anclar a top/bottom para no estirarse
+            window.set_anchor(Edge::Top, false);
+            window.set_anchor(Edge::Bottom, false);
+            // Margen superior para respetar la waybar (~30px)
+            window.set_margin(Edge::Top, 30);
+            window.set_margin(Edge::Bottom, 0);
+            // Exclusive zone 0 = se comporta bien con otras ventanas
+            window.set_exclusive_zone(0);
 
             println!("GTK: Creando WebView...");
             let webview = WebView::new();
