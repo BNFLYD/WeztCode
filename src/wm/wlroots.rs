@@ -1,12 +1,11 @@
 use super::WindowGeometry;
 
 use wayland_client::{Connection, Dispatch, QueueHandle, protocol::wl_registry};
-use wayland_protocols::wlr::unstable::foreign_toplevel::v1::client::{
-    zwlr_foreign_toplevel_manager_v1::{ZwlrForeignToplevelManagerV1, self},
+use wayland_protocols_wlr::foreign_toplevel::v1::client::{
+    zwlr_foreign_toplevel_manager_v1::ZwlrForeignToplevelManagerV1,
     zwlr_foreign_toplevel_handle_v1::ZwlrForeignToplevelHandleV1,
 };
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
 
 pub struct WlrootsWindowManager {
     connection: Connection,
@@ -16,7 +15,7 @@ impl WlrootsWindowManager {
     pub fn new() -> Self {
         let connection = Connection::connect_to_env()
             .expect("Failed to connect to Wayland display");
-        
+
         Self { connection }
     }
 }
@@ -26,21 +25,21 @@ impl super::WindowManager for WlrootsWindowManager {
         let mut state = WmState::new(target_app_id.to_string());
         let mut event_queue = self.connection.new_event_queue();
         let qh = event_queue.handle();
-        
+
         let display = self.connection.display();
         display.get_registry(&qh, ());
-        
+
         // Roundtrip para obtener el registry
         event_queue.roundtrip(&mut state).ok()?;
-        
+
         // Si encontramos el toplevel manager, obtener toplevels
         if let Some(ref manager) = state.toplevel_manager {
             manager.stop(&qh);
         }
-        
+
         // Roundtrip para procesar eventos
         event_queue.roundtrip(&mut state).ok()?;
-        
+
         // Buscar el toplevel con el app_id objetivo
         for (handle, info) in &state.toplevels {
             if let Some(ref app_id) = info.app_id {
@@ -57,7 +56,7 @@ impl super::WindowManager for WlrootsWindowManager {
                 }
             }
         }
-        
+
         None
     }
 }
@@ -115,13 +114,14 @@ impl Dispatch<ZwlrForeignToplevelManagerV1, ()> for WmState {
     fn event(
         state: &mut Self,
         _: &ZwlrForeignToplevelManagerV1,
-        event: zwlr_foreign_toplevel_manager_v1::Event,
+        event: <ZwlrForeignToplevelManagerV1 as wayland_client::Proxy>::Event,
         _: &(),
         _: &Connection,
         qh: &QueueHandle<Self>,
     ) {
+        use wayland_protocols_wlr::foreign_toplevel::v1::client::zwlr_foreign_toplevel_manager_v1::Event;
         match event {
-            zwlr_foreign_toplevel_manager_v1::Event::Toplevel { toplevel } => {
+            Event::Toplevel { toplevel } => {
                 state.toplevels.insert(toplevel, ToplevelInfo {
                     app_id: None,
                     title: None,
@@ -141,12 +141,13 @@ impl Dispatch<ZwlrForeignToplevelHandleV1, ()> for WmState {
         _: &Connection,
         _: &QueueHandle<Self>,
     ) {
+        use wayland_protocols_wlr::foreign_toplevel::v1::client::zwlr_foreign_toplevel_handle_v1::Event;
         if let Some(info) = state.toplevels.get_mut(handle) {
             match event {
-                zwlr_foreign_toplevel_handle_v1::Event::AppId { app_id } => {
+                Event::AppId { app_id } => {
                     info.app_id = Some(app_id);
                 }
-                zwlr_foreign_toplevel_handle_v1::Event::Title { title } => {
+                Event::Title { title } => {
                     info.title = Some(title);
                 }
                 _ => {}
