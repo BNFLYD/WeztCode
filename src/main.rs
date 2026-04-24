@@ -1,9 +1,11 @@
 mod config;
 mod gui;
 mod terminal;
+mod wm;
 
 use gui::{GuiPlatform, Gtk4Platform};
 use terminal::{TerminalProtocol, WeztermProtocol};
+use wm::WindowManager;
 use std::thread;
 use std::time::Duration;
 use std::path::PathBuf;
@@ -80,12 +82,26 @@ fn main() {
     // Esperar a que el servidor inicie
     thread::sleep(Duration::from_millis(100));
 
+    // Detectar window manager y obtener geometría de la terminal
+    let term_geometry = if let Some(wm) = wm::detect_window_manager() {
+        wm.get_window_geometry("weztcode")
+    } else {
+        None
+    };
+
+    if let Some(geo) = &term_geometry {
+        println!("Geometría de terminal detectada: x={}, y={}, w={}, h={}",
+                 geo.x, geo.y, geo.width, geo.height);
+    } else {
+        println!("Usando geometría por defecto");
+    }
+
     let platform = Gtk4Platform::new();
     let frontend_url = format!("http://127.0.0.1:{}/", http_port);
 
     println!("Frontend URL: {}", frontend_url);
 
-    if let Err(e) = platform.create_overlay(&frontend_url) {
+    if let Err(e) = platform.create_overlay(&frontend_url, term_geometry) {
         eprintln!("Error al crear overlay: {}", e);
         std::process::exit(1);
     }

@@ -1,4 +1,5 @@
 use crate::gui::GuiPlatform;
+use crate::wm::WindowGeometry;
 use gtk4::prelude::*;
 use gtk4::{Application, ApplicationWindow};
 use gtk4_layer_shell::{Edge, Layer, LayerShell};
@@ -28,7 +29,7 @@ impl Gtk4Platform {
 }
 
 impl GuiPlatform for Gtk4Platform {
-    fn create_overlay(&self, url: &str) -> Result<(), String> {
+    fn create_overlay(&self, url: &str, term_geometry: Option<WindowGeometry>) -> Result<(), String> {
         let window_ref = self.window.clone();
         let webview_ref = self.webview.clone();
         let url = url.to_string();
@@ -44,12 +45,27 @@ impl GuiPlatform for Gtk4Platform {
             window.init_layer_shell();
             window.set_layer(Layer::Top);
             window.set_anchor(Edge::Right, true);
-            // No anclar a top/bottom para no estirarse
+            // Anclar a top/bottom para que se adapte a los márgenes
             window.set_anchor(Edge::Top, true);
             window.set_anchor(Edge::Bottom, true);
-            // Margen superior para respetar la waybar (~30px)
-            window.set_margin(Edge::Top, 1);
-            window.set_margin(Edge::Bottom, 1);
+
+            // Calcular márgenes basados en la geometría de la terminal
+            if let Some(geo) = &term_geometry {
+                println!("GTK: Usando geometría de terminal: x={}, y={}, w={}, h={}",
+                         geo.x, geo.y, geo.width, geo.height);
+
+                // Margen superior = posición Y de la terminal (para alinearse)
+                window.set_margin(Edge::Top, geo.y);
+                // Margen inferior = espacio restante de la pantalla menos altura de terminal
+                let screen_height = 1080; // TODO: detectar dinámicamente
+                let bottom_margin = screen_height - geo.y - geo.height;
+                window.set_margin(Edge::Bottom, bottom_margin.max(0));
+            } else {
+                // Valores por defecto
+                window.set_margin(Edge::Top, 30);  // Respetar waybar
+                window.set_margin(Edge::Bottom, 0);
+            }
+
             // Exclusive zone 0 = se comporta bien con otras ventanas
             window.set_exclusive_zone(0);
 
