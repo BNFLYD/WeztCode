@@ -1,3 +1,5 @@
+// Esta implementacion existe para poder obtener la geometria de las ventanas de wlroots osea en wm basados en wayland (como sway, hyprland, river, niri, dwl, etc.) y en base a eso posicionar el editor en funcion de la ventana activa a la que apunta osea la terminal que se esta usando para ejecutar el programa
+
 use super::WindowGeometry;
 
 use wayland_client::{Connection, Dispatch, QueueHandle, protocol::wl_registry};
@@ -34,7 +36,7 @@ impl super::WindowManager for WlrootsWindowManager {
 
         // Si encontramos el toplevel manager, obtener toplevels
         if let Some(ref manager) = state.toplevel_manager {
-            manager.stop(&qh);
+            manager.stop();
         }
 
         // Roundtrip para procesar eventos

@@ -1,12 +1,4 @@
-use crate::gui::GuiPlatform;
 use crate::wm::WindowGeometry;
-use gtk4::prelude::*;
-use gtk4::{Application, ApplicationWindow};
-use gtk4_layer_shell::{Edge, Layer, LayerShell};
-use webkit6::prelude::*;
-use webkit6::WebView;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 pub trait GuiPlatform {
     fn create_overlay(&self, url: &str, term_geometry: Option<WindowGeometry>) -> Result<(), String>;
