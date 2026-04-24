@@ -5,6 +5,12 @@ pub use wlroots::WlrootsWindowManager;
 pub trait WindowManager {
     /// Obtiene la geometría (x, y, width, height) de la ventana con el app_id especificado
     fn get_window_geometry(&self, app_id: &str) -> Option<WindowGeometry>;
+    
+    /// Suscribe a cambios de geometría en tiempo real
+    fn subscribe_geometry_changes(&self, app_id: &str, callback: Box<dyn Fn(WindowGeometry) + Send>) -> Result<(), String>;
+    
+    /// Verifica si una ventana está enfocada
+    fn is_window_focused(&self, app_id: &str) -> bool;
 }
 
 #[derive(Debug, Clone, Copy)]

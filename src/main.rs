@@ -1,11 +1,10 @@
 mod config;
 mod gui;
 mod terminal;
-mod wm;
 
 use gui::{GuiPlatform, Gtk4Platform};
 use terminal::{TerminalProtocol, WeztermProtocol};
-use wm::WindowManager;
+use gui::protocol::wayland::wm::WindowManager;
 use std::thread;
 use std::time::Duration;
 use std::path::PathBuf;
@@ -83,7 +82,7 @@ fn main() {
     thread::sleep(Duration::from_millis(100));
 
     // Detectar window manager y obtener geometría de la terminal
-    let term_geometry = if let Some(wm) = wm::detect_window_manager() {
+    let term_geometry = if let Some(wm) = gui::protocol::wayland::wm::detect_window_manager() {
         wm.get_window_geometry("weztcode")
     } else {
         None
