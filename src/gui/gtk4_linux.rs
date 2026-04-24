@@ -1,5 +1,5 @@
 use crate::gui::GuiPlatform;
-use crate::wm::WindowGeometry;
+use crate::gui::protocol::wayland::wm::WindowGeometry;
 use gtk4::prelude::*;
 use gtk4::{Application, ApplicationWindow};
 use gtk4_layer_shell::{Edge, Layer, LayerShell};
