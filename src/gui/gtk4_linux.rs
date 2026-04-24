@@ -62,8 +62,8 @@ impl GuiPlatform for Gtk4Platform {
                 window.set_margin(Edge::Bottom, bottom_margin.max(0));
             } else {
                 // Valores por defecto
-                window.set_margin(Edge::Top, 30);  // Respetar waybar
-                window.set_margin(Edge::Bottom, 0);
+                window.set_margin(Edge::Top, 1);
+                window.set_margin(Edge::Bottom, 1);
             }
 
             // Exclusive zone 0 = se comporta bien con otras ventanas
