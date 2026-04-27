@@ -93,49 +93,31 @@ fn main() {
         println!("Usando geometría por defecto");
     }
 
+    // Inicializar plataforma GUI
     let platform = Gtk4Platform::new();
     let frontend_url = format!("http://127.0.0.1:{}/", http_port);
 
     println!("Frontend URL: {}", frontend_url);
 
+    // Configurar window manager si está disponible
+    if let Some(wm) = wm {
+        println!("Window Manager detectado: {}", wm.wm_name());
+
+        // Obtener receptor de eventos del WM
+        let receiver = wm.event_receiver();
+
+        // Conectar eventos WM a acciones GUI
+        platform.handle_wm_events(receiver);
+
+        // Iniciar monitoreo de ventana objetivo
+        wm.start_monitoring("weztcode".to_string());
+    } else {
+        println!("No se detectó Window Manager - ejecutando en modo standalone");
+    }
+
     if let Err(e) = platform.create_overlay(&frontend_url, term_geometry) {
         eprintln!("Error al crear overlay: {}", e);
         std::process::exit(1);
-    }
-
-    // Configurar callback de foco para ocultar/mostrar automáticamente
-    if let Some(wm) = wm {
-        // Crear canal para comunicación thread-safe con GTK
-        let (sender, receiver) = mpsc::channel::<bool>();
-
-        // Conectar callback de foco (ejecuta en thread de Wayland)
-        if let Err(e) = wm.on_focus_change("weztcode", Box::new(move |focused| {
-            let _ = sender.send(focused);
-        })) {
-            eprintln!("Error al registrar callback de foco: {}", e);
-        }
-
-        // Conectar receptor al main context de GTK (ejecuta en main thread)
-        glib::idle_add_local(move || {
-            match receiver.try_recv() {
-                Ok(focused) => {
-                    if focused {
-                        println!("WezTerm enfocada - mostrando overlay");
-                        platform.show();
-                    } else {
-                        println!("WezTerm perdió foco - ocultando overlay");
-                        platform.hide();
-                    }
-                    glib::ControlFlow::Continue
-                }
-                Err(mpsc::TryRecvError::Empty) => {
-                    glib::ControlFlow::Continue
-                }
-                Err(mpsc::TryRecvError::Disconnected) => {
-                    glib::ControlFlow::Break
-                }
-            }
-        });
     }
 
     println!("WeztCode corriendo...");

@@ -1,36 +1,58 @@
 pub mod foreign_toplevel;
 pub mod sway_ipc;
 
-use super::WindowGeometry;
-use std::sync::{Arc, Mutex};
+use super::{WindowGeometry, WmEvent, WindowManager};
+use std::sync::{Arc, Mutex, mpsc};
+use std::thread;
 
 pub struct WlrootsWindowManager {
-    // TODO: Agregar campos necesarios
+    sender: Mutex<Option<mpsc::Sender<WmEvent>>>,
 }
 
 impl WlrootsWindowManager {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            sender: Mutex::new(None),
+        }
     }
 }
 
-impl super::WindowManager for WlrootsWindowManager {
+impl WindowManager for WlrootsWindowManager {
+    fn event_receiver(&self) -> mpsc::Receiver<WmEvent> {
+        let (tx, rx) = mpsc::channel();
+        *self.sender.lock().unwrap() = Some(tx);
+        rx
+    }
+
+    fn start_monitoring(&self, target_app_id: String) {
+        let sender = self.sender.lock().unwrap().clone();
+
+        thread::spawn(move || {
+            if let Some(s) = sender {
+                // Start foreign_toplevel monitoring
+                foreign_toplevel::start_focus_monitor(target_app_id.clone(), Box::new(move |focused| {
+                    let event = if focused {
+                        WmEvent::WindowFocused { app_id: target_app_id.clone() }
+                    } else {
+                        WmEvent::WindowUnfocused { app_id: target_app_id.clone() }
+                    };
+                    let _ = s.send(event);
+                }));
+            }
+        });
+    }
+
     fn get_window_geometry(&self, _app_id: &str) -> Option<WindowGeometry> {
-        // TODO: Integrar foreign_toplevel + sway_ipc
+        // TODO: Integrate sway_ipc for geometry
         None
     }
 
-    fn subscribe_geometry_changes(&self, _app_id: &str, _callback: Box<dyn Fn(WindowGeometry) + Send>) -> Result<(), String> {
-        // TODO: Implementar
-        Err("Not implemented".to_string())
-    }
-
     fn is_window_focused(&self, _app_id: &str) -> bool {
-        // TODO: Implementar via foreign_toplevel
+        // TODO: Implement via foreign_toplevel
         false
     }
 
-    fn on_focus_change(&self, app_id: &str, callback: Box<dyn Fn(bool) + Send>) -> Result<(), String> {
-        foreign_toplevel::start_focus_monitor(app_id.to_string(), callback)
+    fn wm_name(&self) -> &'static str {
+        "wlroots (Wayland)"
     }
 }
