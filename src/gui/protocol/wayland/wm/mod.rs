@@ -14,7 +14,7 @@ pub trait WindowManager {
 
     /// Registra un callback para cuando cambia el estado de foco de la ventana
     /// El callback recibe (app_id, is_focused)
-    fn on_focus_change(&self, app_id: &str, callback: Box<dyn Fn(bool) + Send>) -> Result<(), String>;
+    fn on_focus_change(&self, app_id: &str, callback: Box<dyn Fn(bool) + Send + 'static>) -> Result<(), String>;
 }
 
 #[derive(Debug, Clone, Copy)]

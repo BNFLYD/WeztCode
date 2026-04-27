@@ -66,6 +66,7 @@ pub struct WindowInfo {
 struct ToplevelInfo {
     app_id: Option<String>,
     title: Option<String>,
+    is_focused: bool,
 }
 
 struct ToplevelState {
@@ -127,6 +128,7 @@ impl Dispatch<ZwlrForeignToplevelManagerV1, ()> for ToplevelState {
                 state.toplevels.insert(toplevel, ToplevelInfo {
                     app_id: None,
                     title: None,
+                    is_focused: false,
                 });
             }
             _ => {}
@@ -179,7 +181,7 @@ fn parse_state(state_data: &[u8]) -> bool {
 }
 
 /// Inicia monitoreo continuo de cambios de foco para el app_id especificado
-pub fn start_focus_monitor(target_app_id: String, callback: Box<dyn Fn(bool) + Send>) -> Result<(), String> {
+pub fn start_focus_monitor(target_app_id: String, callback: Box<dyn Fn(bool) + Send + 'static>) -> Result<(), String> {
     std::thread::spawn(move || {
         let connection = match Connection::connect_to_env() {
             Ok(c) => c,
@@ -212,11 +214,11 @@ struct FocusMonitorState {
     target_app_id: String,
     toplevel_manager: Option<ZwlrForeignToplevelManagerV1>,
     toplevels: HashMap<ZwlrForeignToplevelHandleV1, ToplevelInfo>,
-    focus_callback: Option<Box<dyn Fn(bool) + Send>>,
+    focus_callback: Option<Box<dyn Fn(bool) + Send + 'static>>,
 }
 
 impl FocusMonitorState {
-    fn new(target_app_id: String, callback: Box<dyn Fn(bool) + Send>) -> Self {
+    fn new(target_app_id: String, callback: Box<dyn Fn(bool) + Send + 'static>) -> Self {
         Self {
             target_app_id,
             toplevel_manager: None,

@@ -4,11 +4,9 @@ mod terminal;
 
 use gui::{GuiPlatform, Gtk4Platform};
 use terminal::{TerminalProtocol, WeztermProtocol};
-use gui::protocol::wayland::wm::WindowManager;
+use gtk4::glib;
 use std::thread;
 use std::time::Duration;
-use std::path::PathBuf;
-use std::fs::read_to_string;
 
 fn start_http_server(port: u16) -> thread::JoinHandle<()> {
     let server = tiny_http::Server::http(format!("127.0.0.1:{}", port)).unwrap();
@@ -104,7 +102,18 @@ fn main() {
 
     // Configurar callback de foco para ocultar/mostrar automáticamente
     if let Some(wm) = wm {
+        // Crear canal para comunicación thread-safe con GTK
+        let (sender, receiver) = glib::MainContext::channel(glib::Priority::DEFAULT);
+
+        // Conectar callback de foco (ejecuta en thread de Wayland)
         if let Err(e) = wm.on_focus_change("weztcode", Box::new(move |focused| {
+            let _ = sender.send(focused);
+        })) {
+            eprintln!("Error al registrar callback de foco: {}", e);
+        }
+
+        // Conectar receptor al main context de GTK (ejecuta en main thread)
+        receiver.attach(None, move |focused| {
             if focused {
                 println!("WezTerm enfocada - mostrando overlay");
                 platform.show();
@@ -112,9 +121,8 @@ fn main() {
                 println!("WezTerm perdió foco - ocultando overlay");
                 platform.hide();
             }
-        })) {
-            eprintln!("Error al registrar callback de foco: {}", e);
-        }
+            glib::ControlFlow::Continue
+        });
     }
 
     println!("WeztCode corriendo...");
