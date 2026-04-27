@@ -82,11 +82,8 @@ fn main() {
     thread::sleep(Duration::from_millis(100));
 
     // Detectar window manager y obtener geometría de la terminal
-    let term_geometry = if let Some(wm) = gui::protocol::wayland::wm::detect_window_manager() {
-        wm.get_window_geometry("weztcode")
-    } else {
-        None
-    };
+    let wm = gui::protocol::wayland::wm::detect_window_manager();
+    let term_geometry = wm.as_ref().and_then(|wm| wm.get_window_geometry("weztcode"));
 
     if let Some(geo) = &term_geometry {
         println!("Geometría de terminal detectada: x={}, y={}, w={}, h={}",
@@ -103,6 +100,21 @@ fn main() {
     if let Err(e) = platform.create_overlay(&frontend_url, term_geometry) {
         eprintln!("Error al crear overlay: {}", e);
         std::process::exit(1);
+    }
+
+    // Configurar callback de foco para ocultar/mostrar automáticamente
+    if let Some(wm) = wm {
+        if let Err(e) = wm.on_focus_change("weztcode", Box::new(move |focused| {
+            if focused {
+                println!("WezTerm enfocada - mostrando overlay");
+                platform.show();
+            } else {
+                println!("WezTerm perdió foco - ocultando overlay");
+                platform.hide();
+            }
+        })) {
+            eprintln!("Error al registrar callback de foco: {}", e);
+        }
     }
 
     println!("WeztCode corriendo...");
