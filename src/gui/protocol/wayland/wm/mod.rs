@@ -2,8 +2,6 @@ pub mod wlroots;
 pub mod detection;
 
 pub use wlroots::WlrootsWindowManager;
-pub use detection::{detect_display_server, detect_wayland_compositor, detect_x11_wm,
-                   DisplayServer, WaylandCompositor, X11WindowManager, get_wm_name};
 
 use std::sync::mpsc;
 

@@ -1,7 +1,6 @@
 // Foreign Toplevel Protocol - Wayland
 // Detecta ventanas y su estado de foco
 
-use super::super::WindowGeometry;
 use wayland_client::{Connection, Dispatch, QueueHandle, protocol::wl_registry};
 use wayland_protocols_wlr::foreign_toplevel::v1::client::{
     zwlr_foreign_toplevel_manager_v1::ZwlrForeignToplevelManagerV1,

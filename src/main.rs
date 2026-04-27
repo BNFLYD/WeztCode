@@ -4,12 +4,9 @@ mod terminal;
 
 use gui::{GuiPlatform, Gtk4Platform};
 use terminal::{TerminalProtocol, WeztermProtocol};
-use gtk4::glib;
 use std::thread;
 use std::time::Duration;
 use std::fs::read_to_string;
-use std::path::PathBuf;
-use std::sync::mpsc;
 
 fn start_http_server(port: u16) -> thread::JoinHandle<()> {
     let server = tiny_http::Server::http(format!("127.0.0.1:{}", port)).unwrap();

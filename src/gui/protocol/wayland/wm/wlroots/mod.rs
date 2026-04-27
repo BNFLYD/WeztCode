@@ -2,7 +2,7 @@ pub mod foreign_toplevel;
 pub mod sway_ipc;
 
 use super::{WindowGeometry, WmEvent, WindowManager};
-use std::sync::{Arc, Mutex, mpsc};
+use std::sync::{Mutex, mpsc};
 use std::thread;
 
 pub struct WlrootsWindowManager {

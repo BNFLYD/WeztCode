@@ -116,22 +116,4 @@ impl Gtk4Platform {
     pub fn run(&self) {
         self.app.run();
     }
-
-    /// Registra un callback para cambios de foco de la terminal
-    /// El callback debe ser thread-safe y será ejecutado desde el thread de Wayland
-    pub fn on_focus_change<F>(&self, callback: F)
-    where
-        F: Fn(bool) + Send + 'static,
-    {
-        let window_ref = self.window.clone();
-        std::thread::spawn(move || {
-            // Use glib main context to schedule GTK operations
-            let main_context = gtk4::glib::MainContext::default();
-            loop {
-                // TODO: Integrate with foreign_toplevel events
-                // For now, this is a placeholder for the callback infrastructure
-                std::thread::sleep(std::time::Duration::from_millis(100));
-            }
-        });
-    }
 }
