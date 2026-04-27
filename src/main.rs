@@ -7,6 +7,9 @@ use terminal::{TerminalProtocol, WeztermProtocol};
 use gtk4::glib;
 use std::thread;
 use std::time::Duration;
+use std::fs::read_to_string;
+use std::path::PathBuf;
+use std::sync::mpsc;
 
 fn start_http_server(port: u16) -> thread::JoinHandle<()> {
     let server = tiny_http::Server::http(format!("127.0.0.1:{}", port)).unwrap();
@@ -103,7 +106,7 @@ fn main() {
     // Configurar callback de foco para ocultar/mostrar automáticamente
     if let Some(wm) = wm {
         // Crear canal para comunicación thread-safe con GTK
-        let (sender, receiver) = glib::MainContext::channel(glib::Priority::DEFAULT);
+        let (sender, receiver) = mpsc::channel::<bool>();
 
         // Conectar callback de foco (ejecuta en thread de Wayland)
         if let Err(e) = wm.on_focus_change("weztcode", Box::new(move |focused| {
@@ -113,15 +116,25 @@ fn main() {
         }
 
         // Conectar receptor al main context de GTK (ejecuta en main thread)
-        receiver.attach(None, move |focused| {
-            if focused {
-                println!("WezTerm enfocada - mostrando overlay");
-                platform.show();
-            } else {
-                println!("WezTerm perdió foco - ocultando overlay");
-                platform.hide();
+        glib::idle_add_local(move || {
+            match receiver.try_recv() {
+                Ok(focused) => {
+                    if focused {
+                        println!("WezTerm enfocada - mostrando overlay");
+                        platform.show();
+                    } else {
+                        println!("WezTerm perdió foco - ocultando overlay");
+                        platform.hide();
+                    }
+                    glib::ControlFlow::Continue
+                }
+                Err(mpsc::TryRecvError::Empty) => {
+                    glib::ControlFlow::Continue
+                }
+                Err(mpsc::TryRecvError::Disconnected) => {
+                    glib::ControlFlow::Break
+                }
             }
-            glib::ControlFlow::Continue
         });
     }
 

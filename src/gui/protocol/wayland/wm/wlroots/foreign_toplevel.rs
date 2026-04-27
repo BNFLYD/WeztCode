@@ -157,12 +157,6 @@ impl Dispatch<ZwlrForeignToplevelHandleV1, ()> for ToplevelState {
                 Event::State { state: state_data } => {
                     // Parse state: activated = 1 (focused)
                     info.is_focused = parse_state(&state_data);
-                    // Trigger callback if this is our target
-                    if info.app_id.as_ref() == Some(&state.target_app_id) {
-                        if let Some(ref cb) = state.focus_callback {
-                            cb(info.is_focused);
-                        }
-                    }
                 }
                 _ => {}
             }
