@@ -262,6 +262,12 @@ impl Dispatch<wl_registry::WlRegistry, ()> for FocusMonitorState {
     }
 }
 
+// Register child object creation for toplevel handles (opcode 0 is "toplevel" event)
+// MUST be defined before the Dispatch impl
+wayland_client::event_created_child!(FocusMonitorState, ZwlrForeignToplevelManagerV1, [
+    0 => (ZwlrForeignToplevelHandleV1, ())
+]);
+
 impl Dispatch<ZwlrForeignToplevelManagerV1, ()> for FocusMonitorState {
     fn event(
         state: &mut Self,
@@ -285,11 +291,6 @@ impl Dispatch<ZwlrForeignToplevelManagerV1, ()> for FocusMonitorState {
         }
     }
 }
-
-// Register child object creation for toplevel handles (opcode 0 is "toplevel" event)
-wayland_client::event_created_child!(FocusMonitorState, ZwlrForeignToplevelManagerV1, [
-    0 => (ZwlrForeignToplevelHandleV1, ())
-]);
 
 impl Dispatch<ZwlrForeignToplevelHandleV1, ()> for FocusMonitorState {
     fn event(
