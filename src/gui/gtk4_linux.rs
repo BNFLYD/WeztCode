@@ -116,4 +116,44 @@ impl Gtk4Platform {
     pub fn run(&self) {
         self.app.run();
     }
+
+    /// Handle WM events and update window visibility accordingly
+    pub fn handle_wm_events(&self, receiver: std::sync::mpsc::Receiver<crate::gui::protocol::wayland::wm::WmEvent>) {
+        use gtk4::glib;
+        use crate::gui::protocol::wayland::wm::WmEvent;
+
+        let window_weak = self.window.clone();
+
+        glib::idle_add_local(move || {
+            match receiver.try_recv() {
+                Ok(WmEvent::WindowFocused { .. }) => {
+                    // Terminal gained focus - hide our overlay
+                    if let Ok(window_ref) = window_weak.try_borrow() {
+                        if let Some(ref window) = *window_ref {
+                            println!("Window focused - hiding overlay");
+                            window.set_visible(false);
+                        }
+                    }
+                }
+                Ok(WmEvent::WindowUnfocused { .. }) => {
+                    // Terminal lost focus - show our overlay
+                    if let Ok(window_ref) = window_weak.try_borrow() {
+                        if let Some(ref window) = *window_ref {
+                            println!("Window unfocused - showing overlay");
+                            window.present();
+                        }
+                    }
+                }
+                Ok(WmEvent::GeometryChanged { geometry, .. }) => {
+                    if let Ok(window_ref) = window_weak.try_borrow() {
+                        if let Some(ref window) = *window_ref {
+                            window.set_default_size(geometry.width as i32, geometry.height as i32);
+                        }
+                    }
+                }
+                _ => {}
+            }
+            glib::ControlFlow::Continue
+        });
+    }
 }

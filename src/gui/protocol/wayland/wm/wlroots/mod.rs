@@ -29,15 +29,8 @@ impl WindowManager for WlrootsWindowManager {
 
         thread::spawn(move || {
             if let Some(s) = sender {
-                // Start foreign_toplevel monitoring
-                foreign_toplevel::start_focus_monitor(target_app_id.clone(), Box::new(move |focused| {
-                    let event = if focused {
-                        WmEvent::WindowFocused { app_id: target_app_id.clone() }
-                    } else {
-                        WmEvent::WindowUnfocused { app_id: target_app_id.clone() }
-                    };
-                    let _ = s.send(event);
-                }));
+                // Start foreign_toplevel monitoring with event channel
+                let _ = foreign_toplevel::start_focus_monitor(target_app_id, s);
             }
         });
     }

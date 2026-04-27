@@ -9,31 +9,10 @@ pub trait GuiPlatform {
     fn is_available() -> bool where Self: Sized;
 
     /// Handle WM events by wiring them to GUI actions
-    /// Default implementation - override if needed for specific platform
-    fn handle_wm_events(&self, receiver: mpsc::Receiver<WmEvent>) {
-        use gtk4::glib;
-
-        glib::idle_add_local(move || {
-            match receiver.try_recv() {
-                Ok(event) => {
-                    match event {
-                        WmEvent::WindowFocused { .. } => {
-                            println!("Window focused - showing overlay");
-                        }
-                        WmEvent::WindowUnfocused { .. } => {
-                            println!("Window unfocused - hiding overlay");
-                        }
-                        WmEvent::GeometryChanged { geometry, .. } => {
-                            println!("Geometry changed: {:?}", geometry);
-                        }
-                        _ => {}
-                    }
-                    glib::ControlFlow::Continue
-                }
-                Err(mpsc::TryRecvError::Empty) => glib::ControlFlow::Continue,
-                Err(mpsc::TryRecvError::Disconnected) => glib::ControlFlow::Break,
-            }
-        });
+    /// Handle WM events - platform-specific implementations should override this
+    fn handle_wm_events(&self, _receiver: mpsc::Receiver<WmEvent>) {
+        // Default implementation does nothing - platforms must implement
+        eprintln!("Warning: handle_wm_events not implemented for this platform");
     }
 }
 

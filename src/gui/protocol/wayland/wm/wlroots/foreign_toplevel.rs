@@ -5,8 +5,11 @@ use wayland_client::{Connection, Dispatch, QueueHandle, protocol::wl_registry};
 use wayland_protocols_wlr::foreign_toplevel::v1::client::{
     zwlr_foreign_toplevel_manager_v1::ZwlrForeignToplevelManagerV1,
     zwlr_foreign_toplevel_handle_v1::ZwlrForeignToplevelHandleV1,
+    zwlr_foreign_toplevel_handle_v1::Event,
 };
 use std::collections::HashMap;
+use std::sync::mpsc;
+use super::super::WmEvent;
 
 pub struct ForeignToplevelDetector {
     connection: Connection,
@@ -174,7 +177,8 @@ fn parse_state(state_data: &[u8]) -> bool {
 }
 
 /// Inicia monitoreo continuo de cambios de foco para el app_id especificado
-pub fn start_focus_monitor(target_app_id: String, callback: Box<dyn Fn(bool) + Send + 'static>) -> Result<(), String> {
+/// Envía eventos WmEvent a través del channel proporcionado
+pub fn start_focus_monitor(target_app_id: String, event_sender: mpsc::Sender<WmEvent>) -> Result<(), String> {
     std::thread::spawn(move || {
         let connection = match Connection::connect_to_env() {
             Ok(c) => c,
@@ -184,7 +188,7 @@ pub fn start_focus_monitor(target_app_id: String, callback: Box<dyn Fn(bool) + S
             }
         };
 
-        let mut state = FocusMonitorState::new(target_app_id, callback);
+        let mut state = FocusMonitorState::new(target_app_id, event_sender);
         let mut event_queue = connection.new_event_queue();
         let qh = event_queue.handle();
 
@@ -205,18 +209,20 @@ pub fn start_focus_monitor(target_app_id: String, callback: Box<dyn Fn(bool) + S
 
 struct FocusMonitorState {
     target_app_id: String,
+    event_sender: mpsc::Sender<WmEvent>,
     toplevel_manager: Option<ZwlrForeignToplevelManagerV1>,
     toplevels: HashMap<ZwlrForeignToplevelHandleV1, ToplevelInfo>,
-    focus_callback: Option<Box<dyn Fn(bool) + Send + 'static>>,
+    target_was_focused: bool,  // Track previous state to detect changes
 }
 
 impl FocusMonitorState {
-    fn new(target_app_id: String, callback: Box<dyn Fn(bool) + Send + 'static>) -> Self {
+    fn new(target_app_id: String, event_sender: mpsc::Sender<WmEvent>) -> Self {
         Self {
             target_app_id,
+            event_sender,
             toplevel_manager: None,
             toplevels: HashMap::new(),
-            focus_callback: Some(callback),
+            target_was_focused: false,
         }
     }
 }
@@ -286,17 +292,40 @@ impl Dispatch<ZwlrForeignToplevelHandleV1, ()> for FocusMonitorState {
                     info.title = Some(title);
                 }
                 Event::State { state: state_data } => {
+                    let was_focused_before = info.is_focused;
                     info.is_focused = parse_state(&state_data);
+
+                    // Check if this is our target window and focus state changed
                     if info.app_id.as_ref() == Some(&state.target_app_id) {
-                        if let Some(ref cb) = state.focus_callback {
-                            cb(info.is_focused);
+                        if info.is_focused && !was_focused_before && !state.target_was_focused {
+                            // Window just gained focus
+                            let _ = state.event_sender.send(
+                                WmEvent::WindowFocused {
+                                    app_id: state.target_app_id.clone()
+                                }
+                            );
+                            state.target_was_focused = true;
+                        } else if !info.is_focused && (was_focused_before || state.target_was_focused) {
+                            // Window just lost focus
+                            let _ = state.event_sender.send(
+                                WmEvent::WindowUnfocused {
+                                    app_id: state.target_app_id.clone()
+                                }
+                            );
+                            state.target_was_focused = false;
                         }
                     }
                 }
                 Event::Closed => {
                     if info.app_id.as_ref() == Some(&state.target_app_id) {
-                        if let Some(ref cb) = state.focus_callback {
-                            cb(false); // Window closed = not focused
+                        if state.target_was_focused {
+                            // Window was focused but now closed
+                            let _ = state.event_sender.send(
+                                WmEvent::WindowUnfocused {
+                                    app_id: state.target_app_id.clone()
+                                }
+                            );
+                            state.target_was_focused = false;
                         }
                     }
                     state.toplevels.remove(handle);
