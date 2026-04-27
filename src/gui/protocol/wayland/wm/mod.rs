@@ -124,19 +124,3 @@ impl WindowGeometry {
         Self { x, y, width, height }
     }
 }
-
-/// Detecta el compositor actual y devuelve el WM apropiado
-pub fn detect_window_manager() -> Option<Box<dyn WindowManager>> {
-    // Por ahora solo soportamos wlroots
-    // En el futuro podemos detectar el compositor via environment variables
-    // o intentar conectar a diferentes protocols
-
-    if let Ok(display) = std::env::var("WAYLAND_DISPLAY") {
-        if !display.is_empty() {
-            // Intentar wlroots
-            return Some(Box::new(WlrootsWindowManager::new()));
-        }
-    }
-
-    None
-}
