@@ -81,7 +81,7 @@ fn main() {
 
     // Detectar window manager y obtener geometría de la terminal
     let wm = gui::protocol::wayland::wm::detect_window_manager();
-    let term_geometry = wm.as_ref().and_then(|wm| wm.get_window_geometry("weztcode"));
+    let term_geometry = wm.as_ref().and_then(|wm| wm.get_window_geometry("weztcode-terminal"));
 
     if let Some(geo) = &term_geometry {
         println!("Geometría de terminal detectada: x={}, y={}, w={}, h={}",
@@ -107,7 +107,7 @@ fn main() {
         platform.handle_wm_events(receiver);
 
         // Iniciar monitoreo de ventana objetivo
-        wm.start_monitoring("weztcode".to_string());
+        wm.start_monitoring("weztcode-terminal".to_string());
     } else {
         println!("No se detectó Window Manager - ejecutando en modo standalone");
     }
