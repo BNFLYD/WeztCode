@@ -162,7 +162,7 @@ impl Gtk4Platform {
                     if let Ok(window_ref) = window_weak.try_borrow() {
                         if let Some(ref window) = *window_ref {
                             println!("[GTK] Resizing window to {}x{}", geometry.width, geometry.height);
-                            window.set_default_size(geometry.width, geometry.height);
+                            window.resize(geometry.width, geometry.height);
                         }
                     }
                 }
