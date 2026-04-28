@@ -112,10 +112,12 @@ impl SwayIpcClient {
                                     if let Ok(payload_str) = String::from_utf8(payload_buf) {
                                         println!("[SwayIPC] Raw event: {}", payload_str.chars().take(200).collect::<String>());
 
+                                        // Try to parse as window event first
                                         if let Ok(event) = serde_json::from_str::<WindowEvent>(&payload_str) {
                                             Self::process_window_event(event, &target_app_id, &sender);
                                         } else {
-                                            eprintln!("[SwayIPC] Failed to parse event JSON");
+                                            // Might be a subscribe response or other message - ignore
+                                            println!("[SwayIPC] Not a window event, skipping");
                                         }
                                     }
                                 }
