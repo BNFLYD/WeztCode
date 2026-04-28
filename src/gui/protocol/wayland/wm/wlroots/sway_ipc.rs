@@ -2,11 +2,13 @@
 // Conecta al socket $SWAYSOCK para obtener geometría en tiempo real
 
 use super::super::{WindowGeometry, WmEvent};
-use std::io::{Read, Write};
+use std::io::{BufRead, BufReader, Read, Write};
+use std::net::UnixStream;
 use std::os::unix::net::UnixStream;
-use std::sync::mpsc::Sender;
+use std::process::{Command, Stdio};
+use std::sync::mpsc::{Sender, Receiver};
 use std::thread;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 pub struct SwayIpcClient {
     socket_path: String,
@@ -67,98 +69,63 @@ impl SwayIpcClient {
     }
 
     /// Inicia un listener en un thread separado para monitorear cambios
-    /// Subscribe to window events and send WmEvent through channel
+    /// Subscribe to window events using swaymsg CLI and send WmEvent through channel
     pub fn subscribe_window_events(
         &self,
         target_app_id: String,
         sender: Sender<WmEvent>,
     ) -> Result<(), String> {
-        let socket_path = self.socket_path.clone();
-
         thread::spawn(move || {
-            let mut stream = match UnixStream::connect(&socket_path) {
-                Ok(s) => s,
+            println!("[SwayIPC] Starting swaymsg subscribe for app_id: {}", target_app_id);
+
+            // Spawn swaymsg process to subscribe to window events
+            let mut child = match Command::new("swaymsg")
+                .args(["-t", "subscribe", "-m", "[\"window\"]"])
+                .stdout(Stdio::piped())
+                .stderr(Stdio::null())
+                .spawn()
+            {
+                Ok(c) => c,
                 Err(e) => {
-                    eprintln!("[SwayIPC] Failed to connect: {}", e);
+                    eprintln!("[SwayIPC] Failed to spawn swaymsg: {}", e);
                     return;
                 }
             };
 
-            // Subscribe to window events (type 2 = SUBSCRIBE)
-            let payload = r#"["window"]"#;
-            if let Err(e) = Self::send_message(&mut stream, 2u32, payload) {
-                eprintln!("[SwayIPC] Failed to subscribe: {}", e);
-                return;
-            }
-
-            println!("[SwayIPC] Subscribed to window events");
-
-            // Read and verify subscription response first
-            let mut header_buf = [0u8; 14];
-            if let Err(e) = stream.read_exact(&mut header_buf) {
-                eprintln!("[SwayIPC] Failed to read subscription response header: {}", e);
-                return;
-            }
-
-            let resp_len = u32::from_ne_bytes([header_buf[10], header_buf[11], header_buf[12], header_buf[13]]) as usize;
-            let mut resp_buf = vec![0u8; resp_len];
-            if let Err(e) = stream.read_exact(&mut resp_buf) {
-                eprintln!("[SwayIPC] Failed to read subscription response payload: {}", e);
-                return;
-            }
-
-            if let Ok(resp_str) = String::from_utf8(resp_buf) {
-                println!("[SwayIPC] Subscription response: {}", resp_str);
-                if !resp_str.contains("success") {
-                    eprintln!("[SwayIPC] Subscription failed: {}", resp_str);
+            let stdout = match child.stdout.take() {
+                Some(s) => s,
+                None => {
+                    eprintln!("[SwayIPC] Failed to get stdout from swaymsg");
                     return;
                 }
-            }
+            };
 
-            println!("[SwayIPC] Subscription confirmed, entering event loop");
+            let reader = BufReader::new(stdout);
+            println!("[SwayIPC] Listening for window events...");
 
-            // Read events loop - Sway IPC uses binary message format
-            let mut stream = stream;
-            let mut header_buf = [0u8; 14]; // 6 magic + 4 type + 4 length
+            // Read events line by line (each line is a JSON event)
+            for line in reader.lines() {
+                match line {
+                    Ok(json_str) => {
+                        if json_str.trim().is_empty() {
+                            continue;
+                        }
 
-            loop {
-                println!("[SwayIPC] Waiting for next event...");
-                // Read header (14 bytes)
-                match stream.read_exact(&mut header_buf) {
-                    Ok(()) => {
-                        // Parse payload length (bytes 10-13, little endian)
-                        let payload_len = u32::from_ne_bytes([header_buf[10], header_buf[11], header_buf[12], header_buf[13]]) as usize;
+                        println!("[SwayIPC] Raw event: {}", json_str.chars().take(200).collect::<String>());
 
-                        if payload_len > 0 && payload_len < 10_000_000 { // Sanity check
-                            let mut payload_buf = vec![0u8; payload_len];
-
-                            match stream.read_exact(&mut payload_buf) {
-                                Ok(()) => {
-                                    if let Ok(payload_str) = String::from_utf8(payload_buf) {
-                                        println!("[SwayIPC] Raw event: {}", payload_str.chars().take(200).collect::<String>());
-
-                                        // Try to parse as window event first
-                                        if let Ok(event) = serde_json::from_str::<WindowEvent>(&payload_str) {
-                                            Self::process_window_event(event, &target_app_id, &sender);
-                                        } else {
-                                            // Might be a subscribe response or other message - ignore
-                                            println!("[SwayIPC] Not a window event, skipping");
-                                        }
-                                    }
-                                }
-                                Err(e) => {
-                                    eprintln!("[SwayIPC] Failed to read payload: {}", e);
-                                    break;
-                                }
-                            }
+                        // Parse and process the event
+                        if let Ok(event) = serde_json::from_str::<WindowEvent>(&json_str) {
+                            Self::process_window_event(event, &target_app_id, &sender);
                         }
                     }
                     Err(e) => {
-                        eprintln!("[SwayIPC] Connection error: {}", e);
+                        eprintln!("[SwayIPC] Error reading line: {}", e);
                         break;
                     }
                 }
             }
+
+            eprintln!("[SwayIPC] Event loop ended, swaymsg exited");
         });
 
         Ok(())
@@ -172,35 +139,38 @@ impl SwayIpcClient {
             return;
         }
 
-        let rect = event.container.rect;
+        // Calculate overlay geometry: rect (global position) + window_rect (internal offset and size)
+        let global_rect = &event.container.rect;
+        let window_rect = &event.container.window_rect;
+
         let geometry = WindowGeometry {
-            x: rect.x,
-            y: rect.y,
-            width: rect.width as i32,
-            height: rect.height as i32,
+            x: global_rect.x + window_rect.x,
+            y: global_rect.y + window_rect.y,
+            width: window_rect.width as u32,
+            height: window_rect.height as u32,
         };
 
+        // Determine event type based on change field and focused status
         match event.change.as_str() {
             "focus" => {
-                println!("[SwayIPC] Target window FOCUSED");
-                let _ = sender.send(WmEvent::WindowFocused {
-                    app_id: target_app_id.to_string(),
-                });
+                if event.container.focused {
+                    println!("[SwayIPC] Target window FOCUSED at {:?}", geometry);
+                    let _ = sender.send(WmEvent::WindowFocused(geometry));
+                }
             }
             "unfocus" => {
                 println!("[SwayIPC] Target window UNFOCUSED");
-                let _ = sender.send(WmEvent::WindowUnfocused {
-                    app_id: target_app_id.to_string(),
-                });
+                let _ = sender.send(WmEvent::WindowUnfocused);
             }
-            "move" | "resize" | "floating" | "tile" => {
-                println!("[SwayIPC] Target window geometry changed: {:?}", geometry);
-                let _ = sender.send(WmEvent::GeometryChanged {
-                    app_id: target_app_id.to_string(),
-                    geometry,
-                });
+            "move" | "resize" | "fullscreen" => {
+                if event.container.focused {
+                    println!("[SwayIPC] Target window GEOMETRY CHANGED: {:?}", geometry);
+                    let _ = sender.send(WmEvent::GeometryChanged(geometry));
+                }
             }
-            _ => {}
+            _ => {
+                // Ignore other changes (title, urgent, etc.)
+            }
         }
     }
 
@@ -270,7 +240,9 @@ struct WindowEventContainer {
     id: i64,
     app_id: Option<String>,
     name: Option<String>,
+    focused: bool,
     rect: Rect,
+    window_rect: Rect,
 }
 
 #[derive(Debug, Deserialize)]
