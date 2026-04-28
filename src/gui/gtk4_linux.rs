@@ -173,6 +173,9 @@ impl Gtk4Platform {
                     println!("[GTK] ERROR: Channel disconnected!");
                     return glib::ControlFlow::Break;
                 }
+                _ => {
+                    // Ignore other events (WindowCreated, WindowDestroyed, etc.)
+                }
             }
             glib::ControlFlow::Continue
         });
