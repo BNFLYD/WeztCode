@@ -126,32 +126,53 @@ impl Gtk4Platform {
 
         glib::idle_add_local(move || {
             match receiver.try_recv() {
-                Ok(WmEvent::WindowFocused { .. }) => {
-                    // Terminal gained focus - hide our overlay
+                Ok(WmEvent::WindowFocused { app_id }) => {
+                    // Terminal gained focus - SHOW overlay
+                    println!("[GTK] WindowFocused event received for {}", app_id);
                     if let Ok(window_ref) = window_weak.try_borrow() {
                         if let Some(ref window) = *window_ref {
-                            println!("Window focused - hiding overlay");
-                            window.set_visible(false);
-                        }
-                    }
-                }
-                Ok(WmEvent::WindowUnfocused { .. }) => {
-                    // Terminal lost focus - show our overlay
-                    if let Ok(window_ref) = window_weak.try_borrow() {
-                        if let Some(ref window) = *window_ref {
-                            println!("Window unfocused - showing overlay");
+                            println!("[GTK] Setting visible=true and presenting");
+                            window.set_visible(true);
                             window.present();
+                            println!("[GTK] Overlay should be visible now");
+                        } else {
+                            println!("[GTK] ERROR: Window is None");
                         }
+                    } else {
+                        println!("[GTK] ERROR: Failed to borrow window");
                     }
                 }
-                Ok(WmEvent::GeometryChanged { geometry, .. }) => {
+                Ok(WmEvent::WindowUnfocused { app_id }) => {
+                    // Terminal lost focus - HIDE overlay
+                    println!("[GTK] WindowUnfocused event received for {}", app_id);
                     if let Ok(window_ref) = window_weak.try_borrow() {
                         if let Some(ref window) = *window_ref {
-                            window.set_default_size(geometry.width as i32, geometry.height as i32);
+                            println!("[GTK] Setting visible=false");
+                            window.set_visible(false);
+                            println!("[GTK] Overlay should be hidden now");
+                        } else {
+                            println!("[GTK] ERROR: Window is None");
+                        }
+                    } else {
+                        println!("[GTK] ERROR: Failed to borrow window");
+                    }
+                }
+                Ok(WmEvent::GeometryChanged { app_id, geometry }) => {
+                    println!("[GTK] GeometryChanged for {}: {:?}", app_id, geometry);
+                    if let Ok(window_ref) = window_weak.try_borrow() {
+                        if let Some(ref window) = *window_ref {
+                            println!("[GTK] Resizing window to {}x{}", geometry.width, geometry.height);
+                            window.set_default_size(geometry.width, geometry.height);
                         }
                     }
                 }
-                _ => {}
+                Err(std::sync::mpsc::TryRecvError::Empty) => {
+                    // No events, this is normal
+                }
+                Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                    println!("[GTK] ERROR: Channel disconnected!");
+                    return glib::ControlFlow::Break;
+                }
             }
             glib::ControlFlow::Continue
         });
