@@ -2,7 +2,7 @@
 // Conecta al socket $SWAYSOCK para obtener geometría en tiempo real
 
 use super::super::{WindowGeometry, WmEvent};
-use std::io::{BufRead, BufReader, Read, Write};
+use std::io::{Read, Write};
 use std::os::unix::net::UnixStream;
 use std::sync::mpsc::Sender;
 use std::thread;
@@ -93,24 +93,41 @@ impl SwayIpcClient {
 
             println!("[SwayIPC] Subscribed to window events");
 
-            // Read events loop
-            let mut reader = BufReader::new(stream);
-            let mut buffer = String::new();
+            // Read events loop - Sway IPC uses binary message format
+            let mut stream = stream;
+            let mut header_buf = [0u8; 14]; // 6 magic + 4 type + 4 length
 
             loop {
-                buffer.clear();
-                match reader.read_line(&mut buffer) {
-                    Ok(0) => {
-                        println!("[SwayIPC] Connection closed");
-                        break;
-                    }
-                    Ok(_) => {
-                        if let Ok(event) = serde_json::from_str::<WindowEvent>(&buffer) {
-                            Self::process_window_event(event, &target_app_id, &sender);
+                // Read header (14 bytes)
+                match stream.read_exact(&mut header_buf) {
+                    Ok(()) => {
+                        // Parse payload length (bytes 10-13, little endian)
+                        let payload_len = u32::from_ne_bytes([header_buf[10], header_buf[11], header_buf[12], header_buf[13]]) as usize;
+
+                        if payload_len > 0 && payload_len < 10_000_000 { // Sanity check
+                            let mut payload_buf = vec![0u8; payload_len];
+
+                            match stream.read_exact(&mut payload_buf) {
+                                Ok(()) => {
+                                    if let Ok(payload_str) = String::from_utf8(payload_buf) {
+                                        println!("[SwayIPC] Raw event: {}", payload_str.chars().take(200).collect::<String>());
+
+                                        if let Ok(event) = serde_json::from_str::<WindowEvent>(&payload_str) {
+                                            Self::process_window_event(event, &target_app_id, &sender);
+                                        } else {
+                                            eprintln!("[SwayIPC] Failed to parse event JSON");
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    eprintln!("[SwayIPC] Failed to read payload: {}", e);
+                                    break;
+                                }
+                            }
                         }
                     }
                     Err(e) => {
-                        eprintln!("[SwayIPC] Read error: {}", e);
+                        eprintln!("[SwayIPC] Connection error: {}", e);
                         break;
                     }
                 }
