@@ -1,8 +1,8 @@
 // Sway IPC Socket Client
 // Conecta al socket $SWAYSOCK para obtener geometría en tiempo real
 
-use super::super::WindowGeometry;
-use std::io::{Read, Write};
+use super::super::{WindowGeometry, WmEvent};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::os::unix::net::UnixStream;
 use std::sync::mpsc::Sender;
 use std::thread;
@@ -66,6 +66,113 @@ impl SwayIpcClient {
         Ok(handle)
     }
 
+    /// Inicia un listener en un thread separado para monitorear cambios
+    /// Subscribe to window events and send WmEvent through channel
+    pub fn subscribe_window_events(
+        &self,
+        target_app_id: String,
+        sender: Sender<WmEvent>,
+    ) -> Result<(), String> {
+        let socket_path = self.socket_path.clone();
+
+        thread::spawn(move || {
+            let mut stream = match UnixStream::connect(&socket_path) {
+                Ok(s) => s,
+                Err(e) => {
+                    eprintln!("[SwayIPC] Failed to connect: {}", e);
+                    return;
+                }
+            };
+
+            // Subscribe to window events (type 2 = SUBSCRIBE)
+            let payload = r#"["window"]"#;
+            if let Err(e) = Self::send_message(&mut stream, 2u32, payload) {
+                eprintln!("[SwayIPC] Failed to subscribe: {}", e);
+                return;
+            }
+
+            println!("[SwayIPC] Subscribed to window events");
+
+            // Read events loop
+            let mut reader = BufReader::new(stream);
+            let mut buffer = String::new();
+
+            loop {
+                buffer.clear();
+                match reader.read_line(&mut buffer) {
+                    Ok(0) => {
+                        println!("[SwayIPC] Connection closed");
+                        break;
+                    }
+                    Ok(_) => {
+                        if let Ok(event) = serde_json::from_str::<WindowEvent>(&buffer) {
+                            Self::process_window_event(event, &target_app_id, &sender);
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("[SwayIPC] Read error: {}", e);
+                        break;
+                    }
+                }
+            }
+        });
+
+        Ok(())
+    }
+
+    fn process_window_event(event: WindowEvent, target_app_id: &str, sender: &Sender<WmEvent>) {
+        let app_id = event.container.app_id.as_deref().unwrap_or("");
+
+        // Only process events for our target window
+        if app_id != target_app_id {
+            return;
+        }
+
+        let rect = event.container.rect;
+        let geometry = WindowGeometry {
+            x: rect.x,
+            y: rect.y,
+            width: rect.width as i32,
+            height: rect.height as i32,
+        };
+
+        match event.change.as_str() {
+            "focus" => {
+                println!("[SwayIPC] Target window FOCUSED");
+                let _ = sender.send(WmEvent::WindowFocused {
+                    app_id: target_app_id.to_string(),
+                });
+            }
+            "unfocus" => {
+                println!("[SwayIPC] Target window UNFOCUSED");
+                let _ = sender.send(WmEvent::WindowUnfocused {
+                    app_id: target_app_id.to_string(),
+                });
+            }
+            "move" | "resize" | "floating" | "tile" => {
+                println!("[SwayIPC] Target window geometry changed: {:?}", geometry);
+                let _ = sender.send(WmEvent::GeometryChanged {
+                    app_id: target_app_id.to_string(),
+                    geometry,
+                });
+            }
+            _ => {}
+        }
+    }
+
+    fn send_message(stream: &mut UnixStream, msg_type: u32, payload: &str) -> Result<(), String> {
+        let magic = b"i3-ipc";
+        let payload_bytes = payload.as_bytes();
+
+        stream.write_all(magic).map_err(|e| e.to_string())?;
+        stream.write_all(&msg_type.to_ne_bytes()).map_err(|e| e.to_string())?;
+        stream.write_all(&(payload_bytes.len() as u32).to_ne_bytes()).map_err(|e| e.to_string())?;
+        stream.write_all(payload_bytes).map_err(|e| e.to_string())?;
+        stream.flush().map_err(|e| e.to_string())?;
+
+        Ok(())
+    }
+
     /// Ejecuta un comando IPC y devuelve la respuesta
     fn run_command(&self, command: &str) -> Result<IpcResponse, String> {
         let mut stream = UnixStream::connect(&self.socket_path)
@@ -104,6 +211,22 @@ impl SwayIpcClient {
         serde_json::from_str(&response.payload)
             .map_err(|e| format!("Failed to parse tree JSON: {}", e))
     }
+}
+
+/// Window event from Sway IPC subscription
+#[derive(Debug, Deserialize)]
+struct WindowEvent {
+    change: String,
+    container: WindowEventContainer,
+}
+
+/// Container data in window event
+#[derive(Debug, Deserialize)]
+struct WindowEventContainer {
+    id: i64,
+    app_id: Option<String>,
+    name: Option<String>,
+    rect: Rect,
 }
 
 #[derive(Debug, Deserialize)]

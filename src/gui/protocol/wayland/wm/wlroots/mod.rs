@@ -29,8 +29,10 @@ impl WindowManager for WlrootsWindowManager {
 
         thread::spawn(move || {
             if let Some(s) = sender {
-                // Start foreign_toplevel monitoring with event channel
-                let _ = foreign_toplevel::start_focus_monitor(target_app_id, s);
+                // Start Sway IPC monitoring for focus and geometry events
+                if let Ok(client) = sway_ipc::SwayIpcClient::new() {
+                    let _ = client.subscribe_window_events(target_app_id, s);
+                }
             }
         });
     }
