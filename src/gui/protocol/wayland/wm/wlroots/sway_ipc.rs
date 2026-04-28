@@ -3,12 +3,11 @@
 
 use super::super::{WindowGeometry, WmEvent};
 use std::io::{BufRead, BufReader, Read, Write};
-use std::net::UnixStream;
 use std::os::unix::net::UnixStream;
 use std::process::{Command, Stdio};
-use std::sync::mpsc::{Sender, Receiver};
+use std::sync::mpsc::Sender;
 use std::thread;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 pub struct SwayIpcClient {
     socket_path: String,
@@ -146,26 +145,30 @@ impl SwayIpcClient {
         let geometry = WindowGeometry {
             x: global_rect.x + window_rect.x,
             y: global_rect.y + window_rect.y,
-            width: window_rect.width as u32,
-            height: window_rect.height as u32,
+            width: window_rect.width,
+            height: window_rect.height,
         };
+
+        // Get app_id for event
+        let event_app_id = event.container.app_id.clone().unwrap_or_default();
 
         // Determine event type based on change field and focused status
         match event.change.as_str() {
             "focus" => {
                 if event.container.focused {
                     println!("[SwayIPC] Target window FOCUSED at {:?}", geometry);
-                    let _ = sender.send(WmEvent::WindowFocused(geometry));
+                    let _ = sender.send(WmEvent::WindowFocused { app_id: event_app_id });
+                    let _ = sender.send(WmEvent::GeometryChanged { app_id: target_app_id.to_string(), geometry });
                 }
             }
             "unfocus" => {
                 println!("[SwayIPC] Target window UNFOCUSED");
-                let _ = sender.send(WmEvent::WindowUnfocused);
+                let _ = sender.send(WmEvent::WindowUnfocused { app_id: event_app_id });
             }
             "move" | "resize" | "fullscreen" => {
                 if event.container.focused {
                     println!("[SwayIPC] Target window GEOMETRY CHANGED: {:?}", geometry);
-                    let _ = sender.send(WmEvent::GeometryChanged(geometry));
+                    let _ = sender.send(WmEvent::GeometryChanged { app_id: target_app_id.to_string(), geometry });
                 }
             }
             _ => {
