@@ -98,6 +98,7 @@ impl SwayIpcClient {
             let mut header_buf = [0u8; 14]; // 6 magic + 4 type + 4 length
 
             loop {
+                println!("[SwayIPC] Waiting for next event...");
                 // Read header (14 bytes)
                 match stream.read_exact(&mut header_buf) {
                     Ok(()) => {
