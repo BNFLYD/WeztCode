@@ -93,6 +93,30 @@ impl SwayIpcClient {
 
             println!("[SwayIPC] Subscribed to window events");
 
+            // Read and verify subscription response first
+            let mut header_buf = [0u8; 14];
+            if let Err(e) = stream.read_exact(&mut header_buf) {
+                eprintln!("[SwayIPC] Failed to read subscription response header: {}", e);
+                return;
+            }
+
+            let resp_len = u32::from_ne_bytes([header_buf[10], header_buf[11], header_buf[12], header_buf[13]]) as usize;
+            let mut resp_buf = vec![0u8; resp_len];
+            if let Err(e) = stream.read_exact(&mut resp_buf) {
+                eprintln!("[SwayIPC] Failed to read subscription response payload: {}", e);
+                return;
+            }
+
+            if let Ok(resp_str) = String::from_utf8(resp_buf) {
+                println!("[SwayIPC] Subscription response: {}", resp_str);
+                if !resp_str.contains("success") {
+                    eprintln!("[SwayIPC] Subscription failed: {}", resp_str);
+                    return;
+                }
+            }
+
+            println!("[SwayIPC] Subscription confirmed, entering event loop");
+
             // Read events loop - Sway IPC uses binary message format
             let mut stream = stream;
             let mut header_buf = [0u8; 14]; // 6 magic + 4 type + 4 length
