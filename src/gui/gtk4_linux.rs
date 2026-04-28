@@ -161,8 +161,8 @@ impl Gtk4Platform {
                     println!("[GTK] GeometryChanged for {}: {:?}", app_id, geometry);
                     if let Ok(window_ref) = window_weak.try_borrow() {
                         if let Some(ref window) = *window_ref {
-                            // Calculate proportional width: 30% of terminal width, min 350px
-                            let overlay_width = ((geometry.width as f32) * 0.30).max(350.0) as i32;
+                            // Calculate proportional width: 25% of terminal width, min 350px
+                            let overlay_width = ((geometry.width as f32) * 0.25).max(350.0) as i32;
                             let overlay_height = geometry.height;
                             println!("[GTK] Setting size request: {}x{} (terminal was {}x{})",
                                      overlay_width, overlay_height, geometry.width, geometry.height);
