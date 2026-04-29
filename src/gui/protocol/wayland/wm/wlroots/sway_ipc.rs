@@ -5,7 +5,7 @@ use super::super::{WindowGeometry, WmEvent};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::os::unix::net::UnixStream;
 use std::process::{Command, Stdio};
-use std::sync::mpsc::Sender;
+use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 use serde::Deserialize;
