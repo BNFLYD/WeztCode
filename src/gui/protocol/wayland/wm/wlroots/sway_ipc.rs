@@ -102,6 +102,9 @@ impl SwayIpcClient {
             let reader = BufReader::new(stdout);
             println!("[SwayIPC] Listening for window events...");
 
+            // Track our target window's toplevel identifier
+            let mut target_toplevel_id: Option<String> = None;
+
             // Read events line by line (each line is a JSON event)
             for line in reader.lines() {
                 match line {
@@ -110,11 +113,22 @@ impl SwayIpcClient {
                             continue;
                         }
 
-                        println!("[SwayIPC] Raw event: {}", json_str.chars().take(200).collect::<String>());
-
                         // Parse and process the event
                         if let Ok(event) = serde_json::from_str::<WindowEvent>(&json_str) {
-                            Self::process_window_event(event, &target_app_id, &sender);
+                            // Capture toplevel_id when we first see our target app
+                            if target_toplevel_id.is_none() {
+                                if let Some(ref app_id) = event.container.app_id {
+                                    if app_id == &target_app_id {
+                                        if let Some(ref toplevel_id) = event.container.foreign_toplevel_identifier {
+                                            target_toplevel_id = Some(toplevel_id.clone());
+                                            println!("[SwayIPC] Captured target toplevel_id: {}", toplevel_id);
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Process all events through the event-driven logic
+                            Self::fainting_trigger(event, &target_app_id, target_toplevel_id.as_ref(), &sender);
                         }
                     }
                     Err(e) => {
@@ -175,6 +189,107 @@ impl SwayIpcClient {
                 // Ignore other changes (title, urgent, etc.)
             }
         }
+    }
+
+    /// Process window events using foreign_toplevel_identifier for precise tracking
+    fn fainting_trigger(
+        event: WindowEvent,
+        target_app_id: &str,
+        target_toplevel_id: Option<&String>,
+        sender: &Sender<WmEvent>,
+    ) {
+        let event_toplevel_id = event.container.foreign_toplevel_identifier.as_deref();
+        let app_id = event.container.app_id.as_deref().unwrap_or("");
+
+        // Calculate geometry for our window (in case we need it)
+        let global_rect = &event.container.rect;
+        let window_rect = &event.container.window_rect;
+        let geometry = WindowGeometry {
+            x: global_rect.x + window_rect.x,
+            y: global_rect.y + window_rect.y,
+            width: window_rect.width,
+            height: window_rect.height,
+        };
+
+        // Check if this event is from our target window
+        let is_our_window = target_toplevel_id.is_some()
+            && event_toplevel_id == target_toplevel_id.as_deref();
+
+        if is_our_window {
+            // Our window event - process normally
+            match event.change.as_str() {
+                "focus" => {
+                    if event.container.focused {
+                        println!("[SwayIPC] Target window FOCUSED (toplevel match)");
+                        let _ = sender.send(WmEvent::WindowFocused {
+                            app_id: target_app_id.to_string()
+                        });
+                        let _ = sender.send(WmEvent::GeometryChanged {
+                            app_id: target_app_id.to_string(),
+                            geometry
+                        });
+                    }
+                }
+                "move" | "resize" | "fullscreen" => {
+                    if event.container.focused {
+                        println!("[SwayIPC] Target window GEOMETRY CHANGED (toplevel match)");
+                        let _ = sender.send(WmEvent::GeometryChanged {
+                            app_id: target_app_id.to_string(),
+                            geometry
+                        });
+                    }
+                }
+                _ => {
+                    // Other changes - ignore
+                }
+            }
+        } else if event.change.as_str() == "focus" && event.container.focused {
+            // Another window gained focus - check if our window is still visible
+            println!("[SwayIPC] Another window focused, checking our visibility...");
+
+            // Query sway for current tree to check our window's visibility
+            if let Some(toplevel_id) = target_toplevel_id {
+                if let Ok(client) = Self::new() {
+                    if let Some((visible, is_focused)) = client.get_window_visibility_by_toplevel(toplevel_id) {
+                        if visible {
+                            if is_focused {
+                                println!("[SwayIPC] Our window is visible and focused - keeping overlay visible");
+                                let _ = sender.send(WmEvent::WindowFocused {
+                                    app_id: target_app_id.to_string()
+                                });
+                            } else {
+                                println!("[SwayIPC] Our window is visible but not focused - keeping overlay visible (side-by-side)");
+                                // In side-by-side mode, keep overlay visible even without focus
+                                let _ = sender.send(WmEvent::WindowFocused {
+                                    app_id: target_app_id.to_string()
+                                });
+                            }
+                        } else {
+                            println!("[SwayIPC] Our window is not visible - hiding overlay");
+                            let _ = sender.send(WmEvent::WindowUnfocused {
+                                app_id: target_app_id.to_string()
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Get window visibility and focus status by toplevel identifier
+    fn get_window_visibility_by_toplevel(&self, target_toplevel_id: &str) -> Option<(bool, bool)> {
+        let tree = self.get_tree().ok()?;
+
+        // Search through all nodes for matching toplevel_id
+        for node in tree.nodes.iter().flat_map(|n| flatten_nodes(n)) {
+            if let Some(ref toplevel_id) = node.foreign_toplevel_identifier {
+                if toplevel_id == target_toplevel_id {
+                    return Some((node.visible, node.focused));
+                }
+            }
+        }
+
+        None
     }
 
     fn send_message(stream: &mut UnixStream, msg_type: u32, payload: &str) -> Result<(), String> {
@@ -242,8 +357,10 @@ struct WindowEvent {
 struct WindowEventContainer {
     id: i64,
     app_id: Option<String>,
+    foreign_toplevel_identifier: Option<String>,
     name: Option<String>,
     focused: bool,
+    visible: bool,
     rect: Rect,
     window_rect: Rect,
 }
@@ -260,8 +377,11 @@ struct Node {
     name: Option<String>,
     node_type: Option<String>,
     app_id: Option<String>,
+    foreign_toplevel_identifier: Option<String>,
     rect: Option<Rect>,
     nodes: Vec<Node>,
+    focused: bool,
+    visible: bool,
 }
 
 #[derive(Debug, Deserialize, Clone, Copy)]
