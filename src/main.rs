@@ -4,6 +4,7 @@ mod terminal;
 
 use gui::{GuiPlatform, Gtk4Platform};
 use terminal::{TerminalProtocol, WeztermProtocol};
+use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 use std::fs::read_to_string;
@@ -58,6 +59,9 @@ fn main() {
         std::process::exit(1);
     }
 
+    // Create signal channel for toplevel_id capture
+    let (capture_signal_tx, capture_signal_rx) = mpsc::channel::<()>();
+
     let term = WeztermProtocol::new();
     let class = config::WINDOW_CLASS;
 
@@ -71,6 +75,10 @@ fn main() {
     }
 
     thread::sleep(Duration::from_millis(1200));
+
+    // Send signal to start toplevel_id capture now that terminal is ready
+    println!("[Main] Sending capture signal to WM thread...");
+    let _ = capture_signal_tx.send(());
 
     // Iniciar servidor HTTP
     let http_port = 8765;
@@ -99,6 +107,9 @@ fn main() {
     // Configurar window manager si está disponible
     if let Some(wm) = wm {
         println!("Window Manager detectado: {}", wm.wm_name());
+
+        // Set capture signal channel for toplevel_id capture
+        wm.set_capture_signal(capture_signal_rx);
 
         // Obtener receptor de eventos del WM
         let receiver = wm.event_receiver();

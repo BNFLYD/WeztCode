@@ -32,6 +32,10 @@ pub trait WindowManager: Send + 'static {
     /// Events will be sent to the receiver returned by event_receiver()
     fn start_monitoring(&self, target_app_id: String);
 
+    /// Set signal receiver to trigger toplevel_id capture
+    /// This is called after the target window is known to be ready
+    fn set_capture_signal(&self, _signal_rx: mpsc::Receiver<()>);
+
     /// Synchronous query - current geometry
     fn get_window_geometry(&self, app_id: &str) -> Option<WindowGeometry>;
 

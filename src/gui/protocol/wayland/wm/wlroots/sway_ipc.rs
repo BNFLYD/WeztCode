@@ -70,10 +70,13 @@ impl SwayIpcClient {
 
     /// Inicia un listener en un thread separado para monitorear cambios
     /// Subscribe to window events using swaymsg CLI and send WmEvent through channel
+    ///
+    /// capture_signal_rx: Channel receiver that triggers toplevel_id capture
     pub fn subscribe_window_events(
         &self,
         target_app_id: String,
         sender: Sender<WmEvent>,
+        capture_signal_rx: mpsc::Receiver<()>,
     ) -> Result<(), String> {
         thread::spawn(move || {
             println!("[SwayIPC] Starting swaymsg subscribe for app_id: {}", target_app_id);
@@ -102,13 +105,25 @@ impl SwayIpcClient {
 
             let reader = BufReader::new(stdout);
             println!("[SwayIPC] Listening for window events...");
+            println!("[SwayIPC] Waiting for capture signal before attempting toplevel_id capture...");
 
-            // Capture target toplevel_id immediately at startup using swaymsg CLI
-            let target_toplevel_id = Self::capture_target_toplevel_id(&target_app_id);
+            // Wait for signal to start capture
+            match capture_signal_rx.recv() {
+                Ok(_) => println!("[SwayIPC] Capture signal received, attempting toplevel_id capture..."),
+                Err(e) => {
+                    eprintln!("[SwayIPC] Capture signal channel closed: {}", e);
+                    return;
+                }
+            }
+
+            // HYBRID CAPTURE: First try tree, then fall back to event capture
+            let mut target_toplevel_id = Self::capture_target_toplevel_id(&target_app_id);
+
             if let Some(ref id) = target_toplevel_id {
-                println!("[SwayIPC] Captured target toplevel_id at startup: {}", id);
+                println!("[SwayIPC] Tree capture SUCCESS: toplevel_id={}", id);
             } else {
-                println!("[SwayIPC] WARNING: Could not capture target toplevel_id at startup");
+                println!("[SwayIPC] Tree capture FAILED, falling back to event capture...");
+                println!("[SwayIPC] Will capture toplevel_id from first window event with app_id={}", target_app_id);
             }
 
             // Read events line by line (each line is a JSON event)
@@ -121,9 +136,24 @@ impl SwayIpcClient {
 
                         // Parse and process the event
                         if let Ok(event) = serde_json::from_str::<WindowEvent>(&json_str) {
-                            // Process all events through the event-driven logic
-                            // target_toplevel_id was already captured at startup
-                            Self::fainting_trigger(event, &target_app_id, target_toplevel_id.as_ref(), &sender);
+                            // Lazy capture: if we don't have toplevel_id yet, try to capture from this event
+                            if target_toplevel_id.is_none() {
+                                if let Some(ref app_id) = event.container.app_id {
+                                    if app_id == &target_app_id {
+                                        if let Some(ref toplevel_id) = event.container.foreign_toplevel_identifier {
+                                            target_toplevel_id = Some(toplevel_id.clone());
+                                            println!("[SwayIPC] Event capture SUCCESS: toplevel_id={} from first window event", toplevel_id);
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Process event if we have a toplevel_id (either from tree or event capture)
+                            if let Some(ref id) = target_toplevel_id {
+                                Self::fainting_trigger(event, &target_app_id, Some(id), &sender);
+                            } else {
+                                println!("[SwayIPC] Still waiting for toplevel_id capture, skipping event...");
+                            }
                         }
                     }
                     Err(e) => {
