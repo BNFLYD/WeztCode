@@ -102,8 +102,13 @@ impl SwayIpcClient {
             let reader = BufReader::new(stdout);
             println!("[SwayIPC] Listening for window events...");
 
-            // Track our target window's toplevel identifier
-            let mut target_toplevel_id: Option<String> = None;
+            // Capture target toplevel_id immediately at startup using swaymsg CLI
+            let target_toplevel_id = Self::capture_target_toplevel_id(&target_app_id);
+            if let Some(ref id) = target_toplevel_id {
+                println!("[SwayIPC] Captured target toplevel_id at startup: {}", id);
+            } else {
+                println!("[SwayIPC] WARNING: Could not capture target toplevel_id at startup");
+            }
 
             // Read events line by line (each line is a JSON event)
             for line in reader.lines() {
@@ -115,19 +120,8 @@ impl SwayIpcClient {
 
                         // Parse and process the event
                         if let Ok(event) = serde_json::from_str::<WindowEvent>(&json_str) {
-                            // Capture toplevel_id when we first see our target app
-                            if target_toplevel_id.is_none() {
-                                if let Some(ref app_id) = event.container.app_id {
-                                    if app_id == &target_app_id {
-                                        if let Some(ref toplevel_id) = event.container.foreign_toplevel_identifier {
-                                            target_toplevel_id = Some(toplevel_id.clone());
-                                            println!("[SwayIPC] Captured target toplevel_id: {}", toplevel_id);
-                                        }
-                                    }
-                                }
-                            }
-
                             // Process all events through the event-driven logic
+                            // target_toplevel_id was already captured at startup
                             Self::fainting_trigger(event, &target_app_id, target_toplevel_id.as_ref(), &sender);
                         }
                     }
@@ -142,6 +136,39 @@ impl SwayIpcClient {
         });
 
         Ok(())
+    }
+
+    /// Capture the foreign_toplevel_identifier of our target window at startup
+    fn capture_target_toplevel_id(target_app_id: &str) -> Option<String> {
+        println!("[SwayIPC] Capturing toplevel_id for app_id: {}", target_app_id);
+
+        let output = Command::new("swaymsg")
+            .args(["-t", "get_tree"])
+            .output()
+            .ok()?;
+
+        if !output.status.success() {
+            println!("[SwayIPC] swaymsg get_tree failed");
+            return None;
+        }
+
+        let tree_json = String::from_utf8(output.stdout).ok()?;
+        let tree: Node = serde_json::from_str(&tree_json).ok()?;
+
+        // Search through all nodes for matching app_id
+        for node in tree.nodes.iter().flat_map(|n| flatten_nodes(n)) {
+            if let Some(ref app_id) = node.app_id {
+                if app_id == target_app_id {
+                    if let Some(ref toplevel_id) = node.foreign_toplevel_identifier {
+                        println!("[SwayIPC] Found toplevel_id: {} for app_id: {}", toplevel_id, target_app_id);
+                        return Some(toplevel_id.clone());
+                    }
+                }
+            }
+        }
+
+        println!("[SwayIPC] Could not find window with app_id: {}", target_app_id);
+        None
     }
 
     fn process_window_event(event: WindowEvent, target_app_id: &str, sender: &Sender<WmEvent>) {
@@ -259,22 +286,14 @@ impl SwayIpcClient {
                         println!("[SwayIPC] SwayIpcClient created successfully");
 
                         match client.get_window_visibility_by_toplevel(toplevel_id) {
-                            Some((visible, is_focused)) => {
-                                println!("[SwayIPC] Query result: visible={}, focused={}", visible, is_focused);
+                            Some(visible) => {
+                                println!("[SwayIPC] Query result: visible={}", visible);
 
                                 if visible {
-                                    if is_focused {
-                                        println!("[SwayIPC] Our window is visible and focused - keeping overlay visible");
-                                        let _ = sender.send(WmEvent::WindowFocused {
-                                            app_id: target_app_id.to_string()
-                                        });
-                                    } else {
-                                        println!("[SwayIPC] Our window is visible but not focused - keeping overlay visible (side-by-side)");
-                                        // In side-by-side mode, keep overlay visible even without focus
-                                        let _ = sender.send(WmEvent::WindowFocused {
-                                            app_id: target_app_id.to_string()
-                                        });
-                                    }
+                                    println!("[SwayIPC] Our window is visible - keeping overlay visible");
+                                    let _ = sender.send(WmEvent::WindowFocused {
+                                        app_id: target_app_id.to_string()
+                                    });
                                 } else {
                                     println!("[SwayIPC] Our window is not visible - hiding overlay");
                                     let _ = sender.send(WmEvent::WindowUnfocused {
@@ -299,28 +318,23 @@ impl SwayIpcClient {
         }
     }
 
-    /// Get window visibility and focus status by toplevel identifier
-    fn get_window_visibility_by_toplevel(&self, target_toplevel_id: &str) -> Option<(bool, bool)> {
+    /// Get window visibility by toplevel identifier (returns only visible status)
+    fn get_window_visibility_by_toplevel(&self, target_toplevel_id: &str) -> Option<bool> {
         println!("[SwayIPC] get_window_visibility_by_toplevel called for: {}", target_toplevel_id);
 
         let tree = self.get_tree().ok()?;
-        println!("[SwayIPC] Got tree with {} root nodes", tree.nodes.len());
 
         // Search through all nodes for matching toplevel_id
-        let all_nodes: Vec<_> = tree.nodes.iter().flat_map(|n| flatten_nodes(n)).collect();
-        println!("[SwayIPC] Flattened {} total nodes", all_nodes.len());
-
-        for node in all_nodes {
+        for node in tree.nodes.iter().flat_map(|n| flatten_nodes(n)) {
             if let Some(ref toplevel_id) = node.foreign_toplevel_identifier {
-                println!("[SwayIPC] Checking node with toplevel_id: {}", toplevel_id);
                 if toplevel_id == target_toplevel_id {
-                    println!("[SwayIPC] MATCH FOUND! visible={}, focused={}", node.visible, node.focused);
-                    return Some((node.visible, node.focused));
+                    println!("[SwayIPC] Window found - visible={}", node.visible);
+                    return Some(node.visible);
                 }
             }
         }
 
-        println!("[SwayIPC] No match found for toplevel_id: {}", target_toplevel_id);
+        println!("[SwayIPC] Window with toplevel_id {} not found in tree", target_toplevel_id);
         None
     }
 
@@ -370,30 +384,21 @@ impl SwayIpcClient {
         })
     }
 
+    /// Get the full window tree using swaymsg CLI
     fn get_tree(&self) -> Result<Node, String> {
-        let mut stream = UnixStream::connect(&self.socket_path)
-            .map_err(|e| format!("Failed to connect to sway IPC socket: {}", e))?;
+        let output = Command::new("swaymsg")
+            .args(["-t", "get_tree"])
+            .output()
+            .map_err(|e| format!("Failed to run swaymsg get_tree: {}", e))?;
 
-        // GET_TREE message type = 4
-        let magic = b"i3-ipc";
-        let msg_type = 4u32; // GET_TREE
+        if !output.status.success() {
+            return Err(format!("swaymsg get_tree failed with exit code: {:?}", output.status.code()));
+        }
 
-        stream.write_all(magic).map_err(|e| e.to_string())?;
-        stream.write_all(&msg_type.to_ne_bytes()).map_err(|e| e.to_string())?;
-        stream.write_all(&0u32.to_ne_bytes()).map_err(|e| e.to_string())?; // empty payload
-        stream.flush().map_err(|e| e.to_string())?;
+        let tree_json = String::from_utf8(output.stdout)
+            .map_err(|e| format!("Invalid UTF8 in swaymsg output: {}", e))?;
 
-        // Read response header
-        let mut header = [0u8; 14];
-        stream.read_exact(&mut header).map_err(|e| e.to_string())?;
-
-        let payload_len = u32::from_ne_bytes([header[10], header[11], header[12], header[13]]);
-        let mut payload = vec![0u8; payload_len as usize];
-        stream.read_exact(&mut payload).map_err(|e| e.to_string())?;
-
-        let response_str = String::from_utf8(payload).map_err(|e| e.to_string())?;
-
-        serde_json::from_str(&response_str)
+        serde_json::from_str(&tree_json)
             .map_err(|e| format!("Failed to parse tree JSON: {}", e))
     }
 }
