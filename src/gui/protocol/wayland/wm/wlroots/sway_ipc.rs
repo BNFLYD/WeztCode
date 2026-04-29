@@ -48,7 +48,7 @@ impl SwayIpcClient {
     pub fn subscribe_geometry_changes(
         &self,
         target_app_id: String,
-        sender: Sender<WindowGeometry>,
+        sender: mpsc::Sender<WindowGeometry>,
     ) -> Result<thread::JoinHandle<()>, String> {
         let _socket_path = self.socket_path.clone();
 
@@ -75,7 +75,7 @@ impl SwayIpcClient {
     pub fn subscribe_window_events(
         &self,
         target_app_id: String,
-        sender: Sender<WmEvent>,
+        sender: mpsc::Sender<WmEvent>,
         capture_signal_rx: mpsc::Receiver<()>,
     ) -> Result<(), String> {
         thread::spawn(move || {
@@ -209,7 +209,7 @@ impl SwayIpcClient {
         None
     }
 
-    fn process_window_event(event: WindowEvent, target_app_id: &str, sender: &Sender<WmEvent>) {
+    fn process_window_event(event: WindowEvent, target_app_id: &str, sender: &mpsc::Sender<WmEvent>) {
         let app_id = event.container.app_id.as_deref().unwrap_or("");
 
         // Only process events for our target window
@@ -261,7 +261,7 @@ impl SwayIpcClient {
         event: WindowEvent,
         target_app_id: &str,
         target_toplevel_id: Option<&String>,
-        sender: &Sender<WmEvent>,
+        sender: &mpsc::Sender<WmEvent>,
     ) {
         let event_toplevel_id = event.container.foreign_toplevel_identifier.as_deref();
         let app_id = event.container.app_id.as_deref().unwrap_or("");
