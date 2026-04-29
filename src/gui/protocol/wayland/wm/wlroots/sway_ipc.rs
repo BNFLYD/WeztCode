@@ -301,17 +301,26 @@ impl SwayIpcClient {
 
     /// Get window visibility and focus status by toplevel identifier
     fn get_window_visibility_by_toplevel(&self, target_toplevel_id: &str) -> Option<(bool, bool)> {
+        println!("[SwayIPC] get_window_visibility_by_toplevel called for: {}", target_toplevel_id);
+
         let tree = self.get_tree().ok()?;
+        println!("[SwayIPC] Got tree with {} root nodes", tree.nodes.len());
 
         // Search through all nodes for matching toplevel_id
-        for node in tree.nodes.iter().flat_map(|n| flatten_nodes(n)) {
+        let all_nodes: Vec<_> = tree.nodes.iter().flat_map(|n| flatten_nodes(n)).collect();
+        println!("[SwayIPC] Flattened {} total nodes", all_nodes.len());
+
+        for node in all_nodes {
             if let Some(ref toplevel_id) = node.foreign_toplevel_identifier {
+                println!("[SwayIPC] Checking node with toplevel_id: {}", toplevel_id);
                 if toplevel_id == target_toplevel_id {
+                    println!("[SwayIPC] MATCH FOUND! visible={}, focused={}", node.visible, node.focused);
                     return Some((node.visible, node.focused));
                 }
             }
         }
 
+        println!("[SwayIPC] No match found for toplevel_id: {}", target_toplevel_id);
         None
     }
 
@@ -362,8 +371,29 @@ impl SwayIpcClient {
     }
 
     fn get_tree(&self) -> Result<Node, String> {
-        let response = self.run_command("get_tree")?;
-        serde_json::from_str(&response.payload)
+        let mut stream = UnixStream::connect(&self.socket_path)
+            .map_err(|e| format!("Failed to connect to sway IPC socket: {}", e))?;
+
+        // GET_TREE message type = 4
+        let magic = b"i3-ipc";
+        let msg_type = 4u32; // GET_TREE
+
+        stream.write_all(magic).map_err(|e| e.to_string())?;
+        stream.write_all(&msg_type.to_ne_bytes()).map_err(|e| e.to_string())?;
+        stream.write_all(&0u32.to_ne_bytes()).map_err(|e| e.to_string())?; // empty payload
+        stream.flush().map_err(|e| e.to_string())?;
+
+        // Read response header
+        let mut header = [0u8; 14];
+        stream.read_exact(&mut header).map_err(|e| e.to_string())?;
+
+        let payload_len = u32::from_ne_bytes([header[10], header[11], header[12], header[13]]);
+        let mut payload = vec![0u8; payload_len as usize];
+        stream.read_exact(&mut payload).map_err(|e| e.to_string())?;
+
+        let response_str = String::from_utf8(payload).map_err(|e| e.to_string())?;
+
+        serde_json::from_str(&response_str)
             .map_err(|e| format!("Failed to parse tree JSON: {}", e))
     }
 }
