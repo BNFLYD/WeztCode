@@ -213,7 +213,7 @@ impl SwayIpcClient {
 
         // Check if this event is from our target window
         let is_our_window = target_toplevel_id.is_some()
-            && event_toplevel_id == target_toplevel_id.as_deref();
+            && event_toplevel_id == target_toplevel_id.as_deref().map(|s| s.as_str());
 
         if is_our_window {
             // Our window event - process normally
