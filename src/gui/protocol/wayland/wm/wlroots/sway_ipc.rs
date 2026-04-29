@@ -245,34 +245,57 @@ impl SwayIpcClient {
             }
         } else if event.change.as_str() == "focus" && event.container.focused {
             // Another window gained focus - check if our window is still visible
-            println!("[SwayIPC] Another window focused, checking our visibility...");
+            println!("[SwayIPC] === TRIGGER ACTIVATED ===");
+            println!("[SwayIPC] Another window focused: app_id={:?}, toplevel_id={:?}",
+                event.container.app_id, event.container.foreign_toplevel_identifier);
+            println!("[SwayIPC] Our target toplevel_id: {:?}", target_toplevel_id);
 
             // Query sway for current tree to check our window's visibility
             if let Some(toplevel_id) = target_toplevel_id {
-                if let Ok(client) = Self::new() {
-                    if let Some((visible, is_focused)) = client.get_window_visibility_by_toplevel(toplevel_id) {
-                        if visible {
-                            if is_focused {
-                                println!("[SwayIPC] Our window is visible and focused - keeping overlay visible");
-                                let _ = sender.send(WmEvent::WindowFocused {
-                                    app_id: target_app_id.to_string()
-                                });
-                            } else {
-                                println!("[SwayIPC] Our window is visible but not focused - keeping overlay visible (side-by-side)");
-                                // In side-by-side mode, keep overlay visible even without focus
-                                let _ = sender.send(WmEvent::WindowFocused {
-                                    app_id: target_app_id.to_string()
-                                });
+                println!("[SwayIPC] Querying visibility for toplevel_id: {}", toplevel_id);
+
+                match Self::new() {
+                    Ok(client) => {
+                        println!("[SwayIPC] SwayIpcClient created successfully");
+
+                        match client.get_window_visibility_by_toplevel(toplevel_id) {
+                            Some((visible, is_focused)) => {
+                                println!("[SwayIPC] Query result: visible={}, focused={}", visible, is_focused);
+
+                                if visible {
+                                    if is_focused {
+                                        println!("[SwayIPC] Our window is visible and focused - keeping overlay visible");
+                                        let _ = sender.send(WmEvent::WindowFocused {
+                                            app_id: target_app_id.to_string()
+                                        });
+                                    } else {
+                                        println!("[SwayIPC] Our window is visible but not focused - keeping overlay visible (side-by-side)");
+                                        // In side-by-side mode, keep overlay visible even without focus
+                                        let _ = sender.send(WmEvent::WindowFocused {
+                                            app_id: target_app_id.to_string()
+                                        });
+                                    }
+                                } else {
+                                    println!("[SwayIPC] Our window is not visible - hiding overlay");
+                                    let _ = sender.send(WmEvent::WindowUnfocused {
+                                        app_id: target_app_id.to_string()
+                                    });
+                                }
                             }
-                        } else {
-                            println!("[SwayIPC] Our window is not visible - hiding overlay");
-                            let _ = sender.send(WmEvent::WindowUnfocused {
-                                app_id: target_app_id.to_string()
-                            });
+                            None => {
+                                println!("[SwayIPC] ERROR: Window with toplevel_id {} not found in tree!", toplevel_id);
+                            }
                         }
                     }
+                    Err(e) => {
+                        println!("[SwayIPC] ERROR: Failed to create SwayIpcClient: {}", e);
+                    }
                 }
+            } else {
+                println!("[SwayIPC] WARNING: target_toplevel_id is None, cannot query visibility");
             }
+
+            println!("[SwayIPC] === TRIGGER COMPLETED ===");
         }
     }
 
