@@ -7,6 +7,7 @@ use std::os::unix::net::UnixStream;
 use std::process::{Command, Stdio};
 use std::sync::mpsc::Sender;
 use std::thread;
+use std::time::Duration;
 use serde::Deserialize;
 
 pub struct SwayIpcClient {
@@ -138,36 +139,43 @@ impl SwayIpcClient {
         Ok(())
     }
 
-    /// Capture the foreign_toplevel_identifier of our target window at startup
+    /// Capture the foreign_toplevel_identifier of our target window at startup with retries
     fn capture_target_toplevel_id(target_app_id: &str) -> Option<String> {
-        println!("[SwayIPC] Capturing toplevel_id for app_id: {}", target_app_id);
+        println!("[SwayIPC] Capturing toplevel_id for app_id: {} (will retry until found)", target_app_id);
 
-        let output = Command::new("swaymsg")
-            .args(["-t", "get_tree"])
-            .output()
-            .ok()?;
+        let max_attempts = 60; // 60 attempts * 500ms = 30 seconds max
+        for attempt in 1..=max_attempts {
+            let output = Command::new("swaymsg")
+                .args(["-t", "get_tree"])
+                .output()
+                .ok()?;
 
-        if !output.status.success() {
-            println!("[SwayIPC] swaymsg get_tree failed");
-            return None;
-        }
+            if !output.status.success() {
+                println!("[SwayIPC] swaymsg get_tree failed (attempt {})", attempt);
+                thread::sleep(Duration::from_millis(500));
+                continue;
+            }
 
-        let tree_json = String::from_utf8(output.stdout).ok()?;
-        let tree: Node = serde_json::from_str(&tree_json).ok()?;
+            let tree_json = String::from_utf8(output.stdout).ok()?;
+            let tree: Node = serde_json::from_str(&tree_json).ok()?;
 
-        // Search through all nodes for matching app_id
-        for node in tree.nodes.iter().flat_map(|n| flatten_nodes(n)) {
-            if let Some(ref app_id) = node.app_id {
-                if app_id == target_app_id {
-                    if let Some(ref toplevel_id) = node.foreign_toplevel_identifier {
-                        println!("[SwayIPC] Found toplevel_id: {} for app_id: {}", toplevel_id, target_app_id);
-                        return Some(toplevel_id.clone());
+            // Search through all nodes for matching app_id
+            for node in tree.nodes.iter().flat_map(|n| flatten_nodes(n)) {
+                if let Some(ref app_id) = node.app_id {
+                    if app_id == target_app_id {
+                        if let Some(ref toplevel_id) = node.foreign_toplevel_identifier {
+                            println!("[SwayIPC] Found toplevel_id: {} for app_id: {} (attempt {})", toplevel_id, target_app_id, attempt);
+                            return Some(toplevel_id.clone());
+                        }
                     }
                 }
             }
+
+            println!("[SwayIPC] Window not found yet, retrying... (attempt {}/{})", attempt, max_attempts);
+            thread::sleep(Duration::from_millis(500));
         }
 
-        println!("[SwayIPC] Could not find window with app_id: {}", target_app_id);
+        println!("[SwayIPC] ERROR: Could not find window with app_id: {} after {} attempts", target_app_id, max_attempts);
         None
     }
 
