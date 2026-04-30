@@ -293,23 +293,34 @@ impl SwayIpcClient {
         }
     }
 
-    /// Get window visibility by PID (available in get_tree)
+    /// Get window visibility by PID using grep-filtered tree query
     fn get_window_visibility_by_pid(&self, target_pid: u32) -> Option<bool> {
         println!("[SwayIPC] get_window_visibility_by_pid called for: {}", target_pid);
 
-        let tree = self.get_tree().ok()?;
+        // Use shell command to filter tree by PID
+        let pid_str = format!("\"pid\": {}", target_pid);
+        let output = Command::new("sh")
+            .arg("-c")
+            .arg(format!("swaymsg -t get_tree | grep -A3 '{}'", pid_str))
+            .output()
+            .map_err(|e| {
+                println!("[SwayIPC] ERROR: Failed to run grep command: {}", e);
+                e
+            }).ok()?;
 
-        // Search through all nodes for matching PID
-        for node in tree.nodes.iter().flat_map(|n| flatten_nodes(n)) {
-            if let Some(pid) = node.pid {
-                if pid == target_pid as i64 {
-                    println!("[SwayIPC] Window found by PID {} - visible={}", pid, node.visible);
-                    return Some(node.visible);
-                }
+        let output_str = String::from_utf8_lossy(&output.stdout);
+        println!("[SwayIPC] grep output:\n{}", output_str);
+
+        // Parse lines to find "visible": true/false
+        for line in output_str.lines() {
+            if line.contains("\"visible\"") {
+                let visible = line.contains("true");
+                println!("[SwayIPC] Found visible={}", visible);
+                return Some(visible);
             }
         }
 
-        println!("[SwayIPC] Window with PID {} not found in tree", target_pid);
+        println!("[SwayIPC] ERROR: visible field not found in grep output");
         None
     }
 
