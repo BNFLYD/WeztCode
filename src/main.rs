@@ -8,7 +8,6 @@ use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 use std::fs::read_to_string;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 fn start_http_server(port: u16) -> thread::JoinHandle<()> {
     let server = tiny_http::Server::http(format!("127.0.0.1:{}", port)).unwrap();
@@ -68,7 +67,7 @@ fn main() {
 
     println!("Iniciando WezTerm...");
     let target_pid = match term.spawn(class) {
-        Ok((child, pid)) => {
+        Ok((_child, pid)) => {
             println!("[Main] WezTerm iniciado con PID: {}", pid);
             pid
         }

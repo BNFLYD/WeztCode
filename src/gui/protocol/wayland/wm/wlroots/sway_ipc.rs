@@ -390,6 +390,7 @@ struct WindowEvent {
 struct WindowEventContainer {
     id: i64,
     app_id: Option<String>,
+    pid: Option<i64>,
     foreign_toplevel_identifier: Option<String>,
     name: Option<String>,
     focused: bool,
@@ -410,6 +411,7 @@ struct Node {
     name: Option<String>,
     node_type: Option<String>,
     app_id: Option<String>,
+    pid: Option<i64>,
     foreign_toplevel_identifier: Option<String>,
     rect: Option<Rect>,
     nodes: Vec<Node>,
