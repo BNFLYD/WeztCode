@@ -30,7 +30,8 @@ pub trait WindowManager: Send + 'static {
 
     /// Start monitoring target window in background thread(s)
     /// Events will be sent to the receiver returned by event_receiver()
-    fn start_monitoring(&self, target_app_id: String);
+    /// target_pid is optional - if provided, it helps identify the exact window instance
+    fn start_monitoring(&self, target_app_id: String, target_pid: Option<u32>);
 
     /// Set signal receiver to trigger toplevel_id capture
     /// This is called after the target window is known to be ready

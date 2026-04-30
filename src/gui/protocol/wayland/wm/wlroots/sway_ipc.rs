@@ -71,15 +71,19 @@ impl SwayIpcClient {
     /// Inicia un listener en un thread separado para monitorear cambios
     /// Subscribe to window events using swaymsg CLI and send WmEvent through channel
     ///
-    /// capture_signal_rx: Channel receiver that triggers toplevel_id capture
+    /// target_pid: Optional PID to identify the exact window instance
+    /// capture_signal_rx: Channel receiver that triggers monitoring start
     pub fn subscribe_window_events(
         &self,
         target_app_id: String,
+        target_pid: Option<u32>,
         sender: mpsc::Sender<WmEvent>,
         capture_signal_rx: mpsc::Receiver<()>,
     ) -> Result<(), String> {
         thread::spawn(move || {
-            println!("[SwayIPC] Starting swaymsg subscribe for app_id: {}", target_app_id);
+            // Clone target_pid for use in this closure
+            let target_pid_opt = target_pid;
+            println!("[SwayIPC] Starting swaymsg subscribe for app_id: {:?}, pid: {:?}", target_app_id, target_pid_opt);
 
             // Spawn swaymsg process to subscribe to window events
             let mut child = match Command::new("swaymsg")
@@ -128,8 +132,8 @@ impl SwayIpcClient {
 
                         // Parse and process the event
                         if let Ok(event) = serde_json::from_str::<WindowEvent>(&json_str) {
-                            // Process all events - fainting_trigger will filter by app_id
-                            Self::fainting_trigger(event, &target_app_id, &sender);
+                            // Process all events - fainting_trigger will filter by PID
+                            Self::fainting_trigger(event, &target_app_id, target_pid_opt, &sender);
                         }
                     }
                     Err(e) => {
@@ -192,13 +196,14 @@ impl SwayIpcClient {
         }
     }
 
-    /// Process window events using app_id for precise tracking
+    /// Process window events using PID for precise tracking
     fn fainting_trigger(
         event: WindowEvent,
         target_app_id: &str,
+        target_pid: Option<u32>,
         sender: &mpsc::Sender<WmEvent>,
     ) {
-        let event_app_id = event.container.app_id.as_deref().unwrap_or("");
+        let event_pid = event.container.pid;
 
         // Calculate geometry for our window (in case we need it)
         let global_rect = &event.container.rect;
@@ -210,8 +215,8 @@ impl SwayIpcClient {
             height: window_rect.height,
         };
 
-        // Check if this event is from our target window (using app_id)
-        let is_our_window = event_app_id == target_app_id;
+        // Check if this event is from our target window (using PID if available)
+        let is_our_window = target_pid.map_or(false, |pid| event_pid == Some(pid as i64));
 
         if is_our_window {
             // Our window event - process normally
@@ -244,64 +249,67 @@ impl SwayIpcClient {
         } else if event.change.as_str() == "focus" && event.container.focused {
             // Another window gained focus - check if our window is still visible
             println!("[SwayIPC] === TRIGGER ACTIVATED ===");
-            println!("[SwayIPC] Another window focused: app_id={:?}, toplevel_id={:?}",
-                event.container.app_id, event.container.foreign_toplevel_identifier);
-            println!("[SwayIPC] Our target app_id: {}", target_app_id);
+            println!("[SwayIPC] Another window focused: app_id={:?}, pid={:?}",
+                event.container.app_id, event.container.pid);
 
-            // Query sway for current tree to check our window's visibility by app_id
-            println!("[SwayIPC] Querying visibility for app_id: {}", target_app_id);
+            // Query sway for current tree to check our window's visibility by PID
+            if let Some(pid) = target_pid {
+                println!("[SwayIPC] Querying visibility for PID: {}", pid);
 
-            match Self::new() {
-                Ok(client) => {
-                    println!("[SwayIPC] SwayIpcClient created successfully");
+                match Self::new() {
+                    Ok(client) => {
+                        println!("[SwayIPC] SwayIpcClient created successfully");
 
-                    match client.get_window_visibility_by_app_id(target_app_id) {
-                        Some(visible) => {
-                            println!("[SwayIPC] Query result: visible={}", visible);
+                        match client.get_window_visibility_by_pid(pid) {
+                            Some(visible) => {
+                                println!("[SwayIPC] Query result: visible={}", visible);
 
-                            if visible {
-                                println!("[SwayIPC] Our window is visible - keeping overlay visible");
-                                let _ = sender.send(WmEvent::WindowFocused {
-                                    app_id: target_app_id.to_string()
-                                });
-                            } else {
-                                println!("[SwayIPC] Our window is not visible - hiding overlay");
-                                let _ = sender.send(WmEvent::WindowUnfocused {
-                                    app_id: target_app_id.to_string()
-                                });
+                                if visible {
+                                    println!("[SwayIPC] Our window is visible - keeping overlay visible");
+                                    let _ = sender.send(WmEvent::WindowFocused {
+                                        app_id: target_app_id.to_string()
+                                    });
+                                } else {
+                                    println!("[SwayIPC] Our window is not visible - hiding overlay");
+                                    let _ = sender.send(WmEvent::WindowUnfocused {
+                                        app_id: target_app_id.to_string()
+                                    });
+                                }
+                            }
+                            None => {
+                                println!("[SwayIPC] ERROR: Window with PID {} not found in tree!", pid);
                             }
                         }
-                        None => {
-                            println!("[SwayIPC] ERROR: Window with app_id {} not found in tree!", target_app_id);
-                        }
+                    }
+                    Err(e) => {
+                        println!("[SwayIPC] ERROR: Failed to create SwayIpcClient: {}", e);
                     }
                 }
-                Err(e) => {
-                    println!("[SwayIPC] ERROR: Failed to create SwayIpcClient: {}", e);
-                }
+            } else {
+                println!("[SwayIPC] WARNING: target_pid is None, cannot query visibility");
             }
 
             println!("[SwayIPC] === TRIGGER COMPLETED ===");
         }
     }
 
-    /// Get window visibility by app_id (available in get_tree)
-    fn get_window_visibility_by_app_id(&self, target_app_id: &str) -> Option<bool> {
-        println!("[SwayIPC] get_window_visibility_by_app_id called for: {}", target_app_id);
+    /// Get window visibility by PID (available in get_tree)
+    fn get_window_visibility_by_pid(&self, target_pid: u32) -> Option<bool> {
+        println!("[SwayIPC] get_window_visibility_by_pid called for: {}", target_pid);
 
         let tree = self.get_tree().ok()?;
 
-        // Search through all nodes for matching app_id
+        // Search through all nodes for matching PID
         for node in tree.nodes.iter().flat_map(|n| flatten_nodes(n)) {
-            if let Some(ref app_id) = node.app_id {
-                if app_id == target_app_id {
-                    println!("[SwayIPC] Window found by app_id - visible={}", node.visible);
+            if let Some(pid) = node.pid {
+                if pid == target_pid as i64 {
+                    println!("[SwayIPC] Window found by PID {} - visible={}", pid, node.visible);
                     return Some(node.visible);
                 }
             }
         }
 
-        println!("[SwayIPC] Window with app_id {} not found in tree", target_app_id);
+        println!("[SwayIPC] Window with PID {} not found in tree", target_pid);
         None
     }
 

@@ -10,13 +10,16 @@ impl WeztermProtocol {
 }
 
 impl TerminalProtocol for WeztermProtocol {
-    fn spawn(&self, class: &str) -> Result<Child, String> {
-        Command::new("wezterm")
+    fn spawn(&self, class: &str) -> Result<(Child, u32), String> {
+        let child = Command::new("wezterm")
             .args(["start", "--class", class])
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .spawn()
-            .map_err(|e| format!("Failed to spawn wezterm: {}", e))
+            .map_err(|e| format!("Failed to spawn wezterm: {}", e))?;
+
+        let pid = child.id();
+        Ok((child, pid))
     }
 
     fn list_panes(&self) -> Result<String, String> {

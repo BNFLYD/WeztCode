@@ -63,22 +63,20 @@ fn main() {
     // Create signal channel for toplevel_id capture
     let (capture_signal_tx, capture_signal_rx) = mpsc::channel::<()>();
 
-    // Generate unique instance ID for this WezTerm window
-    let instance_id = format!("{}", SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis());
-    let app_id = format!("weztcode-terminal-{}", &instance_id[..8.min(instance_id.len())]);
-    println!("[Main] Generated unique app_id: {}", app_id);
-
     let term = WeztermProtocol::new();
-    let class = &app_id;
+    let class = config::WINDOW_CLASS;
 
     println!("Iniciando WezTerm...");
-    match term.spawn(class) {
-        Ok(_) => println!("WezTerm iniciado"),
+    let target_pid = match term.spawn(class) {
+        Ok((child, pid)) => {
+            println!("[Main] WezTerm iniciado con PID: {}", pid);
+            pid
+        }
         Err(e) => {
             eprintln!("Error al iniciar terminal: {}", e);
             std::process::exit(1);
         }
-    }
+    };
 
     thread::sleep(Duration::from_millis(1200));
 
@@ -86,45 +84,45 @@ fn main() {
     println!("[Main] Sending capture signal to WM thread...");
     let _ = capture_signal_tx.send(());
 
-    // Iniciar servidor HTTP
+    //  Start HTTP server
     let http_port = 8765;
     let _http_thread = start_http_server(http_port);
 
-    // Esperar a que el servidor inicie
+    // Wait for server to start
     thread::sleep(Duration::from_millis(100));
 
-    // Detectar window manager y obtener geometría de la terminal
+    // Detect window manager and get terminal geometry
     let wm = gui::protocol::wayland::wm::detect_window_manager();
-    let term_geometry = wm.as_ref().and_then(|wm| wm.get_window_geometry(&app_id));
+    let term_geometry = wm.as_ref().and_then(|wm| wm.get_window_geometry(config::WINDOW_CLASS));
 
     if let Some(geo) = &term_geometry {
         println!("Geometría de terminal detectada: x={}, y={}, w={}, h={}",
                  geo.x, geo.y, geo.width, geo.height);
     } else {
-        println!("Usando geometría por defecto");
+        println!("Using default geometry");
     }
 
-    // Inicializar plataforma GUI
+    // Initialize GUI platform
     let platform = Gtk4Platform::new();
     let frontend_url = format!("http://127.0.0.1:{}/", http_port);
 
     println!("Frontend URL: {}", frontend_url);
 
-    // Configurar window manager si está disponible
+    // Configure window manager if available
     if let Some(wm) = wm {
-        println!("Window Manager detectado: {}", wm.wm_name());
+        println!("Window Manager detected: {}", wm.wm_name());
 
         // Set capture signal channel for toplevel_id capture
         wm.set_capture_signal(capture_signal_rx);
 
-        // Obtener receptor de eventos del WM
+        // Get event receiver from WM
         let receiver = wm.event_receiver();
 
-        // Conectar eventos WM a acciones GUI
+        // Connect WM events to GUI actions
         platform.handle_wm_events(receiver);
 
-        // Iniciar monitoreo de ventana objetivo
-        wm.start_monitoring(app_id.clone());
+        // Start monitoring target window
+        wm.start_monitoring(config::WINDOW_CLASS.to_string(), Some(target_pid));
     } else {
         println!("No se detectó Window Manager - ejecutando en modo standalone");
     }

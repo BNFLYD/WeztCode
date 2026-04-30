@@ -32,7 +32,7 @@ impl WindowManager for WlrootsWindowManager {
         *self.capture_signal_receiver.lock().unwrap() = Some(signal_rx);
     }
 
-    fn start_monitoring(&self, target_app_id: String) {
+    fn start_monitoring(&self, target_app_id: String, target_pid: Option<u32>) {
         let sender = self.sender.lock().unwrap().clone();
         let capture_signal_opt = self.capture_signal_receiver.lock().unwrap().take();
 
@@ -48,7 +48,7 @@ impl WindowManager for WlrootsWindowManager {
 
                 // Start Sway IPC monitoring with capture signal channel
                 if let Ok(client) = sway_ipc::SwayIpcClient::new() {
-                    let _ = client.subscribe_window_events(target_app_id, s, capture_rx);
+                    let _ = client.subscribe_window_events(target_app_id, target_pid, s, capture_rx);
                 }
             }
         });
