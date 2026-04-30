@@ -8,6 +8,7 @@ use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 use std::fs::read_to_string;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 fn start_http_server(port: u16) -> thread::JoinHandle<()> {
     let server = tiny_http::Server::http(format!("127.0.0.1:{}", port)).unwrap();
@@ -62,8 +63,13 @@ fn main() {
     // Create signal channel for toplevel_id capture
     let (capture_signal_tx, capture_signal_rx) = mpsc::channel::<()>();
 
+    // Generate unique instance ID for this WezTerm window
+    let instance_id = format!("{}", SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis());
+    let app_id = format!("weztcode-terminal-{}", &instance_id[..8.min(instance_id.len())]);
+    println!("[Main] Generated unique app_id: {}", app_id);
+
     let term = WeztermProtocol::new();
-    let class = config::WINDOW_CLASS;
+    let class = &app_id;
 
     println!("Iniciando WezTerm...");
     match term.spawn(class) {
@@ -89,7 +95,7 @@ fn main() {
 
     // Detectar window manager y obtener geometría de la terminal
     let wm = gui::protocol::wayland::wm::detect_window_manager();
-    let term_geometry = wm.as_ref().and_then(|wm| wm.get_window_geometry("weztcode-terminal"));
+    let term_geometry = wm.as_ref().and_then(|wm| wm.get_window_geometry(&app_id));
 
     if let Some(geo) = &term_geometry {
         println!("Geometría de terminal detectada: x={}, y={}, w={}, h={}",
@@ -118,7 +124,7 @@ fn main() {
         platform.handle_wm_events(receiver);
 
         // Iniciar monitoreo de ventana objetivo
-        wm.start_monitoring("weztcode-terminal".to_string());
+        wm.start_monitoring(app_id.clone());
     } else {
         println!("No se detectó Window Manager - ejecutando en modo standalone");
     }

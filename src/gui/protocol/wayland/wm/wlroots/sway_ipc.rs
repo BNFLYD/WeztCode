@@ -107,24 +107,16 @@ impl SwayIpcClient {
             println!("[SwayIPC] Listening for window events...");
             println!("[SwayIPC] Waiting for capture signal before attempting toplevel_id capture...");
 
-            // Wait for signal to start capture
+            // Wait for signal to start monitoring
             match capture_signal_rx.recv() {
-                Ok(_) => println!("[SwayIPC] Capture signal received, attempting toplevel_id capture..."),
+                Ok(_) => println!("[SwayIPC] Capture signal received, starting monitoring..."),
                 Err(e) => {
                     eprintln!("[SwayIPC] Capture signal channel closed: {}", e);
                     return;
                 }
             }
 
-            // HYBRID CAPTURE: First try tree, then fall back to event capture
-            let mut target_toplevel_id = Self::capture_target_toplevel_id(&target_app_id);
-
-            if let Some(ref id) = target_toplevel_id {
-                println!("[SwayIPC] Tree capture SUCCESS: toplevel_id={}", id);
-            } else {
-                println!("[SwayIPC] Tree capture FAILED, falling back to event capture...");
-                println!("[SwayIPC] Will capture toplevel_id from first window event with app_id={}", target_app_id);
-            }
+            println!("[SwayIPC] Monitoring app_id: {}", target_app_id);
 
             // Read events line by line (each line is a JSON event)
             for line in reader.lines() {
@@ -136,24 +128,8 @@ impl SwayIpcClient {
 
                         // Parse and process the event
                         if let Ok(event) = serde_json::from_str::<WindowEvent>(&json_str) {
-                            // Lazy capture: if we don't have toplevel_id yet, try to capture from this event
-                            if target_toplevel_id.is_none() {
-                                if let Some(ref app_id) = event.container.app_id {
-                                    if app_id == &target_app_id {
-                                        if let Some(ref toplevel_id) = event.container.foreign_toplevel_identifier {
-                                            target_toplevel_id = Some(toplevel_id.clone());
-                                            println!("[SwayIPC] Event capture SUCCESS: toplevel_id={} from first window event", toplevel_id);
-                                        }
-                                    }
-                                }
-                            }
-
-                            // Process event if we have a toplevel_id (either from tree or event capture)
-                            if let Some(ref id) = target_toplevel_id {
-                                Self::fainting_trigger(event, &target_app_id, Some(id), &sender);
-                            } else {
-                                println!("[SwayIPC] Still waiting for toplevel_id capture, skipping event...");
-                            }
+                            // Process all events - fainting_trigger will filter by app_id
+                            Self::fainting_trigger(event, &target_app_id, &sender);
                         }
                     }
                     Err(e) => {
@@ -167,46 +143,6 @@ impl SwayIpcClient {
         });
 
         Ok(())
-    }
-
-    /// Capture the foreign_toplevel_identifier of our target window at startup with retries
-    fn capture_target_toplevel_id(target_app_id: &str) -> Option<String> {
-        println!("[SwayIPC] Capturing toplevel_id for app_id: {} (will retry until found)", target_app_id);
-
-        let max_attempts = 60; // 60 attempts * 500ms = 30 seconds max
-        for attempt in 1..=max_attempts {
-            let output = Command::new("swaymsg")
-                .args(["-t", "get_tree"])
-                .output()
-                .ok()?;
-
-            if !output.status.success() {
-                println!("[SwayIPC] swaymsg get_tree failed (attempt {})", attempt);
-                thread::sleep(Duration::from_millis(500));
-                continue;
-            }
-
-            let tree_json = String::from_utf8(output.stdout).ok()?;
-            let tree: Node = serde_json::from_str(&tree_json).ok()?;
-
-            // Search through all nodes for matching app_id
-            for node in tree.nodes.iter().flat_map(|n| flatten_nodes(n)) {
-                if let Some(ref app_id) = node.app_id {
-                    if app_id == target_app_id {
-                        if let Some(ref toplevel_id) = node.foreign_toplevel_identifier {
-                            println!("[SwayIPC] Found toplevel_id: {} for app_id: {} (attempt {})", toplevel_id, target_app_id, attempt);
-                            return Some(toplevel_id.clone());
-                        }
-                    }
-                }
-            }
-
-            println!("[SwayIPC] Window not found yet, retrying... (attempt {}/{})", attempt, max_attempts);
-            thread::sleep(Duration::from_millis(500));
-        }
-
-        println!("[SwayIPC] ERROR: Could not find window with app_id: {} after {} attempts", target_app_id, max_attempts);
-        None
     }
 
     fn process_window_event(event: WindowEvent, target_app_id: &str, sender: &mpsc::Sender<WmEvent>) {
@@ -256,15 +192,13 @@ impl SwayIpcClient {
         }
     }
 
-    /// Process window events using foreign_toplevel_identifier for precise tracking
+    /// Process window events using app_id for precise tracking
     fn fainting_trigger(
         event: WindowEvent,
         target_app_id: &str,
-        target_toplevel_id: Option<&String>,
         sender: &mpsc::Sender<WmEvent>,
     ) {
-        let event_toplevel_id = event.container.foreign_toplevel_identifier.as_deref();
-        let app_id = event.container.app_id.as_deref().unwrap_or("");
+        let event_app_id = event.container.app_id.as_deref().unwrap_or("");
 
         // Calculate geometry for our window (in case we need it)
         let global_rect = &event.container.rect;
@@ -276,9 +210,8 @@ impl SwayIpcClient {
             height: window_rect.height,
         };
 
-        // Check if this event is from our target window
-        let is_our_window = target_toplevel_id.is_some()
-            && event_toplevel_id == target_toplevel_id.as_deref().map(|s| s.as_str());
+        // Check if this event is from our target window (using app_id)
+        let is_our_window = event_app_id == target_app_id;
 
         if is_our_window {
             // Our window event - process normally
@@ -313,66 +246,62 @@ impl SwayIpcClient {
             println!("[SwayIPC] === TRIGGER ACTIVATED ===");
             println!("[SwayIPC] Another window focused: app_id={:?}, toplevel_id={:?}",
                 event.container.app_id, event.container.foreign_toplevel_identifier);
-            println!("[SwayIPC] Our target toplevel_id: {:?}", target_toplevel_id);
+            println!("[SwayIPC] Our target app_id: {}", target_app_id);
 
-            // Query sway for current tree to check our window's visibility
-            if let Some(toplevel_id) = target_toplevel_id {
-                println!("[SwayIPC] Querying visibility for toplevel_id: {}", toplevel_id);
+            // Query sway for current tree to check our window's visibility by app_id
+            println!("[SwayIPC] Querying visibility for app_id: {}", target_app_id);
 
-                match Self::new() {
-                    Ok(client) => {
-                        println!("[SwayIPC] SwayIpcClient created successfully");
+            match Self::new() {
+                Ok(client) => {
+                    println!("[SwayIPC] SwayIpcClient created successfully");
 
-                        match client.get_window_visibility_by_toplevel(toplevel_id) {
-                            Some(visible) => {
-                                println!("[SwayIPC] Query result: visible={}", visible);
+                    match client.get_window_visibility_by_app_id(target_app_id) {
+                        Some(visible) => {
+                            println!("[SwayIPC] Query result: visible={}", visible);
 
-                                if visible {
-                                    println!("[SwayIPC] Our window is visible - keeping overlay visible");
-                                    let _ = sender.send(WmEvent::WindowFocused {
-                                        app_id: target_app_id.to_string()
-                                    });
-                                } else {
-                                    println!("[SwayIPC] Our window is not visible - hiding overlay");
-                                    let _ = sender.send(WmEvent::WindowUnfocused {
-                                        app_id: target_app_id.to_string()
-                                    });
-                                }
-                            }
-                            None => {
-                                println!("[SwayIPC] ERROR: Window with toplevel_id {} not found in tree!", toplevel_id);
+                            if visible {
+                                println!("[SwayIPC] Our window is visible - keeping overlay visible");
+                                let _ = sender.send(WmEvent::WindowFocused {
+                                    app_id: target_app_id.to_string()
+                                });
+                            } else {
+                                println!("[SwayIPC] Our window is not visible - hiding overlay");
+                                let _ = sender.send(WmEvent::WindowUnfocused {
+                                    app_id: target_app_id.to_string()
+                                });
                             }
                         }
-                    }
-                    Err(e) => {
-                        println!("[SwayIPC] ERROR: Failed to create SwayIpcClient: {}", e);
+                        None => {
+                            println!("[SwayIPC] ERROR: Window with app_id {} not found in tree!", target_app_id);
+                        }
                     }
                 }
-            } else {
-                println!("[SwayIPC] WARNING: target_toplevel_id is None, cannot query visibility");
+                Err(e) => {
+                    println!("[SwayIPC] ERROR: Failed to create SwayIpcClient: {}", e);
+                }
             }
 
             println!("[SwayIPC] === TRIGGER COMPLETED ===");
         }
     }
 
-    /// Get window visibility by toplevel identifier (returns only visible status)
-    fn get_window_visibility_by_toplevel(&self, target_toplevel_id: &str) -> Option<bool> {
-        println!("[SwayIPC] get_window_visibility_by_toplevel called for: {}", target_toplevel_id);
+    /// Get window visibility by app_id (available in get_tree)
+    fn get_window_visibility_by_app_id(&self, target_app_id: &str) -> Option<bool> {
+        println!("[SwayIPC] get_window_visibility_by_app_id called for: {}", target_app_id);
 
         let tree = self.get_tree().ok()?;
 
-        // Search through all nodes for matching toplevel_id
+        // Search through all nodes for matching app_id
         for node in tree.nodes.iter().flat_map(|n| flatten_nodes(n)) {
-            if let Some(ref toplevel_id) = node.foreign_toplevel_identifier {
-                if toplevel_id == target_toplevel_id {
-                    println!("[SwayIPC] Window found - visible={}", node.visible);
+            if let Some(ref app_id) = node.app_id {
+                if app_id == target_app_id {
+                    println!("[SwayIPC] Window found by app_id - visible={}", node.visible);
                     return Some(node.visible);
                 }
             }
         }
 
-        println!("[SwayIPC] Window with toplevel_id {} not found in tree", target_toplevel_id);
+        println!("[SwayIPC] Window with app_id {} not found in tree", target_app_id);
         None
     }
 
