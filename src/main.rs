@@ -121,7 +121,8 @@ fn main() {
         platform.handle_wm_events(receiver);
 
         // Start monitoring target window
-        wm.start_monitoring(config::WINDOW_CLASS.to_string(), Some(target_pid));
+        // target_toplevel_id is None initially - it will be captured from the first matching event
+        wm.start_monitoring(config::WINDOW_CLASS.to_string(), None);
     } else {
         println!("No se detectó Window Manager - ejecutando en modo standalone");
     }
