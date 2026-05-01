@@ -149,6 +149,81 @@ impl SwayIpcClient {
                 }
             }
 
+            // If we have toplevel_id, query for initial geometry and send event
+            if let Some(ref toplevel_id) = target_toplevel_id_opt {
+                println!("[SwayIPC] Querying initial geometry for toplevel_id: {}", toplevel_id);
+
+                let toplevel_str = format!("\"foreign_toplevel_identifier\": \"{}\"", toplevel_id);
+                let cmd = format!("swaymsg -t get_tree | grep -A40 '{}'", toplevel_str);
+
+                if let Ok(output) = Command::new("sh")
+                    .arg("-c")
+                    .arg(&cmd)
+                    .output()
+                {
+                    let output_str = String::from_utf8_lossy(&output.stdout);
+                    let mut rect: Option<(i32, i32, i32, i32)> = None;
+                    let mut window_rect: Option<(i32, i32, i32, i32)> = None;
+                    let mut in_rect = false;
+                    let mut in_window_rect = false;
+
+                    for line in output_str.lines() {
+                        if line.contains("\"rect\":") {
+                            in_rect = true;
+                            in_window_rect = false;
+                        } else if line.contains("\"window_rect\":") {
+                            in_rect = false;
+                            in_window_rect = true;
+                        } else if line.trim().starts_with("}") || line.contains("\"deco_rect\":") {
+                            in_rect = false;
+                            in_window_rect = false;
+                        }
+
+                        if in_rect || in_window_rect {
+                            if let Some((key, val)) = parse_json_int_field(line) {
+                                match key.as_str() {
+                                    "x" => {
+                                        if in_rect { rect = rect.map_or(Some((val, 0, 0, 0)), |r| Some((val, r.1, r.2, r.3))); }
+                                        if in_window_rect { window_rect = window_rect.map_or(Some((val, 0, 0, 0)), |r| Some((val, r.1, r.2, r.3))); }
+                                    }
+                                    "y" => {
+                                        if in_rect { rect = rect.map_or(Some((0, val, 0, 0)), |r| Some((r.0, val, r.2, r.3))); }
+                                        if in_window_rect { window_rect = window_rect.map_or(Some((0, val, 0, 0)), |r| Some((r.0, val, r.2, r.3))); }
+                                    }
+                                    "width" => {
+                                        if in_rect { rect = rect.map_or(Some((0, 0, val, 0)), |r| Some((r.0, r.1, val, r.3))); }
+                                        if in_window_rect { window_rect = window_rect.map_or(Some((0, 0, val, 0)), |r| Some((r.0, r.1, val, r.3))); }
+                                    }
+                                    "height" => {
+                                        if in_rect { rect = rect.map_or(Some((0, 0, 0, val)), |r| Some((r.0, r.1, r.2, val))); }
+                                        if in_window_rect { window_rect = window_rect.map_or(Some((0, 0, 0, val)), |r| Some((r.0, r.1, r.2, val))); }
+                                    }
+                                    _ => {}
+                                }
+                            }
+                        }
+                    }
+
+                    if let (Some(r), Some(wr)) = (rect, window_rect) {
+                        let geometry = WindowGeometry {
+                            x: r.0 + wr.0,
+                            y: r.1 + wr.1,
+                            width: wr.2,
+                            height: wr.3,
+                        };
+
+                        println!("[SwayIPC] Sending initial GeometryChanged: x={}, y={}, w={}, h={}",
+                                 geometry.x, geometry.y, geometry.width, geometry.height);
+                        let _ = sender.send(WmEvent::GeometryChanged {
+                            app_id: target_app_id.to_string(),
+                            geometry,
+                        });
+                    } else {
+                        println!("[SwayIPC] Could not parse initial geometry (rect={:?}, window_rect={:?})", rect, window_rect);
+                    }
+                }
+            }
+
             // Read events line by line (each line is a JSON event)
             for line in reader.lines() {
                 match line {
@@ -571,4 +646,23 @@ fn flatten_nodes(node: &Node) -> Vec<&Node> {
         result.extend(flatten_nodes(child));
     }
     result
+}
+
+/// Parse a simple JSON field like "key": 123 from a line
+fn parse_json_int_field(line: &str) -> Option<(String, i32)> {
+    let trimmed = line.trim();
+    if let Some(colon_pos) = trimmed.find(':') {
+        let key_part = &trimmed[..colon_pos].trim();
+        let value_part = &trimmed[colon_pos + 1..].trim();
+
+        // Extract key (remove quotes)
+        let key = key_part.trim_matches('"').to_string();
+
+        // Extract value (handle trailing comma)
+        let value_str = value_part.trim_end_matches(',').trim();
+        if let Ok(val) = value_str.parse::<i32>() {
+            return Some((key, val));
+        }
+    }
+    None
 }
