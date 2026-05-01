@@ -85,9 +85,9 @@ impl SwayIpcClient {
             let mut target_toplevel_id_opt = target_toplevel_id;
             println!("[SwayIPC] Starting swaymsg subscribe for app_id: {:?}, toplevel_id: {:?}", target_app_id, target_toplevel_id_opt);
 
-            // Spawn swaymsg process to subscribe to window events
+            // Spawn swaymsg process to subscribe to window and workspace events
             let mut child = match Command::new("swaymsg")
-                .args(["-t", "subscribe", "-m", "[\"window\"]"])
+                .args(["-t", "subscribe", "-m", "[\"window\", \"workspace\"]"])
                 .stdout(Stdio::piped())
                 .stderr(Stdio::null())
                 .spawn()
@@ -144,6 +144,34 @@ impl SwayIpcClient {
 
                             // Process all events - fainting_trigger will filter by toplevel_id
                             Self::fainting_trigger(event, &target_app_id, target_toplevel_id_opt.as_deref(), &sender);
+                        } else {
+                            // Not a window event - likely workspace event
+                            // Verify visibility of our window
+                            println!("[SwayIPC] Workspace event detected - checking visibility");
+                            if let Some(ref toplevel_id) = target_toplevel_id_opt {
+                                match Self::new() {
+                                    Ok(client) => {
+                                        match client.get_window_visibility_by_toplevel_id(toplevel_id) {
+                                            Some(false) => {
+                                                // Window not visible - hide overlay
+                                                println!("[SwayIPC] Window not visible after workspace change - hiding overlay");
+                                                let _ = sender.send(WmEvent::WindowUnfocused {
+                                                    app_id: target_app_id.to_string()
+                                                });
+                                            }
+                                            Some(true) => {
+                                                println!("[SwayIPC] Window still visible after workspace change");
+                                            }
+                                            None => {
+                                                println!("[SwayIPC] ERROR: Could not query visibility after workspace change");
+                                            }
+                                        }
+                                    }
+                                    Err(e) => {
+                                        println!("[SwayIPC] ERROR: Failed to create SwayIpcClient: {}", e);
+                                    }
+                                }
+                            }
                         }
                     }
                     Err(e) => {
