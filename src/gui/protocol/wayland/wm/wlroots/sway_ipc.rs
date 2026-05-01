@@ -73,18 +73,136 @@ impl SwayIpcClient {
     ///
     /// target_toplevel_id: Optional foreign_toplevel_identifier to identify the exact window instance
     /// capture_signal_rx: Channel receiver that triggers monitoring start
+    /// Returns initial geometry synchronously after performing initial queries
     pub fn subscribe_window_events(
         &self,
         target_app_id: String,
         target_toplevel_id: Option<String>,
         sender: mpsc::Sender<WmEvent>,
         capture_signal_rx: mpsc::Receiver<()>,
-    ) -> Result<(), String> {
-        thread::spawn(move || {
-            // Mutable target_toplevel_id - can be captured from first matching event if not provided
-            let mut target_toplevel_id_opt = target_toplevel_id;
-            println!("[SwayIPC] Starting swaymsg subscribe for app_id: {:?}, toplevel_id: {:?}", target_app_id, target_toplevel_id_opt);
+    ) -> Result<Option<WindowGeometry>, String> {
+        // Wait for signal to start monitoring (SYNCHRONOUS)
+        println!("[SwayIPC] Waiting for capture signal before starting...");
+        match capture_signal_rx.recv() {
+            Ok(_) => println!("[SwayIPC] Capture signal received, performing initial queries..."),
+            Err(e) => {
+                return Err(format!("[SwayIPC] Capture signal channel closed: {}", e));
+            }
+        }
 
+        println!("[SwayIPC] Monitoring app_id: {}", target_app_id);
+
+        // Mutable target_toplevel_id - can be captured from query if not provided
+        let mut target_toplevel_id_opt = target_toplevel_id;
+        let mut initial_geometry: Option<WindowGeometry> = None;
+
+        // If we don't have toplevel_id yet, query for it now before starting event loop
+        if target_toplevel_id_opt.is_none() {
+            println!("[SwayIPC] Performing initial query to capture toplevel_id...");
+
+            let cmd = format!("swaymsg -t get_tree | grep -B5 -A15 '\"app_id\": \"{}\"'", target_app_id);
+            if let Ok(output) = Command::new("sh")
+                .arg("-c")
+                .arg(&cmd)
+                .output()
+            {
+                let output_str = String::from_utf8_lossy(&output.stdout);
+                for line in output_str.lines() {
+                    if line.contains("foreign_toplevel_identifier") {
+                        if let Some(id) = line.split('"').nth(3) {
+                            println!("[SwayIPC] Captured toplevel_id from initial query: {}", id);
+                            target_toplevel_id_opt = Some(id.to_string());
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if target_toplevel_id_opt.is_none() {
+                println!("[SwayIPC] Initial query did not find toplevel_id, will wait for first window event");
+            }
+        }
+
+        // If we have toplevel_id, query for initial geometry
+        if let Some(ref toplevel_id) = target_toplevel_id_opt {
+            println!("[SwayIPC] Querying initial geometry for toplevel_id: {}", toplevel_id);
+
+            let toplevel_str = format!("\"foreign_toplevel_identifier\": \"{}\"", toplevel_id);
+            let cmd = format!("swaymsg -t get_tree | grep -A40 '{}'", toplevel_str);
+
+            if let Ok(output) = Command::new("sh")
+                .arg("-c")
+                .arg(&cmd)
+                .output()
+            {
+                let output_str = String::from_utf8_lossy(&output.stdout);
+                let mut rect: Option<(i32, i32, i32, i32)> = None;
+                let mut window_rect: Option<(i32, i32, i32, i32)> = None;
+                let mut in_rect = false;
+                let mut in_window_rect = false;
+
+                for line in output_str.lines() {
+                    if line.contains("\"rect\":") {
+                        in_rect = true;
+                        in_window_rect = false;
+                    } else if line.contains("\"window_rect\":") {
+                        in_rect = false;
+                        in_window_rect = true;
+                    } else if line.trim().starts_with("}") || line.contains("\"deco_rect\":") {
+                        in_rect = false;
+                        in_window_rect = false;
+                    }
+
+                    if in_rect || in_window_rect {
+                        if let Some((key, val)) = parse_json_int_field(line) {
+                            match key.as_str() {
+                                "x" => {
+                                    if in_rect { rect = rect.map_or(Some((val, 0, 0, 0)), |r| Some((val, r.1, r.2, r.3))); }
+                                    if in_window_rect { window_rect = window_rect.map_or(Some((val, 0, 0, 0)), |r| Some((val, r.1, r.2, r.3))); }
+                                }
+                                "y" => {
+                                    if in_rect { rect = rect.map_or(Some((0, val, 0, 0)), |r| Some((r.0, val, r.2, r.3))); }
+                                    if in_window_rect { window_rect = window_rect.map_or(Some((0, val, 0, 0)), |r| Some((r.0, val, r.2, r.3))); }
+                                }
+                                "width" => {
+                                    if in_rect { rect = rect.map_or(Some((0, 0, val, 0)), |r| Some((r.0, r.1, val, r.3))); }
+                                    if in_window_rect { window_rect = window_rect.map_or(Some((0, 0, val, 0)), |r| Some((r.0, r.1, val, r.3))); }
+                                }
+                                "height" => {
+                                    if in_rect { rect = rect.map_or(Some((0, 0, 0, val)), |r| Some((r.0, r.1, r.2, val))); }
+                                    if in_window_rect { window_rect = window_rect.map_or(Some((0, 0, 0, val)), |r| Some((r.0, r.1, r.2, val))); }
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                }
+
+                if let (Some(r), Some(wr)) = (rect, window_rect) {
+                    let geometry = WindowGeometry {
+                        x: r.0 + wr.0,
+                        y: r.1 + wr.1,
+                        width: wr.2,
+                        height: wr.3,
+                    };
+
+                    println!("[SwayIPC] Initial geometry captured: x={}, y={}, w={}, h={}",
+                             geometry.x, geometry.y, geometry.width, geometry.height);
+                    initial_geometry = Some(geometry.clone());
+
+                    // Also send as event for consistency
+                    let _ = sender.send(WmEvent::GeometryChanged {
+                        app_id: target_app_id.to_string(),
+                        geometry,
+                    });
+                } else {
+                    println!("[SwayIPC] Could not parse initial geometry (rect={:?}, window_rect={:?})", rect, window_rect);
+                }
+            }
+        }
+
+        // Spawn event thread with captured data
+        thread::spawn(move || {
             // Spawn swaymsg process to subscribe to window and workspace events
             let mut child = match Command::new("swaymsg")
                 .args(["-t", "subscribe", "-m", "[\"window\", \"workspace\"]"])
@@ -109,120 +227,6 @@ impl SwayIpcClient {
 
             let reader = BufReader::new(stdout);
             println!("[SwayIPC] Listening for window events...");
-            println!("[SwayIPC] Waiting for capture signal before attempting toplevel_id capture...");
-
-            // Wait for signal to start monitoring
-            match capture_signal_rx.recv() {
-                Ok(_) => println!("[SwayIPC] Capture signal received, starting monitoring..."),
-                Err(e) => {
-                    eprintln!("[SwayIPC] Capture signal channel closed: {}", e);
-                    return;
-                }
-            }
-
-            println!("[SwayIPC] Monitoring app_id: {}", target_app_id);
-
-            // If we don't have toplevel_id yet, query for it now before starting event loop
-            if target_toplevel_id_opt.is_none() {
-                println!("[SwayIPC] Performing initial query to capture toplevel_id...");
-
-                let cmd = format!("swaymsg -t get_tree | grep -B5 -A15 '\"app_id\": \"{}\"'", target_app_id);
-                if let Ok(output) = Command::new("sh")
-                    .arg("-c")
-                    .arg(&cmd)
-                    .output()
-                {
-                    let output_str = String::from_utf8_lossy(&output.stdout);
-                    for line in output_str.lines() {
-                        if line.contains("foreign_toplevel_identifier") {
-                            if let Some(id) = line.split('"').nth(3) {
-                                println!("[SwayIPC] Captured toplevel_id from initial query: {}", id);
-                                target_toplevel_id_opt = Some(id.to_string());
-                                break;
-                            }
-                        }
-                    }
-                }
-
-                if target_toplevel_id_opt.is_none() {
-                    println!("[SwayIPC] Initial query did not find toplevel_id, will wait for first window event");
-                }
-            }
-
-            // If we have toplevel_id, query for initial geometry and send event
-            if let Some(ref toplevel_id) = target_toplevel_id_opt {
-                println!("[SwayIPC] Querying initial geometry for toplevel_id: {}", toplevel_id);
-
-                let toplevel_str = format!("\"foreign_toplevel_identifier\": \"{}\"", toplevel_id);
-                let cmd = format!("swaymsg -t get_tree | grep -A40 '{}'", toplevel_str);
-
-                if let Ok(output) = Command::new("sh")
-                    .arg("-c")
-                    .arg(&cmd)
-                    .output()
-                {
-                    let output_str = String::from_utf8_lossy(&output.stdout);
-                    let mut rect: Option<(i32, i32, i32, i32)> = None;
-                    let mut window_rect: Option<(i32, i32, i32, i32)> = None;
-                    let mut in_rect = false;
-                    let mut in_window_rect = false;
-
-                    for line in output_str.lines() {
-                        if line.contains("\"rect\":") {
-                            in_rect = true;
-                            in_window_rect = false;
-                        } else if line.contains("\"window_rect\":") {
-                            in_rect = false;
-                            in_window_rect = true;
-                        } else if line.trim().starts_with("}") || line.contains("\"deco_rect\":") {
-                            in_rect = false;
-                            in_window_rect = false;
-                        }
-
-                        if in_rect || in_window_rect {
-                            if let Some((key, val)) = parse_json_int_field(line) {
-                                match key.as_str() {
-                                    "x" => {
-                                        if in_rect { rect = rect.map_or(Some((val, 0, 0, 0)), |r| Some((val, r.1, r.2, r.3))); }
-                                        if in_window_rect { window_rect = window_rect.map_or(Some((val, 0, 0, 0)), |r| Some((val, r.1, r.2, r.3))); }
-                                    }
-                                    "y" => {
-                                        if in_rect { rect = rect.map_or(Some((0, val, 0, 0)), |r| Some((r.0, val, r.2, r.3))); }
-                                        if in_window_rect { window_rect = window_rect.map_or(Some((0, val, 0, 0)), |r| Some((r.0, val, r.2, r.3))); }
-                                    }
-                                    "width" => {
-                                        if in_rect { rect = rect.map_or(Some((0, 0, val, 0)), |r| Some((r.0, r.1, val, r.3))); }
-                                        if in_window_rect { window_rect = window_rect.map_or(Some((0, 0, val, 0)), |r| Some((r.0, r.1, val, r.3))); }
-                                    }
-                                    "height" => {
-                                        if in_rect { rect = rect.map_or(Some((0, 0, 0, val)), |r| Some((r.0, r.1, r.2, val))); }
-                                        if in_window_rect { window_rect = window_rect.map_or(Some((0, 0, 0, val)), |r| Some((r.0, r.1, r.2, val))); }
-                                    }
-                                    _ => {}
-                                }
-                            }
-                        }
-                    }
-
-                    if let (Some(r), Some(wr)) = (rect, window_rect) {
-                        let geometry = WindowGeometry {
-                            x: r.0 + wr.0,
-                            y: r.1 + wr.1,
-                            width: wr.2,
-                            height: wr.3,
-                        };
-
-                        println!("[SwayIPC] Sending initial GeometryChanged: x={}, y={}, w={}, h={}",
-                                 geometry.x, geometry.y, geometry.width, geometry.height);
-                        let _ = sender.send(WmEvent::GeometryChanged {
-                            app_id: target_app_id.to_string(),
-                            geometry,
-                        });
-                    } else {
-                        println!("[SwayIPC] Could not parse initial geometry (rect={:?}, window_rect={:?})", rect, window_rect);
-                    }
-                }
-            }
 
             // Read events line by line (each line is a JSON event)
             for line in reader.lines() {
@@ -234,16 +238,6 @@ impl SwayIpcClient {
 
                         // Parse and process the event
                         if let Ok(event) = serde_json::from_str::<WindowEvent>(&json_str) {
-                            // If we don't have toplevel_id yet, try to capture it from matching app_id event
-                            if target_toplevel_id_opt.is_none() {
-                                if event.container.app_id.as_deref() == Some(&target_app_id) {
-                                    if let Some(ref id) = event.container.foreign_toplevel_identifier {
-                                        println!("[SwayIPC] Captured toplevel_id: {} from first matching event", id);
-                                        target_toplevel_id_opt = Some(id.clone());
-                                    }
-                                }
-                            }
-
                             // Process all events - fainting_trigger will filter by toplevel_id
                             Self::fainting_trigger(event, &target_app_id, target_toplevel_id_opt.as_deref(), &sender);
                         } else {
@@ -273,6 +267,8 @@ impl SwayIpcClient {
                                         println!("[SwayIPC] ERROR: Failed to create SwayIpcClient: {}", e);
                                     }
                                 }
+                            } else {
+                                println!("[SwayIPC] WARNING: target_toplevel_id is None, cannot query visibility");
                             }
                         }
                     }
@@ -286,7 +282,7 @@ impl SwayIpcClient {
             eprintln!("[SwayIPC] Event loop ended, swaymsg exited");
         });
 
-        Ok(())
+        Ok(initial_geometry)
     }
 
     fn process_window_event(event: WindowEvent, target_app_id: &str, sender: &mpsc::Sender<WmEvent>) {

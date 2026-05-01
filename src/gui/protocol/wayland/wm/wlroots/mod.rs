@@ -32,9 +32,12 @@ impl WindowManager for WlrootsWindowManager {
         *self.capture_signal_receiver.lock().unwrap() = Some(signal_rx);
     }
 
-    fn start_monitoring(&self, target_app_id: String, target_toplevel_id: Option<String>) {
+    fn start_monitoring(&self, target_app_id: String, target_toplevel_id: Option<String>) -> Option<WindowGeometry> {
         let sender = self.sender.lock().unwrap().clone();
         let capture_signal_opt = self.capture_signal_receiver.lock().unwrap().take();
+
+        // Create channel to receive initial geometry from the thread
+        let (geometry_tx, geometry_rx) = mpsc::channel::<Option<WindowGeometry>>();
 
         thread::spawn(move || {
             if let Some(s) = sender {
@@ -48,10 +51,21 @@ impl WindowManager for WlrootsWindowManager {
 
                 // Start Sway IPC monitoring with capture signal channel
                 if let Ok(client) = sway_ipc::SwayIpcClient::new() {
-                    let _ = client.subscribe_window_events(target_app_id, target_toplevel_id, s, capture_rx);
+                    let initial_geometry = client.subscribe_window_events(target_app_id, target_toplevel_id, s, capture_rx)
+                        .ok()
+                        .flatten();
+                    // Send initial geometry back to main thread
+                    let _ = geometry_tx.send(initial_geometry);
+                } else {
+                    let _ = geometry_tx.send(None);
                 }
+            } else {
+                let _ = geometry_tx.send(None);
             }
         });
+
+        // Wait for initial geometry (with timeout-like behavior using recv)
+        geometry_rx.recv().ok().flatten()
     }
 
     fn get_window_geometry(&self, _app_id: &str) -> Option<WindowGeometry> {
