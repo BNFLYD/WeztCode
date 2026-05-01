@@ -166,17 +166,22 @@ impl Gtk4Platform {
                             let overlay_height = geometry.height;
                             let screen_height = 1080; // TODO: detect dynamically
 
+                            let screen_width = 1920; // TODO: detect dynamically
+                            let right_margin = (screen_width - geometry.x - overlay_width).max(0);
+
                             println!("[GTK] Updating position and size: x={}, y={}, w={}, h={}",
                                      geometry.x, geometry.y, overlay_width, overlay_height);
+                            println!("[GTK] Calculated margins: right={}, top={}", right_margin, geometry.y);
 
                             // Resize the window
                             window.set_default_size(overlay_width, overlay_height);
 
                             // Reposition using layer shell margins
+                            window.set_margin(Edge::Right, right_margin);
                             window.set_margin(Edge::Top, geometry.y);
-                            window.set_margin(Edge::Bottom, (screen_height - geometry.y - geometry.height).max(0));
 
-                            println!("[GTK] Repositioned to y={} with height={}", geometry.y, overlay_height);
+                            println!("[GTK] Repositioned to x={}, y={} with size {}x{}",
+                                     geometry.x, geometry.y, overlay_width, overlay_height);
                         }
                     }
                 }
@@ -198,12 +203,16 @@ impl Gtk4Platform {
                                 println!("[GTK] Terminal exited fullscreen - layer restored to TOP");
                             }
 
+                            let screen_width = 1920; // TODO: detect dynamically
+                            let right_margin = (screen_width - geometry.x - overlay_width).max(0);
+
                             // Resize and reposition
                             window.set_default_size(overlay_width, overlay_height);
+                            window.set_margin(Edge::Right, right_margin);
                             window.set_margin(Edge::Top, geometry.y);
-                            window.set_margin(Edge::Bottom, (screen_height - geometry.y - geometry.height).max(0));
 
-                            println!("[GTK] Fullscreen resize: {}x{} at y={}", overlay_width, overlay_height, geometry.y);
+                            println!("[GTK] Fullscreen resize: {}x{} at x={}, y={}",
+                                     overlay_width, overlay_height, geometry.x, geometry.y);
                         }
                     }
                 }
