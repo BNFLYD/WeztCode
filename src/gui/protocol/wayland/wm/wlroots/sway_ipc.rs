@@ -128,7 +128,7 @@ impl SwayIpcClient {
             println!("[SwayIPC] Querying initial geometry for toplevel_id: {}", toplevel_id);
 
             let toplevel_str = format!("\"foreign_toplevel_identifier\": \"{}\"", toplevel_id);
-            let cmd = format!("swaymsg -t get_tree | grep -A40 '{}'", toplevel_str);
+            let cmd = format!("swaymsg -t get_tree | grep -B40 '{}'", toplevel_str);
 
             if let Ok(output) = Command::new("sh")
                 .arg("-c")
