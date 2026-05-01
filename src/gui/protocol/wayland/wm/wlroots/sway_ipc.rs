@@ -122,6 +122,33 @@ impl SwayIpcClient {
 
             println!("[SwayIPC] Monitoring app_id: {}", target_app_id);
 
+            // If we don't have toplevel_id yet, query for it now before starting event loop
+            if target_toplevel_id_opt.is_none() {
+                println!("[SwayIPC] Performing initial query to capture toplevel_id...");
+
+                let cmd = format!("swaymsg -t get_tree | grep -B5 -A15 '\"app_id\": \"{}\"'", target_app_id);
+                if let Ok(output) = Command::new("sh")
+                    .arg("-c")
+                    .arg(&cmd)
+                    .output()
+                {
+                    let output_str = String::from_utf8_lossy(&output.stdout);
+                    for line in output_str.lines() {
+                        if line.contains("foreign_toplevel_identifier") {
+                            if let Some(id) = line.split('"').nth(3) {
+                                println!("[SwayIPC] Captured toplevel_id from initial query: {}", id);
+                                target_toplevel_id_opt = Some(id.to_string());
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if target_toplevel_id_opt.is_none() {
+                    println!("[SwayIPC] Initial query did not find toplevel_id, will wait for first window event");
+                }
+            }
+
             // Read events line by line (each line is a JSON event)
             for line in reader.lines() {
                 match line {
