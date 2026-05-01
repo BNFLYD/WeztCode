@@ -164,55 +164,28 @@ impl Gtk4Platform {
                             // Calculate proportional width: 20% of terminal width, min 350px
                             let overlay_width = ((geometry.width as f32) * 0.20).max(350.0) as i32;
                             let overlay_height = geometry.height;
-                            let screen_height = 1080; // TODO: detect dynamically
 
-                            let screen_width = 1920; // TODO: detect dynamically
-                            let right_margin = (screen_width - geometry.x - overlay_width).max(0);
+                            println!("[GTK] Resizing overlay to {}x{} (terminal: {}x{} at x={}, y={})",
+                                     overlay_width, overlay_height, geometry.width, geometry.height, geometry.x, geometry.y);
 
-                            println!("[GTK] Updating position and size: x={}, y={}, w={}, h={}",
-                                     geometry.x, geometry.y, overlay_width, overlay_height);
-                            println!("[GTK] Calculated margins: right={}, top={}", right_margin, geometry.y);
-
-                            // Resize the window
                             window.set_default_size(overlay_width, overlay_height);
-
-                            // Reposition using layer shell margins
-                            window.set_margin(Edge::Right, right_margin);
-                            window.set_margin(Edge::Top, geometry.y);
-
-                            println!("[GTK] Repositioned to x={}, y={} with size {}x{}",
-                                     geometry.x, geometry.y, overlay_width, overlay_height);
+                            // TODO: Positioning to be implemented
                         }
                     }
                 }
                 Ok(WmEvent::FullscreenChanged { app_id, geometry, is_fullscreen }) => {
-                    println!("[GTK] FullscreenChanged for {}: fullscreen={}, geometry={:?}", app_id, is_fullscreen, geometry);
+                    println!("[GTK] FullscreenChanged for {}: fullscreen={}", app_id, is_fullscreen);
                     if let Ok(window_ref) = window_weak.try_borrow() {
                         if let Some(ref window) = *window_ref {
                             let overlay_width = ((geometry.width as f32) * 0.20).max(350.0) as i32;
                             let overlay_height = geometry.height;
-                            let screen_height = 1080; // TODO: detect dynamically
 
-                            if is_fullscreen {
-                                // In fullscreen mode: change to OVERLAY layer to stay on top
-                                window.set_layer(Layer::Overlay);
-                                println!("[GTK] Terminal fullscreen - layer changed to OVERLAY");
-                            } else {
-                                // Exited fullscreen: restore TOP layer
-                                window.set_layer(Layer::Top);
-                                println!("[GTK] Terminal exited fullscreen - layer restored to TOP");
-                            }
+                            println!("[GTK] Fullscreen mode: {}, resizing to {}x{}",
+                                     is_fullscreen, overlay_width, overlay_height);
 
-                            let screen_width = 1920; // TODO: detect dynamically
-                            let right_margin = (screen_width - geometry.x - overlay_width).max(0);
-
-                            // Resize and reposition
                             window.set_default_size(overlay_width, overlay_height);
-                            window.set_margin(Edge::Right, right_margin);
-                            window.set_margin(Edge::Top, geometry.y);
-
-                            println!("[GTK] Fullscreen resize: {}x{} at x={}, y={}",
-                                     overlay_width, overlay_height, geometry.x, geometry.y);
+                            // TODO: Layer shell switching to be implemented later
+                            // TODO: Positioning to be implemented later
                         }
                     }
                 }
