@@ -164,9 +164,19 @@ impl Gtk4Platform {
                             // Calculate proportional width: 20% of terminal width, min 350px
                             let overlay_width = ((geometry.width as f32) * 0.20).max(350.0) as i32;
                             let overlay_height = geometry.height;
-                            println!("[GTK] Setting size request: {}x{} (terminal was {}x{})",
-                                     overlay_width, overlay_height, geometry.width, geometry.height);
-                            window.set_size_request(overlay_width, overlay_height);
+                            let screen_height = 1080; // TODO: detect dynamically
+
+                            println!("[GTK] Updating position and size: x={}, y={}, w={}, h={}",
+                                     geometry.x, geometry.y, overlay_width, overlay_height);
+
+                            // Resize the window
+                            window.set_default_size(overlay_width, overlay_height);
+
+                            // Reposition using layer shell margins
+                            window.set_margin(Edge::Top, geometry.y);
+                            window.set_margin(Edge::Bottom, (screen_height - geometry.y - geometry.height).max(0));
+
+                            println!("[GTK] Repositioned to y={} with height={}", geometry.y, overlay_height);
                         }
                     }
                 }
@@ -174,21 +184,26 @@ impl Gtk4Platform {
                     println!("[GTK] FullscreenChanged for {}: fullscreen={}, geometry={:?}", app_id, is_fullscreen, geometry);
                     if let Ok(window_ref) = window_weak.try_borrow() {
                         if let Some(ref window) = *window_ref {
+                            let overlay_width = ((geometry.width as f32) * 0.20).max(350.0) as i32;
+                            let overlay_height = geometry.height;
+                            let screen_height = 1080; // TODO: detect dynamically
+
                             if is_fullscreen {
-                                // In fullscreen mode: resize to match terminal but keep visible
-                                let overlay_width = ((geometry.width as f32) * 0.20).max(350.0) as i32;
-                                let overlay_height = geometry.height;
-                                window.set_size_request(overlay_width, overlay_height);
-                                println!("[GTK] Terminal fullscreen - overlay resized to {}x{}", overlay_width, overlay_height);
-                                // TODO: Change layer shell from TOP to OVERLAY if needed
+                                // In fullscreen mode: change to OVERLAY layer to stay on top
+                                window.set_layer(Layer::Overlay);
+                                println!("[GTK] Terminal fullscreen - layer changed to OVERLAY");
                             } else {
-                                // Exited fullscreen: restore normal size
-                                let overlay_width = ((geometry.width as f32) * 0.20).max(350.0) as i32;
-                                let overlay_height = geometry.height;
-                                window.set_size_request(overlay_width, overlay_height);
-                                println!("[GTK] Terminal exited fullscreen - overlay restored to {}x{}", overlay_width, overlay_height);
-                                // TODO: Restore layer shell to TOP if changed
+                                // Exited fullscreen: restore TOP layer
+                                window.set_layer(Layer::Top);
+                                println!("[GTK] Terminal exited fullscreen - layer restored to TOP");
                             }
+
+                            // Resize and reposition
+                            window.set_default_size(overlay_width, overlay_height);
+                            window.set_margin(Edge::Top, geometry.y);
+                            window.set_margin(Edge::Bottom, (screen_height - geometry.y - geometry.height).max(0));
+
+                            println!("[GTK] Fullscreen resize: {}x{} at y={}", overlay_width, overlay_height, geometry.y);
                         }
                     }
                 }
