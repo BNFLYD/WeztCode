@@ -68,10 +68,8 @@ impl GuiPlatform for Gtk4Platform {
 
                 // Top margin = terminal Y position (for alignment)
                 window.set_margin(Edge::Top, geo.y);
-                // Bottom margin = remaining screen space minus terminal height
-                let screen_height = 1080; // TODO: detectar dinámicamente
-                let bottom_margin = screen_height - geo.y - geo.height;
-                window.set_margin(Edge::Bottom, bottom_margin.max(0));
+                // No bottom margin needed - window stretches naturally
+                window.set_margin(Edge::Bottom, 0);
             } else {
                 // Default values
                 window.set_margin(Edge::Top, 1);
