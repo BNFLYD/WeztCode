@@ -15,6 +15,8 @@ pub enum WmEvent {
     WindowUnfocused { app_id: String },
     /// Window geometry changed
     GeometryChanged { app_id: String, geometry: WindowGeometry },
+    /// Window fullscreen state changed
+    FullscreenChanged { app_id: String, geometry: WindowGeometry, is_fullscreen: bool },
     /// New window created
     WindowCreated { app_id: String },
     /// Window destroyed/closed

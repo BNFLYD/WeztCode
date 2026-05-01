@@ -272,13 +272,14 @@ impl SwayIpcClient {
                         });
                     }
                 }
-                "move" | "resize" | "fullscreen" => {
+                "move" | "resize" => {
                     if event.container.focused {
-                        println!("[SwayIPC] Target window GEOMETRY CHANGED (toplevel match)");
-                        let _ = sender.send(WmEvent::GeometryChanged {
-                            app_id: target_app_id.to_string(),
-                            geometry
-                        });
+                        Self::geometry_trigger(event, target_app_id, sender);
+                    }
+                }
+                "fullscreen" => {
+                    if event.container.focused {
+                        Self::fullscreen_trigger(event, target_app_id, sender);
                     }
                 }
                 _ => {
@@ -366,6 +367,62 @@ impl SwayIpcClient {
         None
     }
 
+    /// Trigger for move and resize events - updates overlay position and size
+    fn geometry_trigger(
+        event: WindowEvent,
+        target_app_id: &str,
+        sender: &mpsc::Sender<WmEvent>,
+    ) {
+        // Calculate geometry using rect + window_rect
+        let global_rect = &event.container.rect;
+        let window_rect = &event.container.window_rect;
+
+        let geometry = WindowGeometry {
+            x: global_rect.x + window_rect.x,
+            y: global_rect.y + window_rect.y,
+            width: window_rect.width,
+            height: window_rect.height,
+        };
+
+        println!("[SwayIPC] Geometry trigger - move/resize: x={}, y={}, w={}, h={}",
+            geometry.x, geometry.y, geometry.width, geometry.height);
+
+        let _ = sender.send(WmEvent::GeometryChanged {
+            app_id: target_app_id.to_string(),
+            geometry,
+        });
+    }
+
+    /// Trigger for fullscreen events - updates overlay position, size, and layer shell
+    fn fullscreen_trigger(
+        event: WindowEvent,
+        target_app_id: &str,
+        sender: &mpsc::Sender<WmEvent>,
+    ) {
+        // Calculate fullscreen geometry
+        let global_rect = &event.container.rect;
+        let window_rect = &event.container.window_rect;
+
+        let geometry = WindowGeometry {
+            x: global_rect.x + window_rect.x,
+            y: global_rect.y + window_rect.y,
+            width: window_rect.width,
+            height: window_rect.height,
+        };
+
+        // Check if window is in fullscreen mode (fullscreen_mode > 0 means fullscreen)
+        let is_fullscreen = event.container.fullscreen_mode.unwrap_or(0) > 0;
+
+        println!("[SwayIPC] Fullscreen trigger: is_fullscreen={}, geometry={:?}",
+            is_fullscreen, geometry);
+
+        let _ = sender.send(WmEvent::FullscreenChanged {
+            app_id: target_app_id.to_string(),
+            geometry,
+            is_fullscreen,
+        });
+    }
+
     fn send_message(stream: &mut UnixStream, msg_type: u32, payload: &str) -> Result<(), String> {
         let magic = b"i3-ipc";
         let payload_bytes = payload.as_bytes();
@@ -448,6 +505,7 @@ struct WindowEventContainer {
     name: Option<String>,
     focused: bool,
     visible: bool,
+    fullscreen_mode: Option<i64>,
     rect: Rect,
     window_rect: Rect,
 }

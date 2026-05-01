@@ -45,37 +45,37 @@ impl GuiPlatform for Gtk4Platform {
             window.init_layer_shell();
             window.set_layer(Layer::Top);
             window.set_anchor(Edge::Right, true);
-            // Anclar a top/bottom para que se adapte a los márgenes
+            // Anchor to top and bottom to adapt to margins
             window.set_anchor(Edge::Top, true);
             window.set_anchor(Edge::Bottom, true);
 
-            // Calcular márgenes basados en la geometría de la terminal
+            // Calculate margins based on terminal geometry
             if let Some(geo) = &term_geometry {
-                println!("GTK: Usando geometría de terminal: x={}, y={}, w={}, h={}",
+                println!("GTK: Using terminal geometry: x={}, y={}, w={}, h={}",
                          geo.x, geo.y, geo.width, geo.height);
 
-                // Margen superior = posición Y de la terminal (para alinearse)
+                // Top margin = terminal Y position (for alignment)
                 window.set_margin(Edge::Top, geo.y);
-                // Margen inferior = espacio restante de la pantalla menos altura de terminal
+                // Bottom margin = remaining screen space minus terminal height
                 let screen_height = 1080; // TODO: detectar dinámicamente
                 let bottom_margin = screen_height - geo.y - geo.height;
                 window.set_margin(Edge::Bottom, bottom_margin.max(0));
             } else {
-                // Valores por defecto
+                // Default values
                 window.set_margin(Edge::Top, 1);
                 window.set_margin(Edge::Bottom, 1);
             }
 
-            // Exclusive zone 0 = se comporta bien con otras ventanas
+            // Exclusive zone 0 = behaves well with other windows
             window.set_exclusive_zone(0);
 
-            println!("GTK: Creando WebView...");
+            println!("GTK: Creating WebView...");
             let webview = WebView::new();
 
-            println!("GTK: Cargando URL: {}", &url);
+            println!("GTK: Loading URL: {}", &url);
             webview.load_uri(&url);
 
-            println!("GTK: Añadiendo WebView a ventana...");
+            println!("GTK: Adding WebView to window...");
             window.set_child(Some(&webview));
 
             *window_ref.borrow_mut() = Some(window.clone());
@@ -167,6 +167,28 @@ impl Gtk4Platform {
                             println!("[GTK] Setting size request: {}x{} (terminal was {}x{})",
                                      overlay_width, overlay_height, geometry.width, geometry.height);
                             window.set_size_request(overlay_width, overlay_height);
+                        }
+                    }
+                }
+                Ok(WmEvent::FullscreenChanged { app_id, geometry, is_fullscreen }) => {
+                    println!("[GTK] FullscreenChanged for {}: fullscreen={}, geometry={:?}", app_id, is_fullscreen, geometry);
+                    if let Ok(window_ref) = window_weak.try_borrow() {
+                        if let Some(ref window) = *window_ref {
+                            if is_fullscreen {
+                                // In fullscreen mode: resize to match terminal but keep visible
+                                let overlay_width = ((geometry.width as f32) * 0.20).max(350.0) as i32;
+                                let overlay_height = geometry.height;
+                                window.set_size_request(overlay_width, overlay_height);
+                                println!("[GTK] Terminal fullscreen - overlay resized to {}x{}", overlay_width, overlay_height);
+                                // TODO: Change layer shell from TOP to OVERLAY if needed
+                            } else {
+                                // Exited fullscreen: restore normal size
+                                let overlay_width = ((geometry.width as f32) * 0.20).max(350.0) as i32;
+                                let overlay_height = geometry.height;
+                                window.set_size_request(overlay_width, overlay_height);
+                                println!("[GTK] Terminal exited fullscreen - overlay restored to {}x{}", overlay_width, overlay_height);
+                                // TODO: Restore layer shell to TOP if changed
+                            }
                         }
                     }
                 }
