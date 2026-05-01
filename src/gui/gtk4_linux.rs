@@ -33,13 +33,25 @@ impl GuiPlatform for Gtk4Platform {
         let window_ref = self.window.clone();
         let webview_ref = self.webview.clone();
         let url = url.to_string();
+        let term_geometry_clone = term_geometry.clone();
 
         self.app.connect_activate(move |app| {
+            // Calculate initial size based on terminal geometry if available
+            let (initial_width, initial_height) = if let Some(ref geo) = term_geometry_clone {
+                let width = ((geo.width as f32) * 0.20).max(350.0) as i32;
+                println!("[GTK] Calculating initial size: terminal {}x{} -> overlay {}x{}",
+                         geo.width, geo.height, width, geo.height);
+                (width, geo.height)
+            } else {
+                println!("[GTK] Using default size 350x600 (no terminal geometry available)");
+                (350, 600)
+            };
+
             let window = ApplicationWindow::builder()
                 .application(app)
                 .title("WeztCode")
-                .default_width(350)
-                .default_height(600)
+                .default_width(initial_width)
+                .default_height(initial_height)
                 .build();
 
             window.init_layer_shell();
