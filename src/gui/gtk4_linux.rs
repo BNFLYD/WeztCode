@@ -1,7 +1,7 @@
 use crate::gui::GuiPlatform;
 use crate::gui::protocol::wayland::wm::WindowGeometry;
 use gtk4::prelude::*;
-use gtk4::{Application, ApplicationWindow};
+use gtk4::{Application, ApplicationWindow, gdk};
 use gtk4_layer_shell::{Edge, Layer, LayerShell};
 use webkit6::prelude::*;
 use webkit6::WebView;
@@ -24,6 +24,34 @@ impl Gtk4Platform {
             app,
             window: Rc::new(RefCell::new(None)),
             webview: Rc::new(RefCell::new(None)),
+        }
+    }
+
+    /// Detect monitor geometry using GTK4/GDK - logs dimensions only, no calculations yet
+    fn detect_monitor_geometry(window: &ApplicationWindow) {
+        if let Some(display) = gdk::Display::default() {
+            if let Some(surface) = window.surface() {
+                if let Some(monitor) = display.monitor_at_surface(&surface) {
+                    let geo = monitor.geometry();
+                    println!("[GTK] Monitor detected: {}x{} at x={}, y={}",
+                             geo.width(), geo.height(), geo.x(), geo.y());
+
+                    // Log additional monitor info
+                    println!("[GTK] Monitor scale factor: {}", monitor.scale_factor());
+                    if let Some(manufacturer) = monitor.manufacturer() {
+                        println!("[GTK] Monitor manufacturer: {}", manufacturer);
+                    }
+                    if let Some(model) = monitor.model() {
+                        println!("[GTK] Monitor model: {}", model);
+                    }
+                } else {
+                    println!("[GTK] WARNING: Could not detect monitor at surface");
+                }
+            } else {
+                println!("[GTK] WARNING: Window has no surface yet");
+            }
+        } else {
+            println!("[GTK] WARNING: No default display available");
         }
     }
 }
@@ -92,6 +120,9 @@ impl GuiPlatform for Gtk4Platform {
             *webview_ref.borrow_mut() = Some(webview);
 
             window.present();
+
+            // Log monitor dimensions for future Canvas implementation
+            Self::detect_monitor_geometry(&window);
         });
 
         Ok(())
