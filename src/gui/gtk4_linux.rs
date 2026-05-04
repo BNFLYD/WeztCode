@@ -27,8 +27,8 @@ impl Gtk4Platform {
         }
     }
 
-    /// Detect monitor geometry using GTK4/GDK - logs dimensions only, no calculations yet
-    fn detect_monitor_geometry(window: &ApplicationWindow) {
+    /// Detect monitor geometry using GTK4/GDK and return WindowGeometry
+    fn detect_monitor_geometry(window: &ApplicationWindow) -> Option<WindowGeometry> {
         if let Some(display) = gdk::Display::default() {
             if let Some(surface) = window.surface() {
                 if let Some(monitor) = display.monitor_at_surface(&surface) {
@@ -44,6 +44,13 @@ impl Gtk4Platform {
                     if let Some(model) = monitor.model() {
                         println!("[GTK] Monitor model: {}", model);
                     }
+
+                    return Some(WindowGeometry::new(
+                        geo.x(),
+                        geo.y(),
+                        geo.width(),
+                        geo.height(),
+                    ));
                 } else {
                     println!("[GTK] WARNING: Could not detect monitor at surface");
                 }
@@ -53,6 +60,37 @@ impl Gtk4Platform {
         } else {
             println!("[GTK] WARNING: No default display available");
         }
+        None
+    }
+
+    /// Calculate canvas margins based on monitor and terminal geometry
+    /// Phase 1: Only calculates top and bottom margins
+    /// Side margins (left/right) are kept unchanged from existing behavior
+    fn calculate_canvas_margins(
+        monitor_geo: &WindowGeometry,
+        terminal_geo: &WindowGeometry,
+    ) -> (i32, i32, i32, i32) {
+        // Calculate top margin: space between terminal top and monitor top
+        let margin_top = terminal_geo.y - monitor_geo.y;
+
+        // Calculate bottom margin: space between terminal bottom and monitor bottom
+        let terminal_bottom = terminal_geo.y + terminal_geo.height;
+        let monitor_bottom = monitor_geo.y + monitor_geo.height;
+        let margin_bottom = monitor_bottom - terminal_bottom;
+
+        // Phase 1: Side margins use existing behavior (no dynamic calculation yet)
+        // These values will be applied separately, not returned here
+        let margin_left = 0;  // Keep existing behavior
+        let margin_right = 0; // Keep existing behavior
+
+        println!("[GTK] Canvas margins calculated: top={}, bottom={}, left={}, right={}",
+                 margin_top, margin_bottom, margin_left, margin_right);
+        println!("[GTK] Terminal position: x={}, y={}, w={}, h={}",
+                 terminal_geo.x, terminal_geo.y, terminal_geo.width, terminal_geo.height);
+        println!("[GTK] Monitor position: x={}, y={}, w={}, h={}",
+                 monitor_geo.x, monitor_geo.y, monitor_geo.width, monitor_geo.height);
+
+        (margin_top, margin_bottom, margin_left, margin_right)
     }
 }
 
@@ -89,17 +127,26 @@ impl GuiPlatform for Gtk4Platform {
             window.set_anchor(Edge::Top, true);
             window.set_anchor(Edge::Bottom, true);
 
-            // Calculate margins based on terminal geometry
-            if let Some(geo) = &term_geometry {
-                println!("GTK: Using terminal geometry: x={}, y={}, w={}, h={}",
-                         geo.x, geo.y, geo.width, geo.height);
+            window.present();
 
-                // Top margin = terminal Y position (for alignment)
+            // Get monitor geometry after window is shown
+            if let (Some(monitor_geo), Some(term_geo)) = (Self::detect_monitor_geometry(&window), &term_geometry) {
+                // Calculate canvas margins using monitor + terminal geometry
+                let (margin_top, margin_bottom, _margin_left, _margin_right) =
+                    Self::calculate_canvas_margins(&monitor_geo, term_geo);
+
+                println!("[GTK] Applying canvas margins: top={}, bottom={}", margin_top, margin_bottom);
+                window.set_margin(Edge::Top, margin_top);
+                window.set_margin(Edge::Bottom, margin_bottom);
+            } else if let Some(geo) = &term_geometry {
+                // Fallback: Use terminal geometry only (existing behavior)
+                println!("[GTK] Fallback to terminal-only margins for x={}, y={}, w={}, h={}",
+                         geo.x, geo.y, geo.width, geo.height);
                 window.set_margin(Edge::Top, geo.y);
-                // No bottom margin needed - window stretches naturally
                 window.set_margin(Edge::Bottom, 0);
             } else {
-                // Default values
+                // Default values when no geometry available
+                println!("[GTK] Using default margins (no geometry available)");
                 window.set_margin(Edge::Top, 1);
                 window.set_margin(Edge::Bottom, 1);
             }
@@ -118,11 +165,6 @@ impl GuiPlatform for Gtk4Platform {
 
             *window_ref.borrow_mut() = Some(window.clone());
             *webview_ref.borrow_mut() = Some(webview);
-
-            window.present();
-
-            // Log monitor dimensions for future Canvas implementation
-            Self::detect_monitor_geometry(&window);
         });
 
         Ok(())
