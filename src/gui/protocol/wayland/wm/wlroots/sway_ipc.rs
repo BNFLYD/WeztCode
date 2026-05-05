@@ -602,6 +602,8 @@ impl SwayIpcClient {
             toplevel_str
         );
 
+        println!("[SwayIPC] Querying workarea with cmd: {}", cmd);
+
         match Command::new("sh").arg("-c").arg(&cmd).output() {
             Ok(output) => {
                 let output_str = String::from_utf8_lossy(&output.stdout);
@@ -628,7 +630,14 @@ impl SwayIpcClient {
                              toplevel_id, w, h);
                     WindowGeometry::new(0, 0, w, h)
                 } else {
+                    let output_preview = if output_str.len() > 200 {
+                        &output_str[..200]
+                    } else {
+                        &output_str
+                    };
                     println!("[SwayIPC] Could not parse workspace area for toplevel_id '{}'", toplevel_id);
+                    println!("[SwayIPC] Raw output (first 200 chars): '{}'", output_preview);
+                    println!("[SwayIPC] Parsed: width={:?}, height={:?}", width, height);
                     // Fallback to full monitor size
                     WindowGeometry::new(0, 0, 1920, 1080)
                 }
