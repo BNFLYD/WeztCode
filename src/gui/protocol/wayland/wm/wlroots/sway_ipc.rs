@@ -592,14 +592,18 @@ impl SwayIpcClient {
     /// Get workspace area for a window by foreign_toplevel_identifier using grep
     /// Returns WindowGeometry with workarea dimensions (x=0, y=0, width, height)
     pub fn get_workspace_area(&self, toplevel_id: &str) -> WindowGeometry {
-        // Use grep chain to find workspace rect:
-        // 1. Find toplevel_id with 54 lines after
-        // 2. Find "workspace" with 16 lines after
-        // 3. Find "width" with 1 line after (includes height)
-        let toplevel_str = format!("\"foreign_toplevel_identifier\": \"{}\"", toplevel_id);
+        // Use awk to find workspace rect by searching for patterns instead of line counts
+        // 1. Find toplevel_id
+        // 2. Then find "type": "workspace" in subsequent lines
+        // 3. Extract width and height values and print as "widthxheight"
         let cmd = format!(
-            "swaymsg -t get_tree | grep -A90 '{}' | grep -A16 '\"type\": \"workspace\"' | grep -A1 '\"width\"'",
-            toplevel_str
+            r#"swaymsg -t get_tree | awk -v id="{}" '
+                $0 ~ "\"foreign_toplevel_identifier\": \"" id "\"" {{ found=1 }}
+                found && $0 ~ "\"type\": \"workspace\"" {{ workspace=1 }}
+                workspace && $0 ~ "\"width\":"  {{ gsub(/[^0-9]/,"",$0); width=$0 }}
+                workspace && $0 ~ "\"height\":" {{ gsub(/[^0-9]/,"",$0); print width "x" $0; exit }}
+            '"#,
+            toplevel_id
         );
 
         println!("[SwayIPC] Querying workarea with cmd: {}", cmd);
@@ -608,20 +612,18 @@ impl SwayIpcClient {
             Ok(output) => {
                 let output_str = String::from_utf8_lossy(&output.stdout);
 
-                // Parse width and height from output
+                // Parse width and height from output (format: "1920x1055")
                 let mut width: Option<i32> = None;
                 let mut height: Option<i32> = None;
 
                 for line in output_str.lines() {
                     let trimmed = line.trim();
-                    if trimmed.starts_with("\"width\"") {
-                        if let Some(val) = trimmed.split(':').nth(1) {
-                            width = val.trim().trim_end_matches(',').parse().ok();
-                        }
-                    } else if trimmed.starts_with("\"height\"") {
-                        if let Some(val) = trimmed.split(':').nth(1) {
-                            height = val.trim().trim_end_matches(',').parse().ok();
-                        }
+                    if let Some(pos) = trimmed.find('x') {
+                        let w_str = &trimmed[..pos];
+                        let h_str = &trimmed[pos+1..];
+                        width = w_str.parse().ok();
+                        height = h_str.parse().ok();
+                        break;
                     }
                 }
 
