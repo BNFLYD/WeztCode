@@ -598,7 +598,7 @@ impl SwayIpcClient {
         // 3. Find "width" with 1 line after (includes height)
         let toplevel_str = format!("\"foreign_toplevel_identifier\": \"{}\"", toplevel_id);
         let cmd = format!(
-            "swaymsg -t get_tree | grep -A54 '{}' | grep -A16 '\"type\": \"workspace\"' | grep -A1 '\"width\"'",
+            "swaymsg -t get_tree | grep -A80 '{}' | grep -A16 '\"type\": \"workspace\"' | grep -A1 '\"width\"'",
             toplevel_str
         );
 
