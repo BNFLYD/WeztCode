@@ -589,45 +589,49 @@ impl SwayIpcClient {
             .map_err(|e| format!("Failed to parse tree JSON: {}", e))
     }
 
-    /// Debug log: Find workspace area for a window by foreign_toplevel_identifier
+    /// Debug log: Find workspace area for a window by foreign_toplevel_identifier using grep
     pub fn debug_log_workspace_area(&self, toplevel_id: &str) {
-        // Get the tree
-        let tree = match self.get_tree() {
-            Ok(t) => t,
-            Err(e) => {
-                println!("[SwayIPC] Failed to get tree: {}", e);
-                return;
-            }
-        };
+        // Use grep chain to find workspace rect:
+        // 1. Find toplevel_id with 54 lines after
+        // 2. Find "workspace" with 16 lines after
+        // 3. Find "width" with 1 line after (includes height)
+        let toplevel_str = format!("\"foreign_toplevel_identifier\": \"{}\"", toplevel_id);
+        let cmd = format!(
+            "swaymsg -t get_tree | grep -A54 '{}' | grep -A16 '\"type\": \"workspace\"' | grep -A1 '\"width\"'",
+            toplevel_str
+        );
 
-        // Find the node with matching foreign_toplevel_identifier and its workspace
-        let all_nodes: Vec<&Node> = tree.nodes.iter()
-            .flat_map(|n| flatten_nodes(n))
-            .collect();
+        match Command::new("sh").arg("-c").arg(&cmd).output() {
+            Ok(output) => {
+                let output_str = String::from_utf8_lossy(&output.stdout);
 
-        // Find the target node
-        let target_node = all_nodes.iter()
-            .find(|n| n.foreign_toplevel_identifier.as_deref() == Some(toplevel_id));
+                // Parse width and height from output
+                let mut width: Option<i32> = None;
+                let mut height: Option<i32> = None;
 
-        if let Some(node) = target_node {
-            // Find the workspace parent by looking for node_type == "workspace"
-            let workspace = all_nodes.iter()
-                .find(|n| n.node_type.as_deref() == Some("workspace") &&
-                          node.id.to_string().starts_with(&n.id.to_string()));
-
-            if let Some(ws) = workspace {
-                if let Some(rect) = &ws.rect {
-                    println!("[SwayIPC] Workspace area for toplevel_id '{}': width={}, height={}",
-                             toplevel_id, rect.width, rect.height);
-                } else {
-                    println!("[SwayIPC] Workspace found but no rect: {}",
-                             ws.name.as_deref().unwrap_or("unnamed"));
+                for line in output_str.lines() {
+                    let trimmed = line.trim();
+                    if trimmed.starts_with("\"width\"") {
+                        if let Some(val) = trimmed.split(':').nth(1) {
+                            width = val.trim().trim_end_matches(',').parse().ok();
+                        }
+                    } else if trimmed.starts_with("\"height\"") {
+                        if let Some(val) = trimmed.split(':').nth(1) {
+                            height = val.trim().trim_end_matches(',').parse().ok();
+                        }
+                    }
                 }
-            } else {
-                println!("[SwayIPC] Could not find workspace parent for toplevel_id '{}'", toplevel_id);
+
+                if let (Some(w), Some(h)) = (width, height) {
+                    println!("[SwayIPC] Workspace area for toplevel_id '{}': width={}, height={}",
+                             toplevel_id, w, h);
+                } else {
+                    println!("[SwayIPC] Could not parse workspace area for toplevel_id '{}'", toplevel_id);
+                }
             }
-        } else {
-            println!("[SwayIPC] Window with toplevel_id '{}' not found in tree", toplevel_id);
+            Err(e) => {
+                println!("[SwayIPC] Failed to query workspace area: {}", e);
+            }
         }
     }
 }
