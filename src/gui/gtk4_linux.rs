@@ -95,11 +95,12 @@ impl Gtk4Platform {
 }
 
 impl GuiPlatform for Gtk4Platform {
-    fn create_overlay(&self, url: &str, term_geometry: Option<WindowGeometry>) -> Result<(), String> {
+    fn create_overlay(&self, url: &str, term_geometry: Option<WindowGeometry>, workarea: Option<WindowGeometry>) -> Result<(), String> {
         let window_ref = self.window.clone();
         let webview_ref = self.webview.clone();
         let url = url.to_string();
         let term_geometry_clone = term_geometry.clone();
+        let workarea_clone = workarea.clone();
 
         self.app.connect_activate(move |app| {
             // Calculate initial size based on terminal geometry if available
@@ -129,13 +130,16 @@ impl GuiPlatform for Gtk4Platform {
 
             window.present();
 
-            // Get monitor geometry after window is shown
-            if let (Some(monitor_geo), Some(term_geo)) = (Self::detect_monitor_geometry(&window), &term_geometry) {
-                // Calculate canvas margins using monitor + terminal geometry
-                let (margin_top, margin_bottom, _margin_left, _margin_right) =
-                    Self::calculate_canvas_margins(&monitor_geo, term_geo);
+            // Use provided workarea for margin calculations, fallback to GTK monitor geometry
+            let monitor_geo = workarea_clone.or_else(|| Self::detect_monitor_geometry(&window));
 
-                println!("[GTK] Applying canvas margins: top={}, bottom={}", margin_top, margin_bottom);
+            if let (Some(monitor), Some(term_geo)) = (monitor_geo, &term_geometry) {
+                // Calculate canvas margins using workarea + terminal geometry
+                let (margin_top, margin_bottom, _margin_left, _margin_right) =
+                    Self::calculate_canvas_margins(&monitor, term_geo);
+
+                println!("[GTK] Using workarea for margins: {}x{} (top={}, bottom={})",
+                         monitor.width, monitor.height, margin_top, margin_bottom);
                 window.set_margin(Edge::Top, margin_top);
                 window.set_margin(Edge::Bottom, margin_bottom);
             } else if let Some(geo) = &term_geometry {

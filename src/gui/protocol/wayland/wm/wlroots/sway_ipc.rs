@@ -80,7 +80,7 @@ impl SwayIpcClient {
         target_toplevel_id: Option<String>,
         sender: mpsc::Sender<WmEvent>,
         capture_signal_rx: mpsc::Receiver<()>,
-    ) -> Result<Option<WindowGeometry>, String> {
+    ) -> Result<Option<(WindowGeometry, WindowGeometry)>, String> {
         // Wait for signal to start monitoring (SYNCHRONOUS)
         println!("[SwayIPC] Waiting for capture signal before starting...");
         match capture_signal_rx.recv() {
@@ -94,7 +94,7 @@ impl SwayIpcClient {
 
         // Mutable target_toplevel_id - can be captured from query if not provided
         let mut target_toplevel_id_opt = target_toplevel_id;
-        let mut initial_geometry: Option<WindowGeometry> = None;
+        let mut initial_geometry: Option<(WindowGeometry, WindowGeometry)> = None;
 
         // If we don't have toplevel_id yet, query for it now before starting event loop
         if target_toplevel_id_opt.is_none() {
@@ -189,10 +189,10 @@ impl SwayIpcClient {
                     println!("[SwayIPC] Initial geometry captured: x={}, y={}, w={}, h={}",
                              geometry.x, geometry.y, geometry.width, geometry.height);
 
-                    // Debug log the workspace area for this window
-                    Self::debug_log_workspace_area(&self, toplevel_id);
+                    // Get workspace area for this window
+                    let workarea = Self::get_workspace_area(&self, toplevel_id);
 
-                    initial_geometry = Some(geometry.clone());
+                    initial_geometry = Some((geometry.clone(), workarea));
 
                     // Also send as event for consistency
                     let _ = sender.send(WmEvent::GeometryChanged {
@@ -589,8 +589,9 @@ impl SwayIpcClient {
             .map_err(|e| format!("Failed to parse tree JSON: {}", e))
     }
 
-    /// Debug log: Find workspace area for a window by foreign_toplevel_identifier using grep
-    pub fn debug_log_workspace_area(&self, toplevel_id: &str) {
+    /// Get workspace area for a window by foreign_toplevel_identifier using grep
+    /// Returns WindowGeometry with workarea dimensions (x=0, y=0, width, height)
+    pub fn get_workspace_area(&self, toplevel_id: &str) -> WindowGeometry {
         // Use grep chain to find workspace rect:
         // 1. Find toplevel_id with 54 lines after
         // 2. Find "workspace" with 16 lines after
@@ -625,12 +626,17 @@ impl SwayIpcClient {
                 if let (Some(w), Some(h)) = (width, height) {
                     println!("[SwayIPC] Workspace area for toplevel_id '{}': width={}, height={}",
                              toplevel_id, w, h);
+                    WindowGeometry::new(0, 0, w, h)
                 } else {
                     println!("[SwayIPC] Could not parse workspace area for toplevel_id '{}'", toplevel_id);
+                    // Fallback to full monitor size
+                    WindowGeometry::new(0, 0, 1920, 1080)
                 }
             }
             Err(e) => {
                 println!("[SwayIPC] Failed to query workspace area: {}", e);
+                // Fallback to full monitor size
+                WindowGeometry::new(0, 0, 1920, 1080)
             }
         }
     }
