@@ -188,6 +188,10 @@ impl SwayIpcClient {
 
                     println!("[SwayIPC] Initial geometry captured: x={}, y={}, w={}, h={}",
                              geometry.x, geometry.y, geometry.width, geometry.height);
+
+                    // Debug log the workspace area for this window
+                    Self::debug_log_workspace_area(&self, toplevel_id);
+
                     initial_geometry = Some(geometry.clone());
 
                     // Also send as event for consistency
