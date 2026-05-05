@@ -89,6 +89,7 @@ fn main() {
 
     // Detect window manager and setup monitoring FIRST (before creating GTK platform)
     let mut term_geometry = None;
+    let mut workarea = None;
     let mut wm_receiver = None;
     let wm = gui::protocol::wayland::wm::detect_window_manager();
 
@@ -112,9 +113,11 @@ fn main() {
         // Start monitoring target window - this BLOCKS until initial geometry is captured
         // target_toplevel_id is None initially - it will be captured from the query
         println!("[Main] Starting window monitoring and waiting for initial geometry...");
-        let (term_geometry, workarea) = wm.start_monitoring(config::WINDOW_CLASS.to_string(), None)
+        let (tg, wa) = wm.start_monitoring(config::WINDOW_CLASS.to_string(), None)
             .map(|(g, w)| (Some(g), Some(w)))
             .unwrap_or((None, None));
+        term_geometry = tg;
+        workarea = wa;
 
         if let (Some(ref geo), Some(ref work)) = (&term_geometry, &workarea) {
             println!("[Main] Initial geometry captured: x={}, y={}, w={}, h={}",
