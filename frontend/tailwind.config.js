@@ -5,7 +5,17 @@ export default {
     './src/**/**/*.{html,js,svelte,ts}'
   ],
   theme: {
-    extend: {},
+    extend: {
+      colors: {
+        // Main accent color (cyan)
+        accent: '#2ca798',
+        // Background colors
+        back: '#1e1e1e',
+        'back-deep': '#0d0d0d',
+        // Text color
+        text: '#d0d0d0',
+      },
+    },
   },
   plugins: [
     require('tailwindcss-animate')

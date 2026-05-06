@@ -47,9 +47,9 @@
   });
 </script>
   <!-- Sidebar -->
-  <div class="h-[100vh] flex flex-col bg-[#1e1e1e] border-l-2 border-[#2ca798] rounded-l-3xl overflow-hidden">
+  <div class="h-[100vh] flex flex-col bg-back-deep border-l-2 border-[#2ca798] rounded-l-3xl overflow-hidden">
     <!-- Section Header -->
-    <div class="px-5 py-4 border-b border-[#2ca798]/30 bg-[#1e1e1e]/80">
+    <div class="px-5 py-4 border-b border-[#2ca798]/30 bg-back-deep/80">
       <h2 class="text-sm font-bold uppercase tracking-[3px] text-[#d0d0d0]">
         {sections.find(s => s.id === activeSection)?.label}
       </h2>
@@ -143,7 +143,7 @@
     </div>
 
     <!-- Footer Navigation -->
-    <div class="border-t border-[#2ca798]/30 bg-[#1e1e1e] p-4 flex items-center justify-center gap-2">
+    <div class="border-t border-[#2ca798]/30 bg-back-deep p-4 flex items-center justify-center gap-2">
       {#each sections as section}
         <button
           class="w-9 h-9 flex items-center justify-center rounded-md transition-all {activeSection === section.id ? 'bg-[#2ca798] text-[#0d0d0d]' : 'text-[#2ca798]/70 hover:bg-[#2ca798]/15 hover:text-[#2ca798]'}"
