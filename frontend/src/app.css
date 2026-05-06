@@ -24,6 +24,6 @@
     @apply border-[#2ca798]/30;
   }
   body {
-    @apply bg-[#0d0d0d] text-[#2ca798];
+    @apply bg-transparent text-[#2ca798];
   }
 }
