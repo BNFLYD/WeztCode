@@ -64,7 +64,7 @@
             <div style="padding-left: {item.level * 16}px">
               {#if item.folder}
                 <button
-                  class="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-accent-line/20 transition-colors group text-sm"
+                  class="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-accent-detail/20 transition-colors group text-sm"
                   on:click={() => toggleFolder(item.name)}
                 >
                   <span class="text-accent-warn transition-transform" class:rotate-[-90deg]={!item.isExpanded}>
@@ -74,7 +74,7 @@
                   <span class="text-accent-warn/80 group-hover:text-accent-warn">{item.name}</span>
                 </button>
               {:else}
-                <div class="flex items-center gap-2 px-3 py-2 rounded hover:bg-accent-line/20 transition-colors text-sm">
+                <div class="flex items-center gap-2 px-3 py-2 rounded hover:bg-accent-detail/20 transition-colors text-sm">
                   <span class="text-print">{item.icon}</span>
                   <span class="text-accent-warn/70">{item.name}</span>
                 </div>
@@ -116,7 +116,7 @@
       {:else if activeSection === 'notifications'}
         <div class="flex flex-col gap-2.5">
           {#each [1, 2, 3] as i}
-            <div class="bg-back border border-accent/30 rounded-lg p-3.5 space-y-1 hover:bg-accent-line/10 transition-colors cursor-pointer">
+            <div class="bg-back border border-accent/30 rounded-lg p-3.5 space-y-1 hover:bg-accent-detail/10 transition-colors cursor-pointer">
               <p class="text-xs font-bold text-print">Notificación {i}</p>
               <p class="text-xs text-accent-warn/70">Mensaje de notificación importante</p>
             </div>
@@ -146,7 +146,7 @@
     <div class="border-t border-accent/30 bg-back-deep p-4 flex items-center justify-center gap-2">
       {#each sections as section}
         <button
-          class="w-9 h-9 flex items-center justify-center rounded-md transition-all {activeSection === section.id ? 'bg-accent-line text-back' : 'text-accent-warn/70 hover:bg-accent-line/15 hover:text-accent-warn'}"
+          class="w-9 h-9 flex items-center justify-center rounded-md transition-all {activeSection === section.id ? 'bg-accent-detail text-accent' : 'bg-accent-detail text-back-deep hover:bg-accent/15 hover:text-back'}"
           on:click={() => activeSection = section.id}
           title={section.label}
         >
