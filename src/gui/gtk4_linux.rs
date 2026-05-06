@@ -187,6 +187,9 @@ impl GuiPlatform for Gtk4Platform {
             println!("GTK: Creating WebView...");
             let webview = WebView::new();
 
+            // Make WebView background transparent to allow GTK window transparency
+            webview.set_background_color(&gdk::RGBA::new(0.0, 0.0, 0.0, 0.0));
+
             println!("GTK: Loading URL: {}", &url);
             webview.load_uri(&url);
 
