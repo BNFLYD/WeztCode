@@ -264,7 +264,20 @@ impl Gtk4Platform {
                                      overlay_width, overlay_height, geometry.width, geometry.height, geometry.x, geometry.y);
 
                             window.set_default_size(overlay_width, overlay_height);
-                            // TODO: Positioning to be implemented
+
+                            // Phase 3: Recalculate margins based on new geometry
+                            // Query fresh monitor/workarea data for most current information
+                            if let Some(monitor) = Self::detect_monitor_geometry(window) {
+                                let (margin_top, margin_bottom, _margin_left, margin_right) =
+                                    Self::calculate_canvas_margins(&monitor, &geometry, overlay_width);
+
+                                println!("[GTK] Recalculating margins: top={}, bottom={}, right={}",
+                                         margin_top, margin_bottom, margin_right);
+
+                                window.set_margin(Edge::Top, margin_top);
+                                window.set_margin(Edge::Bottom, margin_bottom);
+                                window.set_margin(Edge::Right, margin_right);
+                            }
                         }
                     }
                 }
