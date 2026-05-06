@@ -130,6 +130,18 @@ impl GuiPlatform for Gtk4Platform {
                 .default_height(initial_height)
                 .build();
 
+            // Make window transparent for rounded corners
+            window.set_css_classes(&[&"transparent-window"]);
+            let css_provider = gtk4::CssProvider::new();
+            css_provider.load_from_data(
+                "window.transparent-window { background: transparent; }"
+            );
+            gtk4::style_context_add_provider_for_display(
+                &gdk::Display::default().expect("No display"),
+                &css_provider,
+                gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION
+            );
+
             window.init_layer_shell();
             window.set_layer(Layer::Top);
             window.set_anchor(Edge::Right, true);
@@ -174,6 +186,9 @@ impl GuiPlatform for Gtk4Platform {
 
             println!("GTK: Creating WebView...");
             let webview = WebView::new();
+
+            // Make WebView background transparent
+            webview.set_background_color(&gdk::RGBA::new(0.0, 0.0, 0.0, 0.0));
 
             println!("GTK: Loading URL: {}", &url);
             webview.load_uri(&url);
