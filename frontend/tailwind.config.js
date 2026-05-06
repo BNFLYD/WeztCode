@@ -7,18 +7,22 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Main accent color (cyan)
+        // Accent colors
         accent: {
           DEFAULT: '#00ffdd',
-          line: '#c5bfae',
+          line: '#efede3',
           warn: '#ac57ff',
           err: '#ff3370',
         },
         // Background colors
-        back: '#1e1e1e',
-        'back-deep': '#0d0d0d',
-        // Text color
-        text: '#d0d0d0',
+        back: {
+          DEFAULT: '#302f2c',
+          deep: '#0d0d0d',
+        },
+        // Text colors
+        print: {
+          DEFAULT: '#d0d0d0',
+        },
       },
     },
   },
