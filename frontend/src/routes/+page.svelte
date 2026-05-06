@@ -47,9 +47,9 @@
   });
 </script>
   <!-- Sidebar -->
-  <div class="h-[100vh] flex flex-col bg-back-deep border-l-2 border-[#2ca798] rounded-l-3xl overflow-hidden">
+  <div class="h-[100vh] flex flex-col bg-back-deep border-l-2 border-accent rounded-l-3xl overflow-hidden">
     <!-- Section Header -->
-    <div class="px-5 py-4 border-b border-[#2ca798]/30 bg-back-deep/80">
+    <div class="px-5 py-4 border-b border-accent/30 bg-back-deep/80">
       <h2 class="text-sm font-bold uppercase tracking-[3px] text-[#d0d0d0]">
         {sections.find(s => s.id === activeSection)?.label}
       </h2>
@@ -89,7 +89,7 @@
           <input
             type="text"
             placeholder="Buscar archivos..."
-            class="w-full px-4 py-2.5 bg-[#0d0d0d] border border-[#2ca798] rounded text-sm text-[#2ca798] placeholder:text-[#2ca798]/50 outline-none focus:ring-2 focus:ring-[#2ca798]/20"
+            class="w-full px-4 py-2.5 bg-[#0d0d0d] border border-accent rounded text-sm text-[#2ca798] placeholder:text-[#2ca798]/50 outline-none focus:ring-2 focus:ring-[#2ca798]/20"
           />
           <div class="text-xs text-[#2ca798]/50 text-center py-8">Ingresa un término para buscar</div>
         </div>
@@ -97,7 +97,7 @@
       <!-- Git Section -->
       {:else if activeSection === 'git'}
         <div class="space-y-4">
-          <div class="bg-[#0d0d0d] border border-[#2ca798]/30 rounded-lg p-4 flex flex-col gap-2">
+          <div class="bg-[#0d0d0d] border border-accent/30 rounded-lg p-4 flex flex-col gap-2">
             <p class="text-xs font-bold text-[#d0d0d0] uppercase tracking-wide">Cambios sin confirmar</p>
             <div class="space-y-1.5 text-xs">
               <div class="flex items-center gap-2">
@@ -116,7 +116,7 @@
       {:else if activeSection === 'notifications'}
         <div class="flex flex-col gap-2.5">
           {#each [1, 2, 3] as i}
-            <div class="bg-[#0d0d0d] border border-[#2ca798]/30 rounded-lg p-3.5 space-y-1 hover:bg-[#2ca798]/10 transition-colors cursor-pointer">
+            <div class="bg-[#0d0d0d] border border-accent/30 rounded-lg p-3.5 space-y-1 hover:bg-[#2ca798]/10 transition-colors cursor-pointer">
               <p class="text-xs font-bold text-[#d0d0d0]">Notificación {i}</p>
               <p class="text-xs text-[#2ca798]/70">Mensaje de notificación importante</p>
             </div>
@@ -128,7 +128,7 @@
         <div class="space-y-4">
           <div class="flex flex-col gap-2">
             <label class="text-xs font-bold text-[#d0d0d0] uppercase tracking-wide">Tema</label>
-            <select class="w-full px-3 py-2 bg-[#0d0d0d] border border-[#2ca798] rounded text-xs text-[#2ca798] outline-none">
+            <select class="w-full px-3 py-2 bg-[#0d0d0d] border border-accent rounded text-xs text-[#2ca798] outline-none">
               <option>Oscuro</option>
               <option>Claro</option>
               <option>Automático</option>
@@ -143,7 +143,7 @@
     </div>
 
     <!-- Footer Navigation -->
-    <div class="border-t border-[#2ca798]/30 bg-back-deep p-4 flex items-center justify-center gap-2">
+    <div class="border-t border-accent/30 bg-back-deep p-4 flex items-center justify-center gap-2">
       {#each sections as section}
         <button
           class="w-9 h-9 flex items-center justify-center rounded-md transition-all {activeSection === section.id ? 'bg-[#2ca798] text-[#0d0d0d]' : 'text-[#2ca798]/70 hover:bg-[#2ca798]/15 hover:text-[#2ca798]'}"
