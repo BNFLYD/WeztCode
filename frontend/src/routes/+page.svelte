@@ -146,7 +146,7 @@
     <div class="border-t border-accent/30 bg-back-deep p-4 flex items-center justify-center gap-2">
       {#each sections as section}
         <button
-          class="w-9 h-9 flex items-center justify-center rounded-md transition-all {activeSection === section.id ? 'bg-accent-detail text-accent/15 shadow-sm shadow-accent/30' : 'bg-accent-detail text-back hover:bg-accent/45 hover:text-back'}"
+          class="w-9 h-9 flex items-center justify-center rounded-md transition-all {activeSection === section.id ? 'bg-accent-detail text-back shadow-md shadow-accent/30' : 'bg-accent-detail text-back-deep hover:bg-accent/45 hover:text-back'}"
           on:click={() => activeSection = section.id}
           title={section.label}
         >
