@@ -11,7 +11,7 @@ export default {
         accent: {
           DEFAULT: '#00ffdd',
           contrast: '#efede3',
-          detail: '#c5bfae',
+          detail: '#cfcfcf',
           warn: '#ac57ff',
           err: '#ff3370',
         },
