@@ -67,16 +67,16 @@
                   class="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-accent-err/20 transition-colors group text-sm"
                   on:click={() => toggleFolder(item.name)}
                 >
-                  <span class="text-accent-warn transition-transform" class:rotate-[-90deg]={!item.isExpanded}>
+                  <span class="text-accent-line transition-transform" class:rotate-[-90deg]={!item.isExpanded}>
                     <Icon icon="lucide:chevron-down" class="w-4 h-4" />
                   </span>
                   <span class="text-[#d0d0d0]/80 group-hover:text-[#d0d0d0]">{item.icon}</span>
-                  <span class="text-accent-warn/80 group-hover:text-accent-warn">{item.name}</span>
+                  <span class="text-accent-line/80 group-hover:text-accent-line">{item.name}</span>
                 </button>
               {:else}
                 <div class="flex items-center gap-2 px-3 py-2 rounded hover:bg-accent-err/20 transition-colors text-sm">
                   <span class="text-[#d0d0d0]">{item.icon}</span>
-                  <span class="text-accent-warn/70">{item.name}</span>
+                  <span class="text-accent-line/70">{item.name}</span>
                 </div>
               {/if}
             </div>
@@ -89,9 +89,9 @@
           <input
             type="text"
             placeholder="Buscar archivos..."
-            class="w-full px-4 py-2.5 bg-[#0d0d0d] border border-accent rounded text-sm text-accent-warn placeholder:text-accent-warn/50 outline-none focus:ring-2 focus:ring-[#2ca798]/20"
+            class="w-full px-4 py-2.5 bg-[#0d0d0d] border border-accent rounded text-sm text-accent-line placeholder:text-accent-line/50 outline-none focus:ring-2 focus:ring-[#2ca798]/20"
           />
-          <div class="text-xs text-accent-warn/50 text-center py-8">Ingresa un término para buscar</div>
+          <div class="text-xs text-accent-line/50 text-center py-8">Ingresa un término para buscar</div>
         </div>
 
       <!-- Git Section -->
@@ -118,7 +118,7 @@
           {#each [1, 2, 3] as i}
             <div class="bg-[#0d0d0d] border border-accent/30 rounded-lg p-3.5 space-y-1 hover:bg-accent-err/10 transition-colors cursor-pointer">
               <p class="text-xs font-bold text-[#d0d0d0]">Notificación {i}</p>
-              <p class="text-xs text-accent-warn/70">Mensaje de notificación importante</p>
+              <p class="text-xs text-accent-line/70">Mensaje de notificación importante</p>
             </div>
           {/each}
         </div>
@@ -128,7 +128,7 @@
         <div class="space-y-4">
           <div class="flex flex-col gap-2">
             <label class="text-xs font-bold text-[#d0d0d0] uppercase tracking-wide">Tema</label>
-            <select class="w-full px-3 py-2 bg-[#0d0d0d] border border-accent rounded text-xs text-accent-warn outline-none">
+            <select class="w-full px-3 py-2 bg-[#0d0d0d] border border-accent rounded text-xs text-accent-line outline-none">
               <option>Oscuro</option>
               <option>Claro</option>
               <option>Automático</option>
@@ -146,7 +146,7 @@
     <div class="border-t border-accent/30 bg-back-deep p-4 flex items-center justify-center gap-2">
       {#each sections as section}
         <button
-          class="w-9 h-9 flex items-center justify-center rounded-md transition-all {activeSection === section.id ? 'bg-accent-err text-[#0d0d0d]' : 'text-accent-warn/70 hover:bg-accent-err/15 hover:text-accent-warn'}"
+          class="w-9 h-9 flex items-center justify-center rounded-md transition-all {activeSection === section.id ? 'bg-accent-err text-[#0d0d0d]' : 'text-accent-line/70 hover:bg-accent-err/15 hover:text-accent-line'}"
           on:click={() => activeSection = section.id}
           title={section.label}
         >
