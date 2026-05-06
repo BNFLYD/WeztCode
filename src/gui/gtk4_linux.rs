@@ -79,12 +79,12 @@ impl Gtk4Platform {
         let margin_bottom = monitor_bottom - terminal_bottom;
 
         // Phase 2: Calculate right margin for right-side positioning
-        // margin_right = monitor.width - terminal.x - terminal.width - overlay_width
+        // margin_right = monitor.width - terminal.x - terminal.width
+        // (NO overlay_width subtraction - we want overlay right edge aligned with terminal right edge)
         let terminal_x_relative = terminal_geo.x - monitor_geo.x;
         let margin_right = monitor_geo.width
             - terminal_x_relative
-            - terminal_geo.width
-            - overlay_width;
+            - terminal_geo.width;
         let margin_right = margin_right.max(0); // Ensure non-negative
 
         let margin_left = 0; // Phase 3: Will calculate for left-side positioning
