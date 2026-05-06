@@ -64,11 +64,11 @@ impl Gtk4Platform {
     }
 
     /// Calculate canvas margins based on monitor and terminal geometry
-    /// Phase 1: Only calculates top and bottom margins
-    /// Side margins (left/right) are kept unchanged from existing behavior
+    /// Phase 2: Calculates top, bottom, and right margins for right-side positioning
     fn calculate_canvas_margins(
         monitor_geo: &WindowGeometry,
         terminal_geo: &WindowGeometry,
+        overlay_width: i32,
     ) -> (i32, i32, i32, i32) {
         // Calculate top margin: space between terminal top and monitor top
         let margin_top = terminal_geo.y - monitor_geo.y;
@@ -78,10 +78,16 @@ impl Gtk4Platform {
         let monitor_bottom = monitor_geo.y + monitor_geo.height;
         let margin_bottom = monitor_bottom - terminal_bottom;
 
-        // Phase 1: Side margins use existing behavior (no dynamic calculation yet)
-        // These values will be applied separately, not returned here
-        let margin_left = 0;  // Keep existing behavior
-        let margin_right = 0; // Keep existing behavior
+        // Phase 2: Calculate right margin for right-side positioning
+        // margin_right = monitor.width - terminal.x - terminal.width - overlay_width
+        let terminal_x_relative = terminal_geo.x - monitor_geo.x;
+        let margin_right = monitor_geo.width
+            - terminal_x_relative
+            - terminal_geo.width
+            - overlay_width;
+        let margin_right = margin_right.max(0); // Ensure non-negative
+
+        let margin_left = 0; // Phase 3: Will calculate for left-side positioning
 
         println!("[GTK] Canvas margins calculated: top={}, bottom={}, left={}, right={}",
                  margin_top, margin_bottom, margin_left, margin_right);
@@ -134,14 +140,16 @@ impl GuiPlatform for Gtk4Platform {
             let monitor_geo = workarea_clone.or_else(|| Self::detect_monitor_geometry(&window));
 
             if let (Some(monitor), Some(term_geo)) = (monitor_geo, &term_geometry) {
-                // Calculate canvas margins using workarea + terminal geometry
-                let (margin_top, margin_bottom, _margin_left, _margin_right) =
-                    Self::calculate_canvas_margins(&monitor, term_geo);
+                // Calculate canvas margins using workarea + terminal geometry + overlay width
+                let overlay_width = initial_width as i32;
+                let (margin_top, margin_bottom, _margin_left, margin_right) =
+                    Self::calculate_canvas_margins(&monitor, term_geo, overlay_width);
 
-                println!("[GTK] Using workarea for margins: {}x{} (top={}, bottom={})",
-                         monitor.width, monitor.height, margin_top, margin_bottom);
+                println!("[GTK] Using workarea for margins: {}x{} (top={}, bottom={}, right={})",
+                         monitor.width, monitor.height, margin_top, margin_bottom, margin_right);
                 window.set_margin(Edge::Top, margin_top);
                 window.set_margin(Edge::Bottom, margin_bottom);
+                window.set_margin(Edge::Right, margin_right);
             } else if let Some(geo) = &term_geometry {
                 // Fallback: Use terminal geometry only (existing behavior)
                 println!("[GTK] Fallback to terminal-only margins for x={}, y={}, w={}, h={}",
