@@ -8,7 +8,11 @@ export default {
     extend: {
       colors: {
         // Main accent color (cyan)
-        accent: '#ac57ff',
+        accent: {
+          DEFAULT: '#00ffdd',
+          warn: '#ac57ff',
+          err: '#ff3370',
+        },
         // Background colors
         back: '#1e1e1e',
         'back-deep': '#0d0d0d',
