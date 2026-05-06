@@ -47,7 +47,7 @@
   });
 </script>
   <!-- Sidebar -->
-  <div class="h-[100vh] flex flex-col bg-back-deep border-l-2 border-accent rounded-l-3xl overflow-hidden">
+  <div class="h-[100vh] flex flex-col bg-back-deep rounded-l-3xl overflow-hidden">
     <!-- Section Header -->
     <div class="px-5 py-4 border-b border-accent/30 bg-back-deep/80">
       <h2 class="text-sm font-bold uppercase tracking-[3px] text-print">
