@@ -10,6 +10,7 @@ export default {
         // Main accent color (cyan)
         accent: {
           DEFAULT: '#00ffdd',
+          line: '#c5bfae',
           warn: '#ac57ff',
           err: '#ff3370',
         },
