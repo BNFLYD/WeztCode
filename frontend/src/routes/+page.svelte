@@ -93,7 +93,7 @@
         <input
           type="text"
           placeholder="Buscar archivos..."
-          class="w-full px-4 py-2.5 bg-back border border-accent rounded text-sm text-accent-warn placeholder:text-accent-warn/50 outline-none focus:ring-2 focus:ring-[#2ca798]/20"
+          class="w-full px-4 py-2.5 bg-back border border-accent-detail rounded text-sm text-accent-warn placeholder:text-accent-warn/50 outline-none focus:ring-2 focus:ring-[#2ca798]/20"
         />
         <div class="text-xs text-accent-warn/50 text-center py-8">
           Ingresa un término para buscar
@@ -196,7 +196,7 @@
       {/each}
     </div>
     <div class="flex justify-center -mb-5">
-      <span class="bg-back-deep px-2 text-xs font-bold uppercase tracking-[3px] text-print">
+      <span class="bg-back-deep px-2 text-xs font-mono uppercase tracking-[3px] text-print">
         {sections.find((s) => s.id === activeSection)?.label}
       </span>
     </div>
