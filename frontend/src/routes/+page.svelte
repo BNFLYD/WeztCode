@@ -168,7 +168,7 @@
 
   <!-- Footer Navigation -->
   <div
-    class="border border-accent-detail rounded-2xl bg-back-deep flex items-center justify-center p-2 mb-2 mx-2"
+    class="border border-accent-detail rounded-2xl bg-back-deep flex flex-col p-2 mb-2 mx-2"
   >
     <div class="flex w-full justify-between px-4 py-2">
       {#each sections as section}
@@ -181,8 +181,10 @@
         </button>
       {/each}
     </div>
-    <span class="bg-back-deep text-sm font-bold uppercase tracking-[3px] text-print">
-      {sections.find((s) => s.id === activeSection)?.label}
-    </span>
+    <div class="flex justify-center -mb-5">
+      <span class="bg-back-deep px-2 text-sm font-bold uppercase tracking-[3px] text-print">
+        {sections.find((s) => s.id === activeSection)?.label}
+      </span>
+    </div>
   </div>
 </div>
