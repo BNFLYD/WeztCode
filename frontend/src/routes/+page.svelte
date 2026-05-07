@@ -173,7 +173,7 @@
     <div class="flex w-full justify-between px-4 py-2">
       {#each sections as section}
         <button
-          class="relative w-8 h-8 flex items-center justify-center rounded-md transition-all shadow-[inset_0_1px_0_rgba(255,255,255,0.10),0_2px_6px_rgba(0,0,0,0.25)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.20),0_3px_8px_rgba(0,0,0,0.35)] active:shadow-[inset_0_4px_12px_rgba(0,0,0,0.55),inset_0_-1px_0_rgba(255,255,255,0.12)] hover:translate-y-[1px] active:translate-y-[3px] hover:bg-accent-detail/75 {activeSection === section.id ? 'bg-accent-detail text-back ring-1 ring-accent/70 ring-offset-0 ring-offset-transparent before:content-[&quot;&quot;] before:absolute before:-inset-2 before:rounded-md before:bg-accent/50 before:blur-xl before:-z-10 before:pointer-events-none hover:text-back' : 'bg-accent-detail text-back-deep hover:text-back-deep'}"
+          class="bg-accent-detail relative w-8 h-8 flex items-center justify-center rounded-md transition-all shadow-[inset_0_1px_0_rgba(255,255,255,0.10),0_2px_6px_rgba(0,0,0,0.25)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.20),0_3px_8px_rgba(0,0,0,0.35)] active:shadow-[inset_0_4px_12px_rgba(0,0,0,0.55),inset_0_-1px_0_rgba(255,255,255,0.12)] hover:translate-y-[1px] active:translate-y-[3px] hover:bg-accent-detail/75 {activeSection === section.id ? 'text-back before:content-[""] before:absolute before:-inset-1 before:rounded-md before:bg-accent/50 before:blur-xl before:-z-10 before:pointer-events-none' : 'text-back-deep'}"
           on:click={() => (activeSection = section.id)}
           // title={section.label}
         >
