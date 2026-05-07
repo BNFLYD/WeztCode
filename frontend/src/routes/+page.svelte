@@ -183,20 +183,20 @@
 
   <!-- Footer Navigation -->
   <div
-    class="border border-accent-detail rounded-2xl bg-back-deep flex flex-col p-2 mb-4 mx-2"
+    class="border border-accent-detail rounded-2xl bg-back-deep flex flex-col p-2 mb-5 mx-2"
   >
     <div class="flex w-full justify-between px-4 py-2">
       {#each sections as section}
         <button
-          class="bg-accent-detail relative w-8 h-8 flex items-center justify-center rounded-md transition-all shadow-[inset_0_1px_0_rgba(255,255,255,0.10),0_2px_6px_rgba(0,0,0,0.25)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.20),0_3px_8px_rgba(0,0,0,0.35)] active:shadow-[inset_0_4px_12px_rgba(0,0,0,0.55),inset_0_-1px_0_rgba(255,255,255,0.12)] hover:translate-y-[1px] active:translate-y-[3px] hover:bg-accent-detail/75 {activeSection === section.id ? 'text-back shadow-[0_0_15px_rgba(0,255,221,0.6),0_0_30px_rgba(0,255,221,0.3)]' : 'text-back-deep'}"
+          class="bg-accent-detail relative w-9 h-9 flex items-center justify-center rounded-md transition-all shadow-[inset_0_1px_0_rgba(255,255,255,0.10),0_2px_6px_rgba(0,0,0,0.25)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.20),0_3px_8px_rgba(0,0,0,0.35)] active:shadow-[inset_0_4px_12px_rgba(0,0,0,0.55),inset_0_-1px_0_rgba(255,255,255,0.12)] hover:translate-y-[1px] active:translate-y-[3px] hover:bg-accent-detail/75 {activeSection === section.id ? 'text-back shadow-[0_0_15px_rgba(0,255,221,0.6),0_0_30px_rgba(0,255,221,0.3)]' : 'text-back-deep'}"
           on:click={() => (activeSection = section.id)}
         >
-          <Icon icon={section.icon} class="w-5 h-5" />
+          <Icon icon={section.icon} class="w-6 h-6" />
         </button>
       {/each}
     </div>
     <div class="flex justify-center -mb-5">
-      <span class="bg-back-deep px-2 text-xs font-mono tracking-[3px] text-print">
+      <span class="bg-back-deep px-2 text-sm font-mono tracking-[3px] text-print">
         {sections.find((s) => s.id === activeSection)?.label}
       </span>
     </div>
