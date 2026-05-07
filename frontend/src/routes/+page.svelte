@@ -7,7 +7,7 @@
   let expandedFolders = new Set();
 
   const sections = [
-    { id: "explorer", icon: "lucide:file-text", label: "Explorer" },
+    { id: "explorer", icon: "lucide:file-text", label: "Files" },
     { id: "search", icon: "lucide:search", label: "Search" },
     { id: "git", icon: "lucide:git-branch", label: "Git" },
     { id: "notifications", icon: "lucide:bell", label: "Notifications" },
@@ -173,16 +173,16 @@
     <div class="flex w-full justify-between px-4 py-2">
       {#each sections as section}
         <button
-          class="w-9 h-9 flex items-center justify-center rounded-md transition-all shadow-[inset_0_1px_0_rgba(255,255,255,0.10),0_2px_6px_rgba(0,0,0,0.25)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.20),0_3px_8px_rgba(0,0,0,0.35)] active:shadow-[inset_0_4px_12px_rgba(0,0,0,0.55),inset_0_-1px_0_rgba(255,255,255,0.12)] hover:translate-y-[1px] active:translate-y-[3px] hover:bg-accent-detail/75 {activeSection === section.id ? 'bg-accent-detail text-back  hover:text-back ring-1 ring-accent/70 ring-offset-0 ring-offset-transparent' : 'bg-accent-detail text-back-deep hover:text-back-deep'}"
+          class="w-9 h-9 flex items-center justify-center rounded-md transition-all shadow-[inset_0_1px_0_rgba(255,255,255,0.10),0_2px_6px_rgba(0,0,0,0.25)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.20),0_3px_8px_rgba(0,0,0,0.35)] active:shadow-[inset_0_4px_12px_rgba(0,0,0,0.55),inset_0_-1px_0_rgba(255,255,255,0.12)] hover:translate-y-[1px] active:translate-y-[3px] hover:bg-accent-detail/75 {activeSection === section.id ? 'bg-accent-detail text-back ring-1 ring-accent/70 ring-offset-0 ring-offset-transparent hover:text-back' : 'bg-accent-detail text-back-deep hover:text-back-deep'}"
           on:click={() => (activeSection = section.id)}
-          title={section.label}
+          // title={section.label}
         >
-          <Icon icon={section.icon} class="w-5 h-5" />
+          <Icon icon={section.icon} class="w-7 h-7" />
         </button>
       {/each}
     </div>
     <div class="flex justify-center -mb-5">
-      <span class="bg-back-deep px-2 text-sm font-bold uppercase tracking-[3px] text-print">
+      <span class="bg-back-deep px-2 text-xs font-bold uppercase tracking-[3px] text-print">
         {sections.find((s) => s.id === activeSection)?.label}
       </span>
     </div>
