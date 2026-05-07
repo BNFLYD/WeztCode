@@ -9,7 +9,7 @@
   const sections = [
     { id: "explorer", icon: "solar:code-2-bold", label: "ファイル" },
     { id: "chat", icon: "mingcute:chat-4-line", label: "チャット" },
-    { id: "git", icon: "mynaui:git-commit", label: "Git" },
+    { id: "git", icon: "mynaui:git-commit", label: "GIT" },
     { id: "view", icon: "streamline-plump:web", label: "ビュー" },
     { id: "term", icon: "devicon-plain:bash", label: "ターミナル" },
     { id: "settings", icon: "streamline-plump:compass-navigator-solid", label: "設定" },
@@ -196,7 +196,7 @@
       {/each}
     </div>
     <div class="flex justify-center -mb-5">
-      <span class="bg-back-deep px-2 text-xs font-mono uppercase tracking-[3px] text-print">
+      <span class="bg-back-deep px-2 text-xs font-mono tracking-[3px] text-print">
         {sections.find((s) => s.id === activeSection)?.label}
       </span>
     </div>
