@@ -173,7 +173,7 @@
     <div class="flex w-full justify-between px-4 py-2">
       {#each sections as section}
         <button
-          class="w-7 h-7 flex items-center justify-center rounded-md transition-all shadow-[inset_0_1px_0_rgba(255,255,255,0.10),0_2px_6px_rgba(0,0,0,0.25)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.20),0_3px_8px_rgba(0,0,0,0.35)] active:shadow-[inset_0_4px_12px_rgba(0,0,0,0.55),inset_0_-1px_0_rgba(255,255,255,0.12)] hover:translate-y-[1px] active:translate-y-[3px] hover:bg-accent-detail/75 {activeSection === section.id ? 'bg-accent-detail text-back ring-1 ring-accent/70 ring-offset-1 ring-offset-transparent hover:text-back' : 'bg-accent-detail text-back-deep hover:text-back-deep'}"
+          class="w-8 h-8 flex items-center justify-center rounded-md transition-all shadow-[inset_0_1px_0_rgba(255,255,255,0.10),0_2px_6px_rgba(0,0,0,0.25)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.20),0_3px_8px_rgba(0,0,0,0.35)] active:shadow-[inset_0_4px_12px_rgba(0,0,0,0.55),inset_0_-1px_0_rgba(255,255,255,0.12)] hover:translate-y-[1px] active:translate-y-[3px] hover:bg-accent-detail/75 {activeSection === section.id ? 'bg-accent-detail text-back ring-1 ring-accent/70 ring-offset-0 ring-offset-transparent hover:text-back' : 'bg-accent-detail text-back-deep hover:text-back-deep'}"
           on:click={() => (activeSection = section.id)}
           // title={section.label}
         >
