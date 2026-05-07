@@ -143,8 +143,8 @@
     </div>
 
     <!-- Footer Navigation -->
-    <div class="border border-accent-detail rounded bg-back-deep flex items-center justify-center p-2 mb-4">
-      <div class="flex w-full justify-between px-8">
+    <div class="border border-accent-detail rounded-l-3xl bg-back-deep flex items-center justify-center p-2 mb-4">
+      <div class="flex w-full justify-between px-8 py-2">
         {#each sections as section}
         <button
           class="w-9 h-9 flex items-center justify-center rounded-md transition-all {activeSection === section.id ? 'bg-accent-detail text-back hover:bg-accent/70 hover:text-back ring-1 ring-accent/70 ring-offset-0 ring-offset-transparent' : 'bg-accent-detail text-back-deep hover:bg-accent/70 hover:text-back-deep'}"
