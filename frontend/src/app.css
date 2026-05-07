@@ -5,6 +5,7 @@
 /* Colores retrofuturistas personalizados */
 @layer base {
   :root {
+    --glow-color: theme(colors.accent);
     --background: 0 0% 5%;
     --foreground: 168 58% 40%;
     --card: 0 0% 12%;
