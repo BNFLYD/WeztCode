@@ -5,7 +5,7 @@
 /* Colores retrofuturistas personalizados */
 @layer base {
   :root {
-    --glow-color: theme(colors.accent);
+    --glow-color: theme('colors.accent.DEFAULT');
     --background: 0 0% 5%;
     --foreground: 168 58% 40%;
     --card: 0 0% 12%;
@@ -17,6 +17,24 @@
     --accent: 0 0% 82%;
     --border: 168 58% 40%;
     --ring: 168 58% 40%;
+  }
+}
+
+@layer components {
+  .btn-glow {
+    position: relative;
+  }
+
+  .btn-glow::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    /* Use box-shadow for glow effect - more compatible than gradient with color-mix */
+    box-shadow:
+      inset 0 0 20px var(--glow-color),
+      inset 0 0 40px var(--glow-color);
+    opacity: 0.4;
   }
 }
 
