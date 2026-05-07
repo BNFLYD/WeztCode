@@ -18,7 +18,7 @@ export default {
       colors: {
         // Accent colors
         accent: {
-          DEFAULT: '#fc3e57',
+          DEFAULT: '#00ffdd',
           contrast: '#efede3',
           detail: '#c5bfae',
           warn: '#ac57ff',
