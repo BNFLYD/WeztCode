@@ -143,11 +143,11 @@
     </div>
 
     <!-- Footer Navigation -->
-    <div class="border-t border-accent/30 bg-back-deep p-4 flex items-center justify-center p-2">
+    <div class="border border-accent-detail bg-back-deep flex items-center justify-center p-2">
       <div class="flex w-full justify-between px-8">
         {#each sections as section}
         <button
-          class="w-9 h-9 flex items-center justify-center rounded-md transition-all {activeSection === section.id ? 'bg-accent-detail text-back hover:bg-accent/45 hover:text-back ring-1 ring-accent/70 ring-offset-0 ring-offset-transparent' : 'bg-accent-detail text-back-deep hover:bg-accent/45 hover:text-back-deep'}"
+          class="w-9 h-9 flex items-center justify-center rounded-md transition-all {activeSection === section.id ? 'bg-accent-detail text-back hover:bg-accent/70 hover:text-back ring-1 ring-accent/70 ring-offset-0 ring-offset-transparent' : 'bg-accent-detail text-back-deep hover:bg-accent/70 hover:text-back-deep'}"
           on:click={() => activeSection = section.id}
           title={section.label}
         >
