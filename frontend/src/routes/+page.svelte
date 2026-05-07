@@ -48,13 +48,6 @@
 </script>
   <!-- Sidebar -->
   <div class="h-[100vh] flex flex-col bg-back-deep rounded-l-3xl overflow-hidden">
-    <!-- Section Header -->
-    <div class="px-5 py-4 border-b border-accent/30 bg-back-deep/80">
-      <h2 class="text-sm font-bold uppercase tracking-[3px] text-print">
-        {sections.find(s => s.id === activeSection)?.label}
-      </h2>
-    </div>
-
     <!-- Content Area -->
     <div class="flex-1 overflow-y-auto p-5">
       <!-- Explorer Section -->
@@ -143,8 +136,8 @@
     </div>
 
     <!-- Footer Navigation -->
-    <div class="border border-accent-detail rounded-l-3xl bg-back-deep flex items-center justify-center p-2 mb-4">
-      <div class="flex w-full justify-between px-8 py-2">
+    <div class="border border-accent-detail rounded-2xl bg-back-deep flex items-center justify-center p-2 mb-8">
+      <div class="flex w-full justify-between px-4 py-2">
         {#each sections as section}
         <button
           class="w-9 h-9 flex items-center justify-center rounded-md transition-all {activeSection === section.id ? 'bg-accent-detail text-back hover:bg-accent/70 hover:text-back ring-1 ring-accent/70 ring-offset-0 ring-offset-transparent' : 'bg-accent-detail text-back-deep hover:bg-accent/70 hover:text-back-deep'}"
@@ -154,6 +147,12 @@
           <Icon icon={section.icon} class="w-5 h-5" />
         </button>
       {/each}
+      </div>
+      <!-- Section Header -->
+      <div class="px-5 py-4 bg-back-deep">
+        <span class="text-sm font-bold uppercase tracking-[3px] text-print">
+          {sections.find(s => s.id === activeSection)?.label}
+        </span>
       </div>
     </div>
   </div>
