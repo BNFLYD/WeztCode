@@ -168,7 +168,7 @@
 
   <!-- Footer Navigation -->
   <div
-    class="border border-accent-detail rounded-2xl bg-back-deep flex flex-col p-2 mb-2 mx-2"
+    class="border border-accent-detail rounded-2xl bg-back-deep flex flex-col p-2 mb-3 mx-2"
   >
     <div class="flex w-full justify-between px-4 py-2">
       {#each sections as section}
