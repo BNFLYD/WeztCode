@@ -143,7 +143,7 @@
     </div>
 
     <!-- Footer Navigation -->
-    <div class="border border-accent-detail bg-back-deep flex items-center justify-center p-2">
+    <div class="border border-accent-detail rounded bg-back-deep flex items-center justify-center p-2 mb-4">
       <div class="flex w-full justify-between px-8">
         {#each sections as section}
         <button
