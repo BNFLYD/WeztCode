@@ -179,13 +179,10 @@
         >
           <Icon icon={section.icon} class="w-5 h-5" />
         </button>
+        <span class="text-sm font-bold uppercase tracking-[3px] text-print">
+          {sections.find((s) => s.id === activeSection)?.label}
+        </span>
       {/each}
-    </div>
-    <!-- Section Header -->
-    <div class="px-5 py-4 bg-back-deep">
-      <span class="text-sm font-bold uppercase tracking-[3px] text-print">
-        {sections.find((s) => s.id === activeSection)?.label}
-      </span>
     </div>
   </div>
 </div>
