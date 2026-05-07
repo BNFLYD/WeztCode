@@ -200,7 +200,7 @@
     {/each}
   </div>
   <div class="flex justify-center -mb-5">
-    <span class="bg-back-deep px-2 text-sm font-sans font-bold tracking-[3px] text-print">
+    <span class="bg-back-deep px-2 text-sm font-sans tracking-[3px] text-print">
       {sections.find((s) => s.id === activeSection)?.label}
     </span>
   </div>
