@@ -190,7 +190,7 @@
         <button
           class="isolate bg-accent-detail relative w-9 h-9 flex items-center justify-center rounded-md transition-all shadow-[inset_0_1px_0_rgba(255,255,255,0.10),0_2px_6px_rgba(0,0,0,0.25)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.20),0_3px_8px_rgba(0,0,0,0.35)] active:shadow-[inset_0_4px_12px_rgba(0,0,0,0.55),inset_0_-1px_0_rgba(255,255,255,0.12)] hover:translate-y-[1px] active:translate-y-[3px] hover:bg-accent-detail/75 {activeSection ===
           section.id
-            ? 'text-back shadow-[inset_0_4px_12px_rgba(0,0,0,0.09),inset_0_-1px_0_rgba(0,255,255,0.7)]'
+            ? 'text-back shadow-[inset_0_4px_12px_rgba(0,255,255,0.7),inset_0_-1px_0_rgba(0,0,0,0.1)]'
             : 'text-back-deep'}"
           on:click={() => (activeSection = section.id)}
         >
