@@ -34,8 +34,8 @@
     background: radial-gradient(
       circle at center,
       var(--glow-color) 0%,
-      var(--glow-color) 40%,
-      transparent 60%
+      var(--glow-color) 60%,
+      transparent 80%
     );
     opacity: 0.25;
   }
