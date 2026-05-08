@@ -101,9 +101,14 @@
               class="w-[90%] px-2 pt-3 pb-5 bg-back rounded-l-xl text-sm text-print-contrast placeholder:text-print-contrast/50 outline-none ring-1 ring-back-deep"
             />
             <button
-              class="w-[10%] px-3 bg-accent-detail rounded-r-xl text-sm text-accent/40 outline-none ring-1 ring-back-deep"
+              class="w-[10%] px-3 bg-accent-detail rounded-r-xl text-sm text-accent/40 outline-none ring-1 ring-back-deep relative"
             >
-              <Icon icon="mingcute:navigation-fill" class="text-back w-4 h-4" />
+              <!-- Diagonal separator -->
+              <div
+                class="absolute left-0 top-0 bottom-0 w-4 bg-back"
+                style="clip-path: polygon(0 0, 100% 0, 0 100%, 0 100%); transform: translateX(-100%);"
+              ></div>
+              <Icon icon="mingcute:navigation-fill" class="text-back w-5 h-5" />
             </button>
           </div>
         </div>
