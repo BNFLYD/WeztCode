@@ -97,7 +97,7 @@
         <input
           type="text"
           placeholder="Escribi lo que pensas..."
-          class="w-full px-4 pt-2.5 bg-back rounded-xl text-sm text-print-contrast placeholder:text-print-contrast/50 outline-none focus:ring-2 focus:ring-accent/20"
+          class="w-full px-2 py-3 bg-back rounded-xl text-sm text-print-contrast placeholder:text-print-contrast/50 outline-none focus:ring-2 focus:ring-accent-detail/20"
         />
       </div>
       </div>
