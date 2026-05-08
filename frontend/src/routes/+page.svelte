@@ -10,7 +10,7 @@
     { id: "explorer", icon: "solar:code-2-bold", label: "ARCHIVOS" },
     { id: "chat", icon: "mingcute:chat-4-line", label: "CHAT" },
     { id: "git", icon: "mynaui:git-commit", label: "GIT" },
-    { id: "view", icon: "streamline-plump:web", label: "VISIBILISAR" },
+    { id: "view", icon: "streamline-plump:web", label: "VISUALIZAR" },
     { id: "term", icon: "devicon-plain:bash", label: "TERMINAL" },
     { id: "settings", icon: "hugeicons:settings-03", label: "CONFIGURACION"},
   ];
@@ -97,7 +97,7 @@
         <input
           type="text"
           placeholder="Escribi lo que pensas..."
-          class="w-full px-4 py-2.5 bg-back rounded-xl text-sm text-print-contrast placeholder:text-print-contrast/50 outline-none focus:ring-2 focus:ring-accent/20"
+          class="w-full px-4 pt-2.5 bg-back rounded-xl text-sm text-print-contrast placeholder:text-print-contrast/50 outline-none focus:ring-2 focus:ring-accent/20"
         />
       </div>
       </div>
