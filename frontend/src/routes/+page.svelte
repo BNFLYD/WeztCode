@@ -94,21 +94,28 @@
           <!-- Chat messages would go here -->
         </div>
         <div class="flex flex-col">
-          <div class="mt-auto pt-4 py-1 w-full flex items-stretch">
+          <div class="flex mt-auto pt-4 pb-2 w-full items-stretch">
+            <!-- Input -->
             <input
               type="text"
-              placeholder="Escribi lo que pensas..."
-              class="w-[90%] px-2 pt-3 pb-7 bg-back rounded-l-xl text-sm text-print-contrast placeholder:text-print-contrast/50 outline-none"
+              placeholder="Escribí lo que pensas..."
+              class="flex-1 px-5 py-4 bg-back rounded-l-2xl text-sm text-print-contrast placeholder:text-print-contrast/50 outline-none"
             />
+
+            <!-- Botón con corte diagonal -->
             <button
-              class="w-[10%] px-3 bg-accent-detail rounded-r-xl text-sm text-accent/40 outline-none relative"
+              class="relative px-6 bg-accent-detail rounded-r-2xl flex items-center justify-center overflow-hidden group"
             >
-              <!-- Diagonal separator -->
+              <!-- Diagonal de fondo -->
               <div
-                class="absolute left-0 top-0 bottom-0 w-4 bg-back"
-                style="clip-path: polygon(0 0, 100% 0, 0 100%); -webkit-clip-path: polygon(0 0, 100% 0, 0 100%); transform: translateX(-100%);"
+                class="absolute inset-0 bg-back translate-x-[70%] skew-x-[-20deg] origin-right"
               ></div>
-              <Icon icon="mingcute:navigation-fill" class="text-back w-5 h-5" />
+
+              <!-- Icono -->
+              <Icon
+                icon="mingcute:navigation-fill"
+                class="text-back w-6 h-6 relative z-10 transition-transform group-active:scale-90"
+              />
             </button>
           </div>
         </div>
