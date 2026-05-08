@@ -94,14 +94,14 @@
           <!-- Chat messages would go here -->
         </div>
         <div class="flex flex-col">
-          <div class="mt-auto pt-4 py-1 w-full ring-2">
+          <div class="mt-auto pt-4 py-1 w-full">
             <input
               type="text"
               placeholder="Escribi lo que pensas..."
-              class="w-9/10 px-2 pt-3 pb-6 bg-back rounded-l-xl text-sm text-print-contrast placeholder:text-print-contrast/50 outline-none ring-back"
+              class="w-9/10 px-2 pt-3 pb-6 bg-back rounded-l-xl text-sm text-print-contrast placeholder:text-print-contrast/50 outline-none ring-1 ring-back"
             />
             <button
-              class="px-2 py-4.5 bg-accent-detail rounded-r-xl text-sm text-accent outline-none ring-accent-detail"
+              class="px-2 py-4.5 bg-accent-detail rounded-r-xl text-sm text-accent outline-none ring-1 ring-accent-detail"
             >
               Enviar
             </button>
