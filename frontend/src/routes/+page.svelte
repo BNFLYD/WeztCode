@@ -104,11 +104,11 @@
 
             <!-- Botón con corte diagonal -->
             <button
-              class="relative px-6 bg-accent-detail rounded-r-2xl flex items-center justify-center overflow-hidden group"
+              class="relative px-6 bg-accent-detail rounded-2xl flex items-center justify-center overflow-hidden group"
             >
               <!-- Diagonal de fondo -->
               <div
-                class="absolute inset-0 bg-back -translate-x-[50%] skew-x-[-40deg] origin-left"
+                class="absolute inset-0 bg-back -translate-x-[70%] skew-x-[-10deg] origin-left"
               ></div>
 
               <!-- Icono -->
