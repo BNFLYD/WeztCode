@@ -12,7 +12,7 @@
     { id: "git", icon: "mynaui:git-commit", label: "GIT" },
     { id: "view", icon: "streamline-plump:web", label: "VISUALIZAR" },
     { id: "term", icon: "devicon-plain:bash", label: "TERMINAL" },
-    { id: "settings", icon: "hugeicons:settings-03", label: "CONFIGURACION"},
+    { id: "settings", icon: "hugeicons:settings-03", label: "CONFIGURACION" },
   ];
 
   const files = [
@@ -51,7 +51,7 @@
 <!-- Sidebar -->
 <div class="h-[100vh] flex flex-col bg-back-deep rounded-l-3xl overflow-hidden">
   <!-- Content Area -->
-  <div class="flex-1 overflow-y-auto px-5 py-1">
+  <div class="flex-1 overflow-y-auto px-5">
     <!-- Explorer Section -->
     {#if activeSection === "explorer"}
       <div class="flex flex-col gap-1">
@@ -91,23 +91,28 @@
     {:else if activeSection === "chat"}
       <div class="flex flex-col h-full">
         <div class="flex-1 overflow-y-auto">
-
+          <!-- Chat messages would go here -->
         </div>
-        <div class="mt-auto pt-4">
-        <input
-          type="text"
-          placeholder="Escribi lo que pensas..."
-          class="w-full px-2 py-3 bg-back rounded-xl text-sm text-print-contrast placeholder:text-print-contrast/50 outline-none focus:ring-2 focus:ring-accent-detail/20"
-        />
-      </div>
+        <div class="flex flex-col">
+          <div class="mt-auto pt-4 py-1">
+            <input
+              type="text"
+              placeholder="Escribi lo que pensas..."
+              class="w-full px-2 pt-3 pb-6 bg-back rounded-l-xl text-sm text-print-contrast placeholder:text-print-contrast/50 outline-none ring-2 ring-back"
+            />
+            <button
+              class="w-full px-2 pt-3 pb-6 bg-back rounded-r-xl text-sm text-print-contrast placeholder:text-print-contrast/50 outline-none ring-2 ring-accent-detail"
+            >
+              Enviar
+            </button>
+          </div>
+        </div>
       </div>
 
       <!-- Git Section -->
     {:else if activeSection === "git"}
       <div class="space-y-4">
-        <div
-          class="bg-back rounded-xl p-4 flex flex-col gap-2"
-        >
+        <div class="bg-back rounded-xl p-4 flex flex-col gap-2">
           <p class="text-xs font-bold text-print uppercase tracking-wide">
             Cambios sin confirmar
           </p>
@@ -186,7 +191,10 @@
     <div class="flex w-full justify-between px-4 py-2">
       {#each sections as section}
         <button
-          class="isolate bg-accent-detail relative w-9 h-9 flex items-center justify-center rounded-md transition-all shadow-[inset_0_1px_0_rgba(255,255,255,0.10),0_2px_6px_rgba(0,0,0,0.25)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.20),0_3px_8px_rgba(0,0,0,0.35)] active:shadow-[inset_0_4px_12px_rgba(0,0,0,0.55),inset_0_-1px_0_rgba(255,255,255,0.12)] hover:translate-y-[1px] active:translate-y-[3px] hover:bg-accent-detail/75 {activeSection === section.id ? 'btn-glow text-back' : 'text-back-deep'}"
+          class="isolate bg-accent-detail relative w-9 h-9 flex items-center justify-center rounded-md transition-all shadow-[inset_0_1px_0_rgba(255,255,255,0.10),0_2px_6px_rgba(0,0,0,0.25)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.20),0_3px_8px_rgba(0,0,0,0.35)] active:shadow-[inset_0_4px_12px_rgba(0,0,0,0.55),inset_0_-1px_0_rgba(255,255,255,0.12)] hover:translate-y-[1px] active:translate-y-[3px] hover:bg-accent-detail/75 {activeSection ===
+          section.id
+            ? 'btn-glow text-back'
+            : 'text-back-deep'}"
           on:click={() => (activeSection = section.id)}
         >
           <Icon icon={section.icon} class="w-6 h-6" />
