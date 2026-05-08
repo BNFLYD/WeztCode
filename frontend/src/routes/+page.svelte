@@ -51,7 +51,7 @@
 <!-- Sidebar -->
 <div class="h-[100vh] flex flex-col bg-back-deep rounded-l-3xl overflow-hidden">
   <!-- Content Area -->
-  <div class="flex-1 overflow-y-auto p-5">
+  <div class="flex-1 overflow-y-auto p-0">
     <!-- Explorer Section -->
     {#if activeSection === "explorer"}
       <div class="flex flex-col gap-1">
