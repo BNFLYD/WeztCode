@@ -89,12 +89,17 @@
 
       <!-- Chat Section -->
     {:else if activeSection === "chat"}
-      <div class="space-y-4 sticky bottom-0">
+      <div class="flex flex-col h-full">
+        <div class="flex-1 overflow-y-auto">
+
+        </div>
+        <div class="mt-auto pt-4">
         <input
           type="text"
           placeholder="Escribi lo que pensas..."
-          class="w-full px-4 py-2.5 bg-back rounded-2xl text-sm text-print-contrast placeholder:text-print-contrast/50 outline-none focus:ring-2 focus:ring-accent/20"
+          class="w-full px-4 py-2.5 bg-back rounded-xl text-sm text-print-contrast placeholder:text-print-contrast/50 outline-none focus:ring-2 focus:ring-accent/20"
         />
+      </div>
       </div>
 
       <!-- Git Section -->
