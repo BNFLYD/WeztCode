@@ -98,10 +98,10 @@
             <input
               type="text"
               placeholder="Escribi lo que pensas..."
-              class="w-full px-2 pt-3 pb-6 bg-back rounded-l-xl text-sm text-print-contrast placeholder:text-print-contrast/50 outline-none ring-2 ring-back"
+              class="w-9/10 px-2 pt-3 pb-6 bg-back rounded-l-xl text-sm text-print-contrast placeholder:text-print-contrast/50 outline-none ring-2 ring-back"
             />
             <button
-              class="w-full px-2 pt-3 pb-6 bg-back rounded-r-xl text-sm text-print-contrast placeholder:text-print-contrast/50 outline-none ring-2 ring-accent-detail"
+              class="px-2 pt-3 pb-6 bg-accent-detail rounded-r-xl text-sm text-print-contrast placeholder:text-print-contrast/50 outline-none ring-2 ring-accent-detail"
             >
               Enviar
             </button>
