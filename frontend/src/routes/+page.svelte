@@ -108,7 +108,7 @@
             >
               <!-- Diagonal de fondo -->
               <div
-                class="absolute inset-0 bg-back -translate-x-[30%] skew-x-[-40deg] origin-left"
+                class="absolute inset-0 bg-back -translate-x-[10%] skew-x-[-30deg] origin-left"
               ></div>
 
               <!-- Icono -->
