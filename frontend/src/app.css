@@ -31,7 +31,7 @@
     background: radial-gradient(
       circle at center,
       var(--glow-color) 0%,
-      var(--glow-color) 70%,
+      var(--glow-color) 60%,
       transparent 80%
     );
     opacity: 0;
@@ -40,8 +40,8 @@
 
   /* Active button - glow visible, slow fade in with 50ms delay */
   .btn-glow::after {
-    opacity: 0.05;
-    transition: opacity 200ms ease-out 100ms;
+    opacity: 0.10;
+    transition: opacity 300ms ease-out 150ms;
   }
 }
 

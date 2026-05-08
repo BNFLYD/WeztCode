@@ -33,6 +33,7 @@ export default {
         print: {
           DEFAULT: '#d0d0d0',
           contrast: '#efede3',
+          tag: '#c5bfae',
         },
       },
     },

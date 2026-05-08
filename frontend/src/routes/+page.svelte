@@ -12,7 +12,7 @@
     { id: "git", icon: "mynaui:git-commit", label: "GIT" },
     { id: "view", icon: "streamline-plump:web", label: "VISIBILISAR" },
     { id: "term", icon: "devicon-plain:bash", label: "TERMINAL" },
-    { id: "settings", icon: "streamline-plump:compass-navigator-solid", label: "CONFIGURACION"},
+    { id: "settings", icon: "hugeicons:settings-03", label: "CONFIGURACION"},
   ];
 
   const files = [
@@ -59,11 +59,11 @@
           <div style="padding-left: {item.level * 16}px">
             {#if item.folder}
               <button
-                class="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-accent-detail/20 transition-colors group text-sm"
+                class="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-accent/20 transition-colors group text-md text-print font-semibold"
                 on:click={() => toggleFolder(item.name)}
               >
                 <span
-                  class="text-print-contrast transition-transform"
+                  class="text-print transition-transform"
                   class:rotate-[-90deg]={!item.isExpanded}
                 >
                   <Icon icon="lucide:chevron-down" class="w-4 h-4" />
@@ -71,7 +71,7 @@
                 <span class="text-print/80 group-hover:text-print"
                   >{item.icon}</span
                 >
-                <span class="text-print-contrast/80 group-hover:text-print-contrast"
+                <span class="text-print/80 group-hover:text-print"
                   >{item.name}</span
                 >
               </button>
@@ -80,7 +80,7 @@
                 class="flex items-center gap-2 px-3 py-2 rounded hover:bg-accent-detail/20 transition-colors text-sm"
               >
                 <span class="text-print">{item.icon}</span>
-                <span class="text-print-contrast/70">{item.name}</span>
+                <span class="text-print/70">{item.name}</span>
               </div>
             {/if}
           </div>
@@ -89,22 +89,19 @@
 
       <!-- Chat Section -->
     {:else if activeSection === "chat"}
-      <div class="space-y-4">
+      <div class="space-y-4 sticky bottom-0">
         <input
           type="text"
-          placeholder="Buscar archivos..."
-          class="w-full px-4 py-2.5 bg-back border border-accent-detail rounded text-sm text-print-contrast placeholder:text-print-contrast/50 outline-none focus:ring-2 focus:ring-accent/20"
+          placeholder="Escribi lo que pensas..."
+          class="w-full px-4 py-2.5 bg-back rounded-2xl text-sm text-print-contrast placeholder:text-print-contrast/50 outline-none focus:ring-2 focus:ring-accent/20"
         />
-        <div class="text-xs text-print-contrast/50 text-center py-8">
-          Ingresa un término para buscar
-        </div>
       </div>
 
       <!-- Git Section -->
     {:else if activeSection === "git"}
       <div class="space-y-4">
         <div
-          class="bg-back border border-accent/30 rounded-lg p-4 flex flex-col gap-2"
+          class="bg-back rounded-xl p-4 flex flex-col gap-2"
         >
           <p class="text-xs font-bold text-print uppercase tracking-wide">
             Cambios sin confirmar
@@ -127,7 +124,7 @@
       <div class="flex flex-col gap-2.5">
         {#each [1, 2, 3] as i}
           <div
-            class="bg-back border border-accent/30 rounded-lg p-3.5 space-y-1 hover:bg-accent-detail/10 transition-colors cursor-pointer"
+            class="bg-back rounded-xl p-3.5 space-y-1 hover:bg-accent-detail/10 transition-colors cursor-pointer"
           >
             <p class="text-xs font-bold text-print">Notificación {i}</p>
             <p class="text-xs text-print-contrast/70">
@@ -140,9 +137,9 @@
       <div class="flex flex-col gap-2.5">
         {#each [1, 2, 3] as i}
           <div
-            class="bg-back border border-accent/30 rounded-lg p-3.5 space-y-1 hover:bg-accent-detail/10 transition-colors cursor-pointer"
+            class="bg-back rounded-xl p-3.5 space-y-1 hover:bg-accent-detail/10 transition-colors cursor-pointer"
           >
-            <p class="text-xs font-bold text-print">Comando {i}</p>
+            <p class="text-xs font-bold text-print">Bash Script {i}</p>
             <p class="text-xs text-print-contrast/70">z /Projects/Rust/</p>
           </div>
         {/each}
@@ -179,7 +176,7 @@
   </div>
   <!-- Footer Navigation -->
   <div
-    class="border border-accent-detail rounded-2xl bg-back-deep flex flex-col p-2 mb-5 mx-4"
+    class="border border-accent-detail rounded-2xl bg-back-deep flex flex-col py-2 px-0 mb-5 mx-4"
   >
     <div class="flex w-full justify-between px-4 py-2">
       {#each sections as section}
@@ -193,7 +190,7 @@
     </div>
     <div class="flex justify-center -mb-5">
       <span
-        class="bg-back-deep px-2 text-sm font-sans font-bold tracking-[3px] text-print"
+        class="bg-back-deep px-2 text-sm text-print-tag font-sans font-bold tracking-[3px]"
       >
         {sections.find((s) => s.id === activeSection)?.label}
       </span>
