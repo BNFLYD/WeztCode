@@ -99,16 +99,16 @@
             <input
               type="text"
               placeholder="Escribí lo que pensas..."
-              class="flex-1 px-5 py-4 bg-back rounded-l-2xl text-sm text-print-contrast placeholder:text-print-contrast/50 outline-none"
+              class="flex-1 px-5 pt-3 pb-7 bg-back rounded-l-2xl text-sm text-print-contrast placeholder:text-print-contrast/50 outline-none"
             />
 
             <!-- Botón con corte diagonal -->
             <button
-              class="relative px-6 bg-accent-detail rounded-2xl flex items-center justify-center overflow-hidden group"
+              class="relative px-4 bg-accent-detail rounded-2xl flex items-center justify-center overflow-hidden group"
             >
               <!-- Diagonal de fondo -->
               <div
-                class="absolute inset-0 bg-back -translate-x-[70%] skew-x-[-10deg] origin-left"
+                class="absolute inset-0 bg-back -translate-x-[90%] skew-x-[-10deg] origin-left"
               ></div>
 
               <!-- Icono -->
