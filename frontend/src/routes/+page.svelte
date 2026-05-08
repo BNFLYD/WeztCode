@@ -103,7 +103,7 @@
             <button
               class="w-[10%] px-3 pt-6 pb-3 bg-accent-detail rounded-r-xl text-sm text-accent/ outline-none ring-1 ring-accent-detail"
             >
-              Enviar
+              <Icon icon="mingcute:navigation-fill" class="text-back w-4 h-4" />
             </button>
           </div>
         </div>
