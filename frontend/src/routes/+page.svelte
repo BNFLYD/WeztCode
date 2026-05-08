@@ -7,16 +7,12 @@
   let expandedFolders = new Set();
 
   const sections = [
-    { id: "explorer", icon: "solar:code-2-bold", label: "ファイル" },
-    { id: "chat", icon: "mingcute:chat-4-line", label: "チャット" },
+    { id: "explorer", icon: "solar:code-2-bold", label: "ARCHIVOS" },
+    { id: "chat", icon: "mingcute:chat-4-line", label: "CHAT" },
     { id: "git", icon: "mynaui:git-commit", label: "GIT" },
-    { id: "view", icon: "streamline-plump:web", label: "ビュー" },
-    { id: "term", icon: "devicon-plain:bash", label: "ターミナル" },
-    {
-      id: "settings",
-      icon: "streamline-plump:compass-navigator-solid",
-      label: "設定",
-    },
+    { id: "view", icon: "streamline-plump:web", label: "VISIBILISAR" },
+    { id: "term", icon: "devicon-plain:bash", label: "TERMINAL" },
+    { id: "settings", icon: "streamline-plump:compass-navigator-solid", label: "CONFIGURACION"},
   ];
 
   const files = [
@@ -67,7 +63,7 @@
                 on:click={() => toggleFolder(item.name)}
               >
                 <span
-                  class="text-accent-warn transition-transform"
+                  class="text-print-contrast transition-transform"
                   class:rotate-[-90deg]={!item.isExpanded}
                 >
                   <Icon icon="lucide:chevron-down" class="w-4 h-4" />
@@ -75,7 +71,7 @@
                 <span class="text-print/80 group-hover:text-print"
                   >{item.icon}</span
                 >
-                <span class="text-accent-warn/80 group-hover:text-accent-warn"
+                <span class="text-print-contrast/80 group-hover:text-print-contrast"
                   >{item.name}</span
                 >
               </button>
@@ -84,7 +80,7 @@
                 class="flex items-center gap-2 px-3 py-2 rounded hover:bg-accent-detail/20 transition-colors text-sm"
               >
                 <span class="text-print">{item.icon}</span>
-                <span class="text-accent-warn/70">{item.name}</span>
+                <span class="text-print-contrast/70">{item.name}</span>
               </div>
             {/if}
           </div>
@@ -97,9 +93,9 @@
         <input
           type="text"
           placeholder="Buscar archivos..."
-          class="w-full px-4 py-2.5 bg-back border border-accent-detail rounded text-sm text-accent-warn placeholder:text-accent-warn/50 outline-none focus:ring-2 focus:ring-[#2ca798]/20"
+          class="w-full px-4 py-2.5 bg-back border border-accent-detail rounded text-sm text-print-contrast placeholder:text-print-contrast/50 outline-none focus:ring-2 focus:ring-accent/20"
         />
-        <div class="text-xs text-accent-warn/50 text-center py-8">
+        <div class="text-xs text-print-contrast/50 text-center py-8">
           Ingresa un término para buscar
         </div>
       </div>
@@ -115,7 +111,7 @@
           </p>
           <div class="space-y-1.5 text-xs">
             <div class="flex items-center gap-2">
-              <span class="text-accent-warn font-bold">M</span>
+              <span class="text-print-contrast font-bold">M</span>
               <span class="text-print">App.svelte</span>
             </div>
             <div class="flex items-center gap-2">
@@ -134,7 +130,7 @@
             class="bg-back border border-accent/30 rounded-lg p-3.5 space-y-1 hover:bg-accent-detail/10 transition-colors cursor-pointer"
           >
             <p class="text-xs font-bold text-print">Notificación {i}</p>
-            <p class="text-xs text-accent-warn/70">
+            <p class="text-xs text-print-contrast/70">
               Mensaje de notificación importante
             </p>
           </div>
@@ -147,7 +143,7 @@
             class="bg-back border border-accent/30 rounded-lg p-3.5 space-y-1 hover:bg-accent-detail/10 transition-colors cursor-pointer"
           >
             <p class="text-xs font-bold text-print">Comando {i}</p>
-            <p class="text-xs text-accent-warn/70">z /Projects/Rust/</p>
+            <p class="text-xs text-print-contrast/70">z /Projects/Rust/</p>
           </div>
         {/each}
       </div>
@@ -160,7 +156,7 @@
             >Tema</label
           >
           <select
-            class="w-full px-3 py-2 bg-back border border-accent-detail rounded text-xs text-accent-warn outline-none"
+            class="w-full px-3 py-2 bg-back border border-accent-detail rounded text-xs text-print-contrast outline-none"
           >
             <option>Oscuro</option>
             <option>Claro</option>
@@ -175,7 +171,7 @@
             type="range"
             min="12"
             max="18"
-            class="w-full h-1.5 bg-back rounded-lg appearance-none cursor-pointer accent-[#2ca798]"
+            class="w-full h-1.5 bg-back rounded-lg appearance-none cursor-pointer"
           />
         </div>
       </div>
@@ -183,7 +179,7 @@
   </div>
   <!-- Footer Navigation -->
   <div
-    class="border border-accent-detail rounded-2xl bg-back-deep flex flex-col p-2 mb-5 mx-2"
+    class="border border-accent-detail rounded-2xl bg-back-deep flex flex-col p-2 mb-5 mx-4"
   >
     <div class="flex w-full justify-between px-4 py-2">
       {#each sections as section}
@@ -197,7 +193,7 @@
     </div>
     <div class="flex justify-center -mb-5">
       <span
-        class="bg-back-deep px-2 text-sm font-sans font-semibold tracking-[3px] text-print"
+        class="bg-back-deep px-2 text-sm font-sans font-bold tracking-[3px] text-print"
       >
         {sections.find((s) => s.id === activeSection)?.label}
       </span>
