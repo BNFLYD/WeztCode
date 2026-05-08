@@ -101,7 +101,7 @@
               class="w-[90%] px-2 pt-3 pb-6 bg-back rounded-l-xl text-sm text-print-contrast placeholder:text-print-contrast/50 outline-none ring-1 ring-back"
             />
             <button
-              class="w-[90%] px-3 py-6 bg-accent-detail rounded-r-xl text-sm text-accent/ outline-none ring-1 ring-accent-detail"
+              class="w-[10%] px-3 pt-6 pb-3 bg-accent-detail rounded-r-xl text-sm text-accent/ outline-none ring-1 ring-accent-detail"
             >
               Enviar
             </button>
