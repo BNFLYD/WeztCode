@@ -144,7 +144,7 @@
               <span class="text-print">App.svelte</span>
             </div>
             <div class="flex items-center gap-2">
-              <span class="text-accent font-bold">A</span>
+              <span class="text-accent-warn font-bold">A</span>
               <span class="text-print">sidebar.svelte</span>
             </div>
           </div>

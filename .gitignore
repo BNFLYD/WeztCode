@@ -4,3 +4,4 @@ pnpm-lock.yaml
 +dump.svelte
 Roadmap.md
 colors.lua
+.svelte-kit/
