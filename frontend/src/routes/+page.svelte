@@ -54,7 +54,7 @@
   <div class="flex-1 overflow-y-auto px-5">
     <!-- Explorer Section -->
     {#if activeSection === "explorer"}
-      <div class="flex flex-col gap-1">
+      <div class="flex flex-col gap-1 py-4">
         {#each explorerItems as item (item.key)}
           <div style="padding-left: {item.level * 16}px">
             {#if item.folder}
@@ -96,40 +96,44 @@
         <div class="flex flex-col">
           <div class="flex mt-auto pt-4 pb-2 w-full items-stretch">
             <!-- Input -->
-            <div class="flex-1 relative px-5 pt-3 pb-7 bg-transparent rounded-xl flex items-center justify-center overflow-hidden group">
-              <!-- Diagonal de fondo -->
-              <div
-                class="rounded-l-none rounded-r-xl absolute inset-0 bg-back -translate-x-[5%] skew-x-[-20deg] origin-left"
-              ></div>
-              <input
-                type="text"
-                placeholder="Escribí lo que pensas..."
-                class="w-full relative z-10 bg-accent/40 rounded-xl text-sm text-print-contrast placeholder:text-print-contrast/50 outline-none"
-              />
-            </div>
-
-            <!-- Botón con corte diagonal -->
-            <button
-              class="relative px-4 bg-transparent rounded-xl flex items-center justify-center overflow-hidden group"
+            <div
+              class="-mr-2 flex-1 relative px-5 py-6 bg-transparent rounded-l-xl flex items-center justify-center overflow-hidden group"
             >
               <!-- Diagonal de fondo -->
               <div
-                class="-ml-2 rounded-l-md rounded-r-xl absolute inset-0 bg-accent-detail translate-x-[17%] skew-x-[-20deg] origin-right"
-              ></div>
+                class="rounded-lg absolute inset-0 bg-back -translate-x-[4%] skew-x-[-20deg] origin-left"
+              >
+                <input
+                  type="text"
+                  placeholder="Decime lo que pensás..."
+                  class="w-full skew-x-[20deg] pl-4 pr-2 bg-transparent rounded-xl text-sm text-print-contrast placeholder:text-print-contrast/50 outline-none"
+                />
+              </div>
+            </div>
+
+            <!-- Botón con corte diagonal -->
+            <div
+              class="relative px-4 -ml-2 bg-transparent rounded-r-xl flex items-center justify-center overflow-hidden group"
+            >
+              <!-- Diagonal de fondo -->
+              <button
+                class="rounded-xl absolute inset-0 bg-accent-detail translate-x-[14%] skew-x-[-20deg] origin-right"
+                aria-label="Enviar"
+              ></button>
 
               <!-- Icono -->
               <Icon
                 icon="mingcute:navigation-fill"
-                class="text-back-deep w-6 h-6 relative z-10 transition-transform group-active:scale-90"
+                class="text-back-deep w-6 h-6 relative z-10 transition-transform group-active:scale-75"
               />
-            </button>
+            </div>
           </div>
         </div>
       </div>
 
       <!-- Git Section -->
     {:else if activeSection === "git"}
-      <div class="space-y-4">
+      <div class="space-y-4 py-4">
         <div class="bg-back rounded-xl p-4 flex flex-col gap-2">
           <p class="text-xs font-bold text-print uppercase tracking-wide">
             Cambios sin confirmar
@@ -149,7 +153,7 @@
 
       <!-- View Section -->
     {:else if activeSection === "view"}
-      <div class="flex flex-col gap-2.5">
+      <div class="flex flex-col gap-2.5 py-4">
         {#each [1, 2, 3] as i}
           <div
             class="bg-back rounded-xl p-3.5 space-y-1 hover:bg-accent-detail/10 transition-colors cursor-pointer"
@@ -162,7 +166,7 @@
         {/each}
       </div>
     {:else if activeSection === "term"}
-      <div class="flex flex-col gap-2.5">
+      <div class="flex flex-col gap-2.5 py-4">
         {#each [1, 2, 3] as i}
           <div
             class="bg-back rounded-xl p-3.5 space-y-1 hover:bg-accent-detail/10 transition-colors cursor-pointer"
@@ -175,7 +179,7 @@
 
       <!-- Settings Section -->
     {:else if activeSection === "settings"}
-      <div class="space-y-4">
+      <div class="space-y-4 py-4">
         <div class="flex flex-col gap-2">
           <label class="text-xs font-bold text-print uppercase tracking-wide"
             >Tema</label
