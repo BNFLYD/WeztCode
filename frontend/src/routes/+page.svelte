@@ -1,235 +1,33 @@
 <script>
-  import Icon from "@iconify/svelte";
-  import { onMount } from "svelte";
+  import {
+    ExplorerSection,
+    ChatSection,
+    GitSection,
+    ViewSection,
+    TerminalSection,
+    SettingsSection,
+  } from "$lib/components/sections";
+  import SidebarFooter from "$lib/components/SidebarFooter.svelte";
 
-  // Secciones del sidebar
   let activeSection = "explorer";
-  let expandedFolders = new Set();
-
-  const sections = [
-    { id: "explorer", icon: "solar:code-2-bold", label: "ARCHIVOS" },
-    { id: "chat", icon: "mingcute:chat-4-line", label: "CHAT" },
-    { id: "git", icon: "mynaui:git-commit", label: "GIT" },
-    { id: "view", icon: "streamline-plump:web", label: "VISUALIZAR" },
-    { id: "term", icon: "devicon-plain:bash", label: "TERMINAL" },
-    { id: "settings", icon: "hugeicons:settings-03", label: "CONFIGURACION" },
-  ];
-
-  const files = [
-    { name: "App.svelte", icon: "📄", level: 0 },
-    { name: "components", icon: "📁", level: 0, folder: true },
-    { name: "button.svelte", icon: "📄", level: 1 },
-    { name: "card.svelte", icon: "📄", level: 1 },
-    { name: "hooks", icon: "📁", level: 0, folder: true },
-    { name: "app.svelte.ts", icon: "📄", level: 1 },
-  ];
-
-  function toggleFolder(name) {
-    if (expandedFolders.has(name)) {
-      expandedFolders.delete(name);
-    } else {
-      expandedFolders.add(name);
-    }
-    expandedFolders = expandedFolders;
-  }
-
-  function getExplorerItems() {
-    return files.map((file, idx) => ({
-      ...file,
-      key: `${file.name}-${idx}`,
-      isExpanded: expandedFolders.has(file.name),
-    }));
-  }
-
-  $: explorerItems = getExplorerItems();
-
-  onMount(() => {
-    console.log("[Svelte] onMount ejecutado");
-  });
 </script>
 
-<!-- Sidebar -->
 <div class="h-[100vh] flex flex-col bg-back-deep rounded-l-3xl overflow-hidden">
-  <!-- Content Area -->
   <div class="flex-1 overflow-y-auto px-5">
-    <!-- Explorer Section -->
     {#if activeSection === "explorer"}
-      <div class="flex flex-col gap-1 py-4">
-        {#each explorerItems as item (item.key)}
-          <div style="padding-left: {item.level * 16}px">
-            {#if item.folder}
-              <button
-                class="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-accent/20 transition-colors group text-md text-print font-semibold"
-                on:click={() => toggleFolder(item.name)}
-              >
-                <span
-                  class="text-print transition-transform"
-                  class:rotate-[-90deg]={!item.isExpanded}
-                >
-                  <Icon icon="lucide:chevron-down" class="w-4 h-4" />
-                </span>
-                <span class="text-print/80 group-hover:text-print"
-                  >{item.icon}</span
-                >
-                <span class="text-print/80 group-hover:text-print"
-                  >{item.name}</span
-                >
-              </button>
-            {:else}
-              <div
-                class="flex items-center gap-2 px-3 py-2 rounded hover:bg-accent-detail/20 transition-colors text-sm"
-              >
-                <span class="text-print">{item.icon}</span>
-                <span class="text-print/70">{item.name}</span>
-              </div>
-            {/if}
-          </div>
-        {/each}
-      </div>
-
-      <!-- Chat Section -->
+      <ExplorerSection />
     {:else if activeSection === "chat"}
-      <div class="flex flex-col h-full">
-        <div class="flex-1 overflow-y-auto">
-          <!-- Chat messages would go here -->
-        </div>
-        <div class="flex flex-col">
-          <div class="flex mt-auto pt-4 pb-2 w-full items-stretch">
-            <!-- Input -->
-            <div
-              class="-mr-2 flex-1 relative px-5 py-6 bg-transparent rounded-l-xl flex items-center justify-center overflow-hidden group"
-            >
-              <!-- Diagonal de fondo -->
-              <div
-                class="rounded-lg absolute inset-0 bg-back -translate-x-[4%] skew-x-[-20deg] origin-left"
-              >
-                <input
-                  type="text"
-                  placeholder="Decime lo que pensás..."
-                  class="w-full skew-x-[20deg] pl-4 pr-2 bg-transparent rounded-xl text-sm text-print-contrast placeholder:text-print-contrast/50 outline-none"
-                />
-              </div>
-            </div>
-
-            <!-- Botón con corte diagonal -->
-            <div
-              class="relative px-4 -ml-2 bg-transparent rounded-r-xl flex items-center justify-center overflow-hidden group"
-            >
-              <!-- Diagonal de fondo -->
-              <button
-                class="rounded-xl absolute inset-0 bg-accent-detail translate-x-[14%] skew-x-[-20deg] origin-right"
-                aria-label="Enviar"
-              ></button>
-
-              <!-- Icono -->
-              <Icon
-                icon="mingcute:navigation-fill"
-                class="text-back-deep w-6 h-6 relative z-10 transition-transform group-active:scale-75"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Git Section -->
+      <ChatSection />
     {:else if activeSection === "git"}
-      <div class="space-y-4 py-4">
-        <div class="bg-back rounded-xl p-4 flex flex-col gap-2">
-          <p class="text-xs font-bold text-print uppercase tracking-wide">
-            Cambios sin confirmar
-          </p>
-          <div class="space-y-1.5 text-xs">
-            <div class="flex items-center gap-2">
-              <span class="text-print-contrast font-bold">M</span>
-              <span class="text-print">App.svelte</span>
-            </div>
-            <div class="flex items-center gap-2">
-              <span class="text-accent-warn font-bold">A</span>
-              <span class="text-print">sidebar.svelte</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- View Section -->
+      <GitSection />
     {:else if activeSection === "view"}
-      <div class="flex flex-col gap-2.5 py-4">
-        {#each [1, 2, 3] as i}
-          <div
-            class="bg-back rounded-xl p-3.5 space-y-1 hover:bg-accent-detail/10 transition-colors cursor-pointer"
-          >
-            <p class="text-xs font-bold text-print">Notificación {i}</p>
-            <p class="text-xs text-print-contrast/70">
-              Mensaje de notificación importante
-            </p>
-          </div>
-        {/each}
-      </div>
+      <ViewSection />
     {:else if activeSection === "term"}
-      <div class="flex flex-col gap-2.5 py-4">
-        {#each [1, 2, 3] as i}
-          <div
-            class="bg-back rounded-xl p-3.5 space-y-1 hover:bg-accent-detail/10 transition-colors cursor-pointer"
-          >
-            <p class="text-xs font-bold text-print">Bash Script {i}</p>
-            <p class="text-xs text-print-contrast/70">z /Projects/Rust/</p>
-          </div>
-        {/each}
-      </div>
-
-      <!-- Settings Section -->
+      <TerminalSection />
     {:else if activeSection === "settings"}
-      <div class="space-y-4 py-4">
-        <div class="flex flex-col gap-2">
-          <label class="text-xs font-bold text-print uppercase tracking-wide">
-            Tema
-            <select
-              class="w-full px-3 py-2 bg-back border border-accent-detail rounded text-xs text-print-contrast outline-none mt-2"
-            >
-              <option>Oscuro</option>
-              <option>Claro</option>
-              <option>Dinámico</option>
-            </select>
-          </label>
-        </div>
-        <div class="flex flex-col gap-2">
-          <label for="font-size" class="text-xs font-bold text-print uppercase tracking-wide"
-            >Tamaño de fuente</label
-          >
-          <input
-            id="font-size"
-            type="range"
-            min="12"
-            max="18"
-            class="w-full h-1.5 bg-back rounded-lg appearance-none cursor-pointer"
-          />
-        </div>
-      </div>
+      <SettingsSection />
     {/if}
   </div>
-  <!-- Footer Navigation -->
-  <div
-    class="border border-accent-detail rounded-2xl bg-back-deep flex flex-col py-2 px-0 mb-5 mx-4"
-  >
-    <div class="flex w-full justify-between px-4 py-2">
-      {#each sections as section}
-        <button
-          class="isolate bg-accent-detail relative w-9 h-9 flex items-center justify-center rounded-md transition-all shadow-[inset_0_1px_0_rgba(255,255,255,0.10),0_2px_6px_rgba(0,0,0,0.25)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.20),0_3px_8px_rgba(0,0,0,0.35)] active:shadow-[inset_0_4px_12px_rgba(0,0,0,0.55),inset_0_-1px_0_rgba(255,255,255,0.12)] hover:translate-y-[1px] active:translate-y-[3px] hover:bg-accent-detail/75 {activeSection ===
-          section.id
-            ? 'btn-glow text-back'
-            : 'text-back-deep'}"
-          on:click={() => (activeSection = section.id)}
-        >
-          <Icon icon={section.icon} class="w-6 h-6" />
-        </button>
-      {/each}
-    </div>
-    <div class="flex justify-center -mb-5">
-      <span
-        class="bg-back-deep px-2 text-sm text-print-tag font-sans font-bold tracking-[3px]"
-      >
-        {sections.find((s) => s.id === activeSection)?.label}
-      </span>
-    </div>
-  </div>
+
+  <SidebarFooter {activeSection} onSectionChange={(id) => (activeSection = id)} />
 </div>
