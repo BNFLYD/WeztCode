@@ -94,12 +94,12 @@
           <!-- Chat messages would go here -->
         </div>
         <div class="flex flex-col">
-          <div class="flex mt-auto pt-4 pb-2 w-full items-stretch">
+          <div class="flex flex-1 mt-auto pt-4 pb-2 w-full items-stretch">
             <!-- Input -->
             <div class="relative px-5 pt-3 pb-7 bg-transparent rounded-xl flex items-center justify-center overflow-hidden group">
               <!-- Diagonal de fondo -->
               <div
-                class="rounded-l-none rounded-r-xl absolute inset-0 bg-back -translate-x-[93%] skew-x-[-20deg] origin-left"
+                class="rounded-l-none rounded-r-xl absolute inset-0 bg-back -translate-x-[3%] skew-x-[-20deg] origin-left"
               ></div>
               <input
                 type="text"
