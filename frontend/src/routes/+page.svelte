@@ -104,7 +104,7 @@
               <input
                 type="text"
                 placeholder="Escribí lo que pensas..."
-                class="flex-1 relative z-10 bg-accent-warn rounded-xl text-sm text-print-contrast placeholder:text-print-contrast/50 outline-none"
+                class="w-full relative z-10 bg-accent-warn rounded-xl text-sm text-print-contrast placeholder:text-print-contrast/50 outline-none"
               />
             </div>
 
@@ -114,7 +114,7 @@
             >
               <!-- Diagonal de fondo -->
               <div
-                class="rounded-l-none rounded-r-xl absolute inset-0 bg-accent-detail translate-x-[17%] skew-x-[-20deg] origin-right"
+                class="rounded-l-md rounded-r-xl absolute inset-0 bg-accent-detail translate-x-[17%] skew-x-[-20deg] origin-right"
               ></div>
 
               <!-- Icono -->
