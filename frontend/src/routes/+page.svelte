@@ -99,12 +99,12 @@
             <div class="relative px-5 pt-3 pb-7 bg-transparent rounded-xl flex items-center justify-center overflow-hidden group">
               <!-- Diagonal de fondo -->
               <div
-                class="rounded-l-none rounded-r-xl absolute inset-0 bg-back -translate-x-[3%] skew-x-[-20deg] origin-left"
+                class="rounded-l-none rounded-r-xl absolute inset-0 bg-back -translate-x-[5%] skew-x-[-20deg] origin-left"
               ></div>
               <input
                 type="text"
                 placeholder="Escribí lo que pensas..."
-                class="flex-1 relative z-10 bg-back rounded-xl text-sm text-print-contrast placeholder:text-print-contrast/50 outline-none"
+                class="flex-1 relative z-10 bg-accent-warn rounded-xl text-sm text-print-contrast placeholder:text-print-contrast/50 outline-none"
               />
             </div>
 
