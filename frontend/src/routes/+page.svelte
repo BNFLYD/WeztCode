@@ -188,7 +188,7 @@
             >
               <option>Oscuro</option>
               <option>Claro</option>
-              <option>Automático</option>
+              <option>Dinámico</option>
             </select>
           </label>
         </div>
