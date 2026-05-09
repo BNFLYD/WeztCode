@@ -96,11 +96,17 @@
         <div class="flex flex-col">
           <div class="flex mt-auto pt-4 pb-2 w-full items-stretch">
             <!-- Input -->
-            <input
-              type="text"
-              placeholder="Escribí lo que pensas..."
-              class="flex-1 px-5 pt-3 pb-7 bg-back rounded-xl text-sm text-print-contrast placeholder:text-print-contrast/50 outline-none"
-            />
+            <div class="flex-1 px-5 pt-3 pb-7 bg-back rounded-xl">
+              <!-- Diagonal de fondo -->
+              <div
+                class="rounded-l-none rounded-r-xl absolute inset-0 bg-accent-detail translate-x-[93%] skew-x-[-20deg] origin-left"
+              ></div>
+              <input
+                type="text"
+                placeholder="Escribí lo que pensas..."
+                class="relative z-10 bg-back rounded-xl text-sm text-print-contrast placeholder:text-print-contrast/50 outline-none"
+              />
+            </div>
 
             <!-- Botón con corte diagonal -->
             <button
@@ -108,7 +114,7 @@
             >
               <!-- Diagonal de fondo -->
               <div
-                class="rounded-l-none rounded-r-xl absolute inset-0 bg-accent-detail translate-x-[15%] skew-x-[-15deg] origin-right"
+                class="rounded-l-none rounded-r-xl absolute inset-0 bg-accent-detail translate-x-[17%] skew-x-[-20deg] origin-right"
               ></div>
 
               <!-- Icono -->
