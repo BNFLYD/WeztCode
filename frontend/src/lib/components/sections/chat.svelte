@@ -12,7 +12,7 @@
     <div class="flex mt-auto pt-4 pb-2 w-full items-stretch">
       <!-- Input -->
       <div
-        class="-mr-2 flex-1 relative px-5 py-6 bg-transparent rounded-l-xl flex items-center justify-center overflow-hidden group"
+        class="-mr-2 flex-1 relative px-5 py-6 bg-transparent rounded-l-lg flex items-center justify-center overflow-hidden group"
       >
         <!-- Background diagonal input -->
         <div
@@ -22,7 +22,7 @@
             type="text"
             placeholder="Decime lo que pensás..."
             bind:value={input_value}
-            class="w-full skew-x-[20deg] pl-4 pr-2 bg-transparent rounded-lg text-sm text-print-contrast placeholder:text-print-contrast/50 outline-none"
+            class="w-full skew-x-[20deg] pl-4 pr-2 bg-transparent rounded-lg text-lg text-print-contrast placeholder:text-print-contrast/50 outline-none"
           />
         </div>
       </div>
