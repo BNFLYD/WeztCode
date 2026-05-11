@@ -1,7 +1,7 @@
 <script>
   import Icon from "@iconify/svelte";
 
-  let inputValue = "";
+  let input_value = "";
 </script>
 
 <div class="flex flex-col h-full">
@@ -14,26 +14,26 @@
       <div
         class="-mr-2 flex-1 relative px-5 py-6 bg-transparent rounded-l-xl flex items-center justify-center overflow-hidden group"
       >
-        <!-- Diagonal de fondo -->
+        <!-- Background diagonal input -->
         <div
           class="rounded-lg absolute inset-0 bg-back -translate-x-[4%] skew-x-[-20deg] origin-left"
         >
           <input
             type="text"
             placeholder="Decime lo que pensás..."
-            bind:value={inputValue}
-            class="w-full skew-x-[20deg] pl-4 pr-2 bg-transparent rounded-xl text-sm text-print-contrast placeholder:text-print-contrast/50 outline-none"
+            bind:value={input_value}
+            class="w-full skew-x-[20deg] pl-4 pr-2 bg-transparent rounded-lg text-sm text-print-contrast placeholder:text-print-contrast/50 outline-none"
           />
         </div>
       </div>
 
-      <!-- Boton con corte diagonal -->
+      <!-- Button -->
       <div
-        class="relative px-4 -ml-2 bg-transparent rounded-r-xl flex items-center justify-center overflow-hidden group"
+        class="relative pl-5 pr-3 -ml-2 bg-transparent rounded-r-lg flex items-center justify-center overflow-hidden group"
       >
-        <!-- Diagonal de fondo -->
+        <!-- Background diagonal button -->
         <button
-          class="rounded-xl absolute inset-0 bg-accent-detail translate-x-[14%] skew-x-[-20deg] origin-right"
+          class="rounded-lg absolute inset-0 bg-accent-detail translate-x-[14%] skew-x-[-20deg] origin-right"
           aria-label="Enviar"
         ></button>
 

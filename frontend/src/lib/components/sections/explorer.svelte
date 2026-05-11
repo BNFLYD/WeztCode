@@ -1,7 +1,7 @@
 <script>
   import Icon from "@iconify/svelte";
 
-  let expandedFolders = new Set();
+  let expanded_folders = new Set();
 
   const files = [
     { name: "App.svelte", icon: "📄", level: 0 },
@@ -12,33 +12,33 @@
     { name: "app.svelte.ts", icon: "📄", level: 1 },
   ];
 
-  function toggleFolder(name) {
-    if (expandedFolders.has(name)) {
-      expandedFolders.delete(name);
+  function toggle_folder(name) {
+    if (expanded_folders.has(name)) {
+      expanded_folders.delete(name);
     } else {
-      expandedFolders.add(name);
+      expanded_folders.add(name);
     }
-    expandedFolders = expandedFolders;
+    expanded_folders = expanded_folders;
   }
 
-  function getExplorerItems() {
+  function get_explorer_items() {
     return files.map((file, idx) => ({
       ...file,
       key: `${file.name}-${idx}`,
-      isExpanded: expandedFolders.has(file.name),
+      isExpanded: expanded_folders.has(file.name),
     }));
   }
 
-  $: explorerItems = getExplorerItems();
+  $: explorer_items = get_explorer_items();
 </script>
 
 <div class="flex flex-col gap-1 py-4">
-  {#each explorerItems as item (item.key)}
+  {#each explorer_items as item (item.key)}
     <div style="padding-left: {item.level * 16}px">
       {#if item.folder}
         <button
           class="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-accent/20 transition-colors group text-md text-print font-semibold"
-          on:click={() => toggleFolder(item.name)}
+          on:click={() => toggle_folder(item.name)}
         >
           <span
             class="text-print transition-transform"

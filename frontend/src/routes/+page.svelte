@@ -7,27 +7,30 @@
     TerminalSection,
     SettingsSection,
   } from "$lib/components/sections";
-  import SidebarFooter from "$lib/components/SidebarFooter.svelte";
+  import {
+    Footer,
+    Monitor,
+  } from "$lib/components/ui";
 
-  let activeSection = "explorer";
+  let active_section = "explorer";
 </script>
 
 <div class="h-[100vh] flex flex-col bg-back-deep rounded-l-3xl overflow-hidden">
   <div class="flex-1 overflow-y-auto px-5">
-    {#if activeSection === "explorer"}
+    {#if active_section === "explorer"}
       <ExplorerSection />
-    {:else if activeSection === "chat"}
+    {:else if active_section === "chat"}
       <ChatSection />
-    {:else if activeSection === "git"}
+    {:else if active_section === "git"}
       <GitSection />
-    {:else if activeSection === "view"}
+    {:else if active_section === "view"}
       <ViewSection />
-    {:else if activeSection === "term"}
+    {:else if active_section === "term"}
       <TerminalSection />
-    {:else if activeSection === "settings"}
+    {:else if active_section === "settings"}
       <SettingsSection />
     {/if}
   </div>
 
-  <SidebarFooter {activeSection} onSectionChange={(id) => (activeSection = id)} />
+  <Footer {active_section} on_section_change={(id) => (active_section = id)} />
 </div>

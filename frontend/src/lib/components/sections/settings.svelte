@@ -1,6 +1,6 @@
 <script>
   let theme = "Dinamico";
-  let fontSize = 14;
+  let font_size = 14;
 </script>
 
 <div class="space-y-4 py-4">
@@ -27,7 +27,7 @@
       type="range"
       min="12"
       max="18"
-      bind:value={fontSize}
+      bind:value={font_size}
       class="w-full h-1.5 bg-back rounded-lg appearance-none cursor-pointer"
     />
   </div>

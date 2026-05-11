@@ -4,7 +4,7 @@
 function createBridge() {
   // Verificar si estamos en WebKitGTK (producción) o desarrollo
   const isWebKit = typeof window.webkit !== 'undefined' && window.webkit.messageHandlers;
-  
+
   // Cola de promesas pendientes
   const pendingPromises = new Map();
   let requestId = 0;

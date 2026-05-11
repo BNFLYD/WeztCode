@@ -1,5 +1,6 @@
 ARCHITECTURE.md
 node_modules/
+z_circunstancial/
 pnpm-lock.yaml
 +dump.svelte
 Roadmap.md
