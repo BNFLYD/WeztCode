@@ -89,7 +89,6 @@ fn main() {
 
     // Detect window manager and setup monitoring FIRST (before creating GTK platform)
     let mut term_geometry = None;
-    let mut workarea = None;
     let mut wm_receiver = None;
     let wm = gui::protocol::wayland::wm::detect_window_manager();
 
@@ -113,19 +112,13 @@ fn main() {
         // Start monitoring target window - this BLOCKS until initial geometry is captured
         // target_toplevel_id is None initially - it will be captured from the query
         println!("[Main] Starting window monitoring and waiting for initial geometry...");
-        let (tg, wa) = wm.start_monitoring(config::WINDOW_CLASS.to_string(), None)
-            .map(|(g, w)| (Some(g), Some(w)))
-            .unwrap_or((None, None));
-        term_geometry = tg;
-        workarea = wa;
+        term_geometry = wm.start_monitoring(config::WINDOW_CLASS.to_string(), None);
 
-        if let (Some(ref geo), Some(ref work)) = (&term_geometry, &workarea) {
+        if let Some(ref geo) = term_geometry {
             println!("[Main] Initial geometry captured: x={}, y={}, w={}, h={}",
                      geo.x, geo.y, geo.width, geo.height);
-            println!("[Main] Workarea captured: w={}, h={}",
-                     work.width, work.height);
         } else {
-            println!("[Main] Could not capture initial geometry or workarea");
+            println!("[Main] Could not capture initial geometry");
         }
     } else {
         println!("No se detectó Window Manager - ejecutando en modo standalone");
@@ -139,8 +132,8 @@ fn main() {
         platform.handle_wm_events(receiver);
     }
 
-    // Create overlay with captured geometry and workarea (or None if no WM)
-    if let Err(e) = platform.create_overlay(&frontend_url, term_geometry, workarea) {
+    // Create overlay with captured geometry (or None if no WM)
+    if let Err(e) = platform.create_overlay(&frontend_url, term_geometry) {
         eprintln!("Error al crear overlay: {}", e);
         std::process::exit(1);
     }

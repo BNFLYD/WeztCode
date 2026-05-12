@@ -12,7 +12,7 @@ pub struct Gtk4Platform {
     app: Application,
     window: Rc<RefCell<Option<ApplicationWindow>>>,
     webview: Rc<RefCell<Option<WebView>>>,
-    workarea: Rc<RefCell<Option<WindowGeometry>>>,
+    monitor_geo: Rc<RefCell<Option<WindowGeometry>>>,
 }
 
 impl Gtk4Platform {
@@ -25,7 +25,7 @@ impl Gtk4Platform {
             app,
             window: Rc::new(RefCell::new(None)),
             webview: Rc::new(RefCell::new(None)),
-            workarea: Rc::new(RefCell::new(None)),
+            monitor_geo: Rc::new(RefCell::new(None)),
         }
     }
 
@@ -103,13 +103,12 @@ impl Gtk4Platform {
 }
 
 impl GuiPlatform for Gtk4Platform {
-    fn create_overlay(&self, url: &str, term_geometry: Option<WindowGeometry>, workarea: Option<WindowGeometry>) -> Result<(), String> {
+    fn create_overlay(&self, url: &str, term_geometry: Option<WindowGeometry>) -> Result<(), String> {
         let window_ref = self.window.clone();
         let webview_ref = self.webview.clone();
-        let workarea_ref = self.workarea.clone();
+        let monitor_geo_ref = self.monitor_geo.clone();
         let url = url.to_string();
         let term_geometry_clone = term_geometry.clone();
-        let workarea_clone = workarea.clone();
 
         self.app.connect_activate(move |app| {
             // Calculate initial size based on terminal geometry if available
@@ -151,23 +150,23 @@ impl GuiPlatform for Gtk4Platform {
 
             window.present();
 
-            // Use provided workarea for margin calculations, fallback to GTK monitor geometry
-            let monitor_geo = workarea_clone.or_else(|| Self::detect_monitor_geometry(&window));
+            // Use GTK monitor geometry for margin calculations
+            let monitor_geo = Self::detect_monitor_geometry(&window);
 
             if let (Some(monitor), Some(term_geo)) = (monitor_geo, &term_geometry) {
-                // Calculate canvas margins using workarea + terminal geometry + overlay width
+                // Calculate canvas margins using monitor geometry + terminal geometry + overlay width
                 let overlay_width = initial_width as i32;
                 let (margin_top, margin_bottom, _margin_left, margin_right) =
                     Self::calculate_canvas_margins(&monitor, term_geo, overlay_width);
 
-                println!("[GTK] Using workarea for margins: {}x{} (top={}, bottom={}, right={})",
+                println!("[GTK] Using monitor geometry for margins: {}x{} (top={}, bottom={}, right={})",
                          monitor.width, monitor.height, margin_top, margin_bottom, margin_right);
                 window.set_margin(Edge::Top, margin_top);
                 window.set_margin(Edge::Bottom, margin_bottom);
                 window.set_margin(Edge::Right, margin_right);
 
-                // Store workarea for dynamic recalculation in GeometryChanged
-                *workarea_ref.borrow_mut() = Some(monitor.clone());
+                // Store monitor geometry for dynamic recalculation in GeometryChanged
+                *monitor_geo_ref.borrow_mut() = Some(monitor.clone());
             } else if let Some(geo) = &term_geometry {
                 // Fallback: Use terminal geometry only (existing behavior)
                 println!("[GTK] Fallback to terminal-only margins for x={}, y={}, w={}, h={}",
@@ -239,7 +238,7 @@ impl Gtk4Platform {
         use crate::gui::protocol::wayland::wm::WmEvent;
 
         let window_weak = self.window.clone();
-        let workarea_weak = self.workarea.clone();
+        let monitor_geo_weak = self.monitor_geo.clone();
 
         glib::idle_add_local(move || {
             match receiver.try_recv() {
@@ -288,8 +287,8 @@ impl Gtk4Platform {
                             window.set_default_size(overlay_width, overlay_height);
 
                             // Phase 3: Recalculate margins based on new geometry
-                            // Use stored workarea for consistent calculations
-                            if let Some(monitor) = workarea_weak.borrow().clone() {
+                            // Use stored monitor geometry for consistent calculations
+                            if let Some(monitor) = monitor_geo_weak.borrow().clone() {
                                 let (margin_top, margin_bottom, _margin_left, margin_right) =
                                     Self::calculate_canvas_margins(&monitor, &geometry, overlay_width);
 

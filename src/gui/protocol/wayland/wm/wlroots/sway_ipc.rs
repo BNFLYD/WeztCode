@@ -80,7 +80,7 @@ impl SwayIpcClient {
         target_toplevel_id: Option<String>,
         sender: mpsc::Sender<WmEvent>,
         capture_signal_rx: mpsc::Receiver<()>,
-    ) -> Result<Option<(WindowGeometry, WindowGeometry)>, String> {
+    ) -> Result<Option<WindowGeometry>, String> {
         // Wait for signal to start monitoring (SYNCHRONOUS)
         println!("[SwayIPC] Waiting for capture signal before starting...");
         match capture_signal_rx.recv() {
@@ -94,7 +94,7 @@ impl SwayIpcClient {
 
         // Mutable target_toplevel_id - can be captured from query if not provided
         let mut target_toplevel_id_opt = target_toplevel_id;
-        let mut initial_geometry: Option<(WindowGeometry, WindowGeometry)> = None;
+        let mut initial_geometry: Option<WindowGeometry> = None;
 
         // If we don't have toplevel_id yet, query for it now before starting event loop
         if target_toplevel_id_opt.is_none() {
@@ -189,10 +189,7 @@ impl SwayIpcClient {
                     println!("[SwayIPC] Initial geometry captured: x={}, y={}, w={}, h={}",
                              geometry.x, geometry.y, geometry.width, geometry.height);
 
-                    // Get workspace area for this window
-                    let workarea = Self::get_workspace_area(&self, toplevel_id);
-
-                    initial_geometry = Some((geometry.clone(), workarea));
+                    initial_geometry = Some(geometry.clone());
 
                     // Also send as event for consistency
                     let _ = sender.send(WmEvent::GeometryChanged {
@@ -589,29 +586,6 @@ impl SwayIpcClient {
             .map_err(|e| format!("Failed to parse tree JSON: {}", e))
     }
 
-    /// Get workspace area for a window by foreign_toplevel_identifier using tree traversal
-    /// Returns WindowGeometry with workarea dimensions (x=0, y=0, width, height)
-    pub fn get_workspace_area(&self, toplevel_id: &str) -> WindowGeometry {
-        let tree = match self.get_tree() {
-            Ok(t) => t,
-            Err(e) => {
-                println!("[SwayIPC] Failed to query tree for workspace area: {}", e);
-                return WindowGeometry::new(0, 0, 1920, 1080);
-            }
-        };
-
-        match find_workspace_for_toplevel(&tree, toplevel_id) {
-            Some(rect) => {
-                println!("[SwayIPC] Workspace area for toplevel_id '{}': width={}, height={}",
-                         toplevel_id, rect.width, rect.height);
-                WindowGeometry::new(0, 0, rect.width, rect.height)
-            }
-            None => {
-                println!("[SwayIPC] Could not find workspace for toplevel_id '{}'", toplevel_id);
-                WindowGeometry::new(0, 0, 1920, 1080)
-            }
-        }
-    }
 }
 
 /// Window event from Sway IPC subscription
@@ -670,35 +644,6 @@ fn flatten_nodes(node: &Node) -> Vec<&Node> {
         result.extend(flatten_nodes(child));
     }
     result
-}
-
-/// Find the workspace rect that contains the given foreign_toplevel_identifier
-fn find_workspace_for_toplevel(node: &Node, toplevel_id: &str) -> Option<Rect> {
-    find_workspace_inner(node, toplevel_id, None)
-}
-
-fn find_workspace_inner(
-    node: &Node,
-    toplevel_id: &str,
-    current_ws_rect: Option<Rect>,
-) -> Option<Rect> {
-    let ws_rect = if node.node_type.as_deref() == Some("workspace") {
-        node.rect.or(current_ws_rect)
-    } else {
-        current_ws_rect
-    };
-
-    if node.foreign_toplevel_identifier.as_deref() == Some(toplevel_id) {
-        return ws_rect;
-    }
-
-    for child in &node.nodes {
-        if let Some(result) = find_workspace_inner(child, toplevel_id, ws_rect) {
-            return Some(result);
-        }
-    }
-
-    None
 }
 
 /// Parse a simple JSON field like "key": 123 from a line

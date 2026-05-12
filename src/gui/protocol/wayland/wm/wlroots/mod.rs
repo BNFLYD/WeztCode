@@ -32,12 +32,12 @@ impl WindowManager for WlrootsWindowManager {
         *self.capture_signal_receiver.lock().unwrap() = Some(signal_rx);
     }
 
-    fn start_monitoring(&self, target_app_id: String, target_toplevel_id: Option<String>) -> Option<(WindowGeometry, WindowGeometry)> {
+    fn start_monitoring(&self, target_app_id: String, target_toplevel_id: Option<String>) -> Option<WindowGeometry> {
         let sender = self.sender.lock().unwrap().clone();
         let capture_signal_opt = self.capture_signal_receiver.lock().unwrap().take();
 
-        // Create channel to receive initial geometry and workarea from the thread
-        let (geometry_tx, geometry_rx) = mpsc::channel::<Option<(WindowGeometry, WindowGeometry)>>();
+        // Create channel to receive initial geometry from the thread
+        let (geometry_tx, geometry_rx) = mpsc::channel::<Option<WindowGeometry>>();
 
         thread::spawn(move || {
             if let Some(s) = sender {
