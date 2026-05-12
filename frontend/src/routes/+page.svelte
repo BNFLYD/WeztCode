@@ -7,15 +7,15 @@
     TerminalSection,
     SettingsSection,
   } from "$lib/components/sections";
-  import {
-    Footer,
-    Monitor,
-  } from "$lib/components/ui";
+  import { Footer, Monitor } from "$lib/components/ui";
 
   let active_section = "explorer";
 </script>
 
 <div class="h-[100vh] flex flex-col bg-back-deep rounded-l-3xl overflow-hidden">
+  <div class="pt-4 mx-auto">
+    <Monitor {active_section} on_section_change={(id) => (active_section = id)}  />
+  </div>
   <div class="flex-1 overflow-y-auto px-5">
     {#if active_section === "explorer"}
       <ExplorerSection />

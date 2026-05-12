@@ -11,7 +11,7 @@ export default {
         'mono': ['"JetBrains Mono"', '"M PLUS 1 Code"'],
         'code': ['"Share Tech Mono"', '"M PLUS 1 Code"'],
         'arcade': ['"Silkscreen"', '"DotGothic16"'],
-        'specs': ['"Share Tech Mono"', '"Workbench"'],
+        'specs': ['"Share Tech Mono"', '"WDXL Lubrifont JP N"'],
         'ascii': ['monospace'],
         'mark': ['"Dela Gothic One"', '"Wavefont"'],
       },

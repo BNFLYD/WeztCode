@@ -1,0 +1,140 @@
+// Hola Kimi soy yo, el random que te pide cosas, este archivo de dump tiene el unico proposito de pasarte cosas que quiero modificar para utilizar en este proyecto como componentes funciones o integraciones con otras apis, espero que entiendas que la finalidad de este archivo no es ser una parte funcional de este proyecto, si no mas bien un apartado para desarrollar en base a cosas que necesitan ser adaptadas antes de que formen parte oficial de este repositorio. Sin mas dilacion gracias por tu atencion.
+
+// Este es un componente jsx que debemos convertir a svelte
+
+import { useEffect, useRef } from "react"
+import WhoamiChannel from "../components/Channels/WhoamiChannel"
+import ProjectsChannel from "../components/Channels/ProjectsChannel"
+import BlogChannel from "../components/Channels/BlogChannel"
+import PlayChannel from "../components/Channels/PlayChannel"
+import HireChannel from "../components/Channels/HireChannel"
+
+const CRTScreen = ({ activeChannel, isDistorting, language, isDark, t }) => {
+  const canvasRef = useRef(null)
+  const animationRef = useRef(null)
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    const ctx = canvas.getContext("2d")
+    const width = canvas.width
+    const height = canvas.height
+    let time = 0
+
+    const animate = () => {
+      // Limpiar canvas - fondo según el tema
+      ctx.fillStyle = isDark ? "#1b1b1b" : "#ffffff"
+      ctx.fillRect(0, 0, width, height)
+
+      // Si está distorsionando, dibujar efecto de estática/glitch
+      if (isDistorting) {
+        // Color de la estática: blanco si el fondo es oscuro, negro si el fondo es claro
+        ctx.fillStyle = isDark ? "#ffffff" : "#000000"
+        for (let i = 0; i < 100; i++) {
+          // Dibujar muchas líneas aleatorias
+          ctx.fillRect(Math.random() * width, Math.random() * height, Math.random() * 20 + 5, 1)
+        }
+        // Añadir un flash rápido
+        if (Math.random() < 0.1) {
+          // 10% de probabilidad de un flash
+          ctx.fillStyle = `rgba(${isDark? "255, 255, 255" : "0, 0, 0"}, ${Math.random() * 0.3 + 0.1})`
+          ctx.fillRect(0, 0, width, height)
+        }
+      } else if (!activeChannel) {
+        // Animación por defecto: onda senoidal (solo si no hay canal activo)
+        ctx.strokeStyle = isDark ? "#ffffff" : "#000000"
+        ctx.lineWidth = 2
+        ctx.beginPath()
+
+        const amplitude = height * 0.15
+        const frequency = 0.04
+        const centerY = height / 2
+
+        for (let x = 0; x < width; x++) {
+          const y = centerY + Math.sin((x + time) * frequency) * amplitude
+          if (x === 0) {
+            ctx.moveTo(x, y)
+          } else {
+            ctx.lineTo(x, y)
+          }
+        }
+        ctx.stroke()
+      }
+
+
+      time += 2
+      animationRef.current = requestAnimationFrame(animate)
+    }
+
+    animate()
+
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current)
+      }
+    }
+  }, [ isDark, activeChannel, isDistorting])
+
+  return (
+    <div className="relative w-full h-full">
+      {/* Marco del monitor CRT cuadrado */}
+      <div
+        className={`w-full aspect-square rounded-xl border-1 p-1 relative overflow-hidden ${
+          isDark ? "border-white/50 bg-white/80" : "border-black/50 bg-black"
+        }`}
+      >
+        {/* Pantalla */}
+        <div className="w-full h-full rounded-lg relative overflow-hidden bg-black">
+          <canvas
+            ref={canvasRef}
+            width={300}
+            height={300}
+            className="w-full h-full"
+            style={{ imageRendering: "" }}
+          />
+
+          {/* Overlay interactivo para el contenido del canal */}
+          {!isDistorting && ( // Ocultar overlay durante la distorsión
+            <div
+              className={`absolute inset-0 font-mono text-sm ${isDark ? "text-white" : "text-black"} flex flex-col`}
+            >
+              {activeChannel === "whoami" && <WhoamiChannel theme={isDark ? "dark" : "light"} language={language} isDark={isDark} t={t} />}
+              {activeChannel === "projects" && <ProjectsChannel theme={isDark ? "dark" : "light"} language={language} isDark={isDark} t={t} />}
+              {activeChannel === "blog" && <BlogChannel theme={isDark ? "dark" : "light"} language={language} isDark={isDark} />}
+              {activeChannel === "hire" && <HireChannel theme={isDark ? "dark" : "light"} isDark={isDark} t={t} />}
+              {activeChannel === "play" && <PlayChannel theme={isDark ? "dark" : "light"} language={language} isDark={isDark} t={t} />}
+            </div>
+          )}
+
+          {/* Líneas de escaneo CRT */}
+          <div
+            className="absolute inset-0 pointer-events-none z-30"
+            style={{
+              background: `repeating-linear-gradient(
+                0deg,
+                ${isDark ? 'rgba(255, 255, 255, 0.09)' : 'rgba(0, 0, 0, 0.1)'} 0px,
+                ${isDark ? 'rgba(255, 255, 255, 0.09)' : 'rgba(0, 0, 0, 0.1)'} 0px,
+                transparent 1px,
+                transparent 6px
+              )`
+            }}
+          />
+
+          {/* Efecto de curvatura CRT */}
+          <div
+            className="absolute inset-0 pointer-events-none z-30"
+            style={{
+              background: `radial-gradient(ellipse at center, transparent 70%, ${isDark ? 'rgba(0, 0, 0, 0.2)' : 'rgba(0, 0, 0, 0.3)'} 100%)`,
+            }}
+          />
+        </div>
+
+        {/* Etiqueta del monitor */}
+        <div className={`absolute bottom-4 right-4 text-sm font-specs ${isDark ? "text-secondary" : "text-primary"}`}>
+          0SC1
+        </div>
+      </div>
+    </div>
+  )
+}

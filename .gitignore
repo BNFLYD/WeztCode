@@ -1,8 +1,4 @@
-ARCHITECTURE.md
 node_modules/
-z_circunstancial/
+z_dump/
 pnpm-lock.yaml
-+dump.svelte
-Roadmap.md
-colors.lua
 .svelte-kit/
