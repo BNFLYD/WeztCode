@@ -13,54 +13,110 @@
     { id: "term", icon: "devicon-plain:bash", label: "ターミナル" },
     { id: "settings", icon: "hugeicons:settings-03", label: "設定" },
   ];
-  // Props in snake_case to distinguish from framework props
   export let active_channel = null;
   export let is_distorting = false;
 
   let canvas_ref = null;
   let animation_id = null;
-  let time = 0;
+
+  let colors = {};
+
+  const update_colors = () => {
+    colors = {
+      back: get_colors('--color-back', '#0d0d0d'),
+      accent: get_colors('--color-accent', '#00ffdd'),
+      detail: get_colors('--color-accent-detail', '#ffffff'),
+    };
+  };
+
+  let is_visible = true;
+
+  const FPS = 30;
+  let last_frame = 0;
+  let start_time = 0;
 
   onMount(() => {
     if (!canvas_ref) return;
 
-    const ctx = canvas_ref.getContext("2d");
-    const width = canvas_ref.width;
-    const height = canvas_ref.height;
+    update_colors();
 
-    const animate = () => {
-      // Clear canvas with dark background
-      ctx.fillStyle = get_colors('--color-back', '#0d0d0d');
-      ctx.fillRect(0, 0, width, height);
+    const dpr = devicePixelRatio || 1;
+    const rect = canvas_ref.parentElement.getBoundingClientRect();
+    canvas_ref.width = rect.width * dpr;
+    canvas_ref.height = rect.height * dpr;
+
+    window.addEventListener('theme-change', update_colors);
+
+    const ro = new ResizeObserver(() => {
+      const dpr = devicePixelRatio || 1;
+      const rect = canvas_ref.parentElement.getBoundingClientRect();
+      canvas_ref.width = rect.width * dpr;
+      canvas_ref.height = rect.height * dpr;
+    });
+    ro.observe(canvas_ref.parentElement);
+
+    const observer = new IntersectionObserver(([entry]) => {
+      is_visible = entry.isIntersecting;
+    });
+    observer.observe(canvas_ref);
+
+    const ctx = canvas_ref.getContext("2d");
+
+    const animate = (timestamp) => {
+      if (!is_visible) {
+        animation_id = requestAnimationFrame(animate);
+        return;
+      }
+
+      if (timestamp - last_frame < 1000 / FPS) {
+        animation_id = requestAnimationFrame(animate);
+        return;
+      }
+      last_frame = timestamp;
+
+      if (!start_time) start_time = timestamp;
+      const elapsed = timestamp - start_time;
+
+      const dpr = devicePixelRatio || 1;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      const css_w = canvas_ref.width / dpr;
+      const css_h = canvas_ref.height / dpr;
+
+      ctx.fillStyle = colors.back;
+      ctx.fillRect(0, 0, css_w, css_h);
 
       if (is_distorting) {
-        // Static/glitch effect
-        ctx.fillStyle = get_colors('--color-accent-detail', '#ffffff');
+        const iw = canvas_ref.width;
+        const ih = canvas_ref.height;
+        const imageData = ctx.createImageData(iw, ih);
+        const data = imageData.data;
         for (let i = 0; i < 100; i++) {
-          ctx.fillRect(
-            Math.random() * width,
-            Math.random() * height,
-            Math.random() * 20 + 5,
-            1
-          );
+          const x = Math.random() * iw;
+          const y = Math.random() * ih;
+          const w = Math.random() * 20 * dpr + 5 * dpr;
+          for (let px = Math.floor(x); px < Math.floor(x) + w && px < iw; px++) {
+            const idx = (Math.floor(y) * iw + px) * 4;
+            data[idx] = 255; data[idx+1] = 255; data[idx+2] = 255; data[idx+3] = 255;
+          }
         }
-        // Random flash effect
+        ctx.putImageData(imageData, 0, 0);
+
         if (Math.random() < 0.1) {
           ctx.fillStyle = `rgba(255, 255, 255, ${Math.random() * 0.3 + 0.1})`;
-          ctx.fillRect(0, 0, width, height);
+          ctx.fillRect(0, 0, css_w, css_h);
         }
       } else if (!active_channel) {
-        // Sine wave animation (default state)
-        ctx.strokeStyle = get_colors('--color-accent-detail', '#00ffdd');
+        ctx.strokeStyle = colors.detail;
         ctx.lineWidth = 2;
         ctx.beginPath();
 
-        const amplitude = height * 0.15;
+        const amplitude = css_h * 0.15;
         const frequency = 0.04;
-        const center_y = height / 2;
+        const center_y = css_h / 2;
 
-        for (let x = 0; x < width; x++) {
-          const y = center_y + Math.sin((x + time) * frequency) * amplitude;
+        for (let x = 0; x < css_w; x++) {
+          const y = center_y + Math.sin((x + elapsed * 0.12) * frequency) * amplitude;
           if (x === 0) {
             ctx.moveTo(x, y);
           } else {
@@ -70,7 +126,6 @@
         ctx.stroke();
       }
 
-      time += 2;
       animation_id = requestAnimationFrame(animate);
     };
 
@@ -81,24 +136,20 @@
     if (animation_id) {
       cancelAnimationFrame(animation_id);
     }
+    window.removeEventListener('theme-change', update_colors);
   });
 </script>
 
 <div class="w-full h-full relative">
-  <!-- CRT monitor frame -->
   <div
     class="aspect-square rounded-xl border border-accent-detail/50 bg-accent-detail p-1 relative overflow-hidden"
   >
-    <!-- Screen container -->
     <div class="w-full h-full rounded-lg relative overflow-hidden bg-back-deep">
       <canvas
         bind:this={canvas_ref}
-        width={300}
-        height={300}
         class="w-full h-full"
       ></canvas>
 
-      <!-- Slot overlay for channel content -->
       {#if !is_distorting}
         <div
           class="absolute inset-0 font-mono text-sm text-print-contrast flex flex-col"
@@ -107,7 +158,6 @@
         </div>
       {/if}
 
-      <!-- CRT scanlines overlay -->
       <div
         class="absolute inset-0 pointer-events-none z-30"
         style="background: repeating-linear-gradient(
@@ -119,14 +169,12 @@
         )"
       ></div>
 
-      <!-- CRT curvature vignette -->
       <div
         class="absolute inset-0 pointer-events-none z-30"
         style="background: radial-gradient(ellipse at center, transparent 70%, rgba(0, 0, 0, 0.2) 100%)"
       ></div>
     </div>
 
-    <!-- Monitor label -->
     <div
       class="absolute bottom-2 right-2 text-xs font-specs text-accent-detail"
     >
