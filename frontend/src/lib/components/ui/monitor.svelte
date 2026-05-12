@@ -140,11 +140,11 @@
   });
 </script>
 
-<div class="w-full h-full relative">
+<div class="w-full h-full relative rounded-2xl border border-accent-detail/40 bg-accent-detail">
   <div
-    class="aspect-square rounded-xl border border-accent-detail/50 bg-accent-detail px-1 py-1 relative overflow-hidden"
+    class="aspect-square m-1 relative rounded-[14px] bg-accent-detail overflow-hidden"
   >
-    <div class="w-full h-full rounded-lg relative overflow-hidden bg-back-deep">
+    <div class="w-full h-full rounded-[14px] relative overflow-hidden bg-back-deep">
       <canvas
         bind:this={canvas_ref}
         class="w-full h-full"
