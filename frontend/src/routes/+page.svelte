@@ -13,7 +13,7 @@
 </script>
 
 <div class="h-[100vh] flex flex-col bg-back-deep rounded-l-3xl overflow-hidden">
-  <div class="px-5 pt-5 pb-2">
+  <div class="px-5 py-5">
     <Monitor {active_section} on_section_change={(id) => (active_section = id)}  />
   </div>
   <div class="flex-1 overflow-y-auto px-5">
