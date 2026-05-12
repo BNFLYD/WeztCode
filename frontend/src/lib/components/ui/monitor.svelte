@@ -142,7 +142,7 @@
 
 <div class="w-full h-full relative">
   <div
-    class="aspect-square rounded-xl border border-accent-detail/50 bg-accent-detail p-1 relative overflow-hidden"
+    class="aspect-square rounded-xl border border-accent-detail/50 bg-accent-detail px-1 py-2 relative overflow-hidden"
   >
     <div class="w-full h-full rounded-lg relative overflow-hidden bg-back-deep">
       <canvas
