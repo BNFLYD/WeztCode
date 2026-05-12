@@ -144,7 +144,7 @@
   <div
     class="aspect-square m-1 relative rounded-[14px] bg-accent-detail overflow-hidden"
   >
-    <div class="w-full h-full rounded-[14px] relative overflow-hidden bg-back-deep">
+    <div class="w-full h-full bg-back-deep">
       <canvas
         bind:this={canvas_ref}
         class="w-full h-full"
