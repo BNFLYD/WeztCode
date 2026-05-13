@@ -145,7 +145,7 @@ impl GuiPlatform for Gtk4Platform {
             window.set_anchor(Edge::Right, true);
             // Anchor to top and bottom to adapt to margins
             window.set_anchor(Edge::Top, true);
-            // window.set_anchor(Edge::Bottom, true);
+            window.set_anchor(Edge::Bottom, true);
 
             window.present();
 
@@ -179,8 +179,8 @@ impl GuiPlatform for Gtk4Platform {
                 window.set_margin(Edge::Bottom, 1);
             }
 
-            // Exclusive zone 0 = behaves well with other windows
-            window.set_exclusive_zone(0);
+            // Exclusive zone -1 = margins measured from monitor edges, not from available area
+            window.set_exclusive_zone(-1);
 
             println!("GTK: Creating WebView...");
             let webview = WebView::new();
