@@ -144,7 +144,7 @@ impl GuiPlatform for Gtk4Platform {
             window.set_layer(Layer::Overlay);
             window.set_anchor(Edge::Right, true);
             // Anchor to top and bottom to adapt to margins
-            // window.set_anchor(Edge::Top, true);
+            window.set_anchor(Edge::Top, true);
             // window.set_anchor(Edge::Bottom, true);
 
             window.present();
