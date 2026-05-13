@@ -73,11 +73,13 @@ impl Gtk4Platform {
         overlay_width: i32,
     ) -> (i32, i32, i32, i32) {
         // Calculate top margin: space between terminal top and monitor top
-        let margin_top = terminal_geo.y - monitor_geo.y;
+        let top_gap = terminal_geo.y - monitor_geo.y;
+        let margin_top = top_gap + 5;
 
         // Calculate bottom margin: space between terminal bottom and monitor bottom
         let terminal_bottom = terminal_geo.y + terminal_geo.height;
-        let margin_bottom = monitor_geo.height - terminal_bottom;
+        let bottom_gap = monitor_geo.height - terminal_bottom;
+        let margin_bottom = bottom_gap + 5;
 
         // Phase 2: Calculate right margin for right-side positioning
         // margin_right = monitor.width - terminal.x - terminal.width
