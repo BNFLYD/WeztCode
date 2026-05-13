@@ -76,7 +76,7 @@ impl Gtk4Platform {
         let margin_top = terminal_geo.y - monitor_geo.y;
 
         // Calculate bottom margin: currently set to 0 for verification
-        let margin_bottom = 0;
+        let margin_bottom = terminal_geo.height - monitor_geo.height;
 
         // Phase 2: Calculate right margin for right-side positioning
         // margin_right = monitor.width - terminal.x - terminal.width
@@ -179,7 +179,7 @@ impl GuiPlatform for Gtk4Platform {
             }
 
             // Exclusive zone 0 = behaves well with other windows
-            window.set_exclusive_zone(-1);
+            window.set_exclusive_zone(0);
 
             println!("GTK: Creating WebView...");
             let webview = WebView::new();
