@@ -74,12 +74,12 @@ impl Gtk4Platform {
     ) -> (i32, i32, i32, i32) {
         // Calculate top margin: space between terminal top and monitor top
         let top_gap = terminal_geo.y - monitor_geo.y;
-        let margin_top = top_gap + 5;
+        let margin_top = top_gap + 1;
 
         // Calculate bottom margin: space between terminal bottom and monitor bottom
         let terminal_bottom = terminal_geo.y + terminal_geo.height;
         let bottom_gap = monitor_geo.height - terminal_bottom;
-        let margin_bottom = bottom_gap + 5;
+        let margin_bottom = bottom_gap + 1;
 
         // Phase 2: Calculate right margin for right-side positioning
         // margin_right = monitor.width - terminal.x - terminal.width
