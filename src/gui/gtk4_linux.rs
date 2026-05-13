@@ -179,7 +179,7 @@ impl GuiPlatform for Gtk4Platform {
             }
 
             // Exclusive zone 0 = behaves well with other windows
-            window.set_exclusive_zone(0);
+            window.set_exclusive_zone(-1);
 
             println!("GTK: Creating WebView...");
             let webview = WebView::new();
