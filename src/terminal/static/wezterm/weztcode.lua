@@ -32,10 +32,9 @@ wezterm.on("update-status", function(window, pane)
     wezterm.log_info("WeztCode session detected - Applying right padding")
 
     local overrides = window:get_config_overrides() or {}
-    overrides.window_padding = wezterm.table_merge(
-      overrides.window_padding or {},
-      { right = FIXED_PADDING }
-    )
+    local padding = overrides.window_padding or {}
+    padding.right = FIXED_PADDING
+    overrides.window_padding = padding
     window:set_config_overrides(overrides)
     wezterm.log_info("Padding applied successfully")
   end
