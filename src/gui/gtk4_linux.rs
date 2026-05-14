@@ -170,6 +170,9 @@ impl GuiPlatform for Gtk4Platform {
                 // Sync terminal padding with overlay width
                 let term = crate::terminal::wezterm::WeztermProtocol::new();
                 let _ = term.set_right_padding(overlay_width as u32);
+                let _ = std::process::Command::new("wezterm")
+                    .args(["cli", "reload-config"])
+                    .output();
 
                 // Store monitor geometry for dynamic recalculation in GeometryChanged
                 *monitor_geo_ref.borrow_mut() = Some(monitor.clone());
@@ -308,6 +311,9 @@ impl Gtk4Platform {
                                 // Sync terminal padding with updated overlay width
                                 let term = crate::terminal::wezterm::WeztermProtocol::new();
                                 let _ = term.set_right_padding(overlay_width as u32);
+                                let _ = std::process::Command::new("wezterm")
+                                    .args(["cli", "reload-config"])
+                                    .output();
                             }
                         }
                     }
@@ -327,6 +333,9 @@ impl Gtk4Platform {
                             // Sync terminal padding with overlay width
                             let term = crate::terminal::wezterm::WeztermProtocol::new();
                             let _ = term.set_right_padding(overlay_width as u32);
+                            let _ = std::process::Command::new("wezterm")
+                                .args(["cli", "reload-config"])
+                                .output();
 
                             // TODO: Layer shell switching to be implemented later
                             // TODO: Positioning to be implemented later
