@@ -166,6 +166,10 @@ impl GuiPlatform for Gtk4Platform {
                 window.set_margin(Edge::Bottom, margin_bottom);
                 window.set_margin(Edge::Right, margin_right);
 
+                // Sync terminal padding with overlay width
+                let term = crate::terminal::wezterm::WeztermProtocol::new();
+                let _ = term.set_right_padding(overlay_width as u32);
+
                 // Store monitor geometry for dynamic recalculation in GeometryChanged
                 *monitor_geo_ref.borrow_mut() = Some(monitor.clone());
             } else if let Some(geo) = &term_geometry {
@@ -299,6 +303,10 @@ impl Gtk4Platform {
                                 window.set_margin(Edge::Top, margin_top);
                                 window.set_margin(Edge::Bottom, margin_bottom);
                                 window.set_margin(Edge::Right, margin_right);
+
+                                // Sync terminal padding with updated overlay width
+                                let term = crate::terminal::wezterm::WeztermProtocol::new();
+                                let _ = term.set_right_padding(overlay_width as u32);
                             }
                         }
                     }
@@ -314,6 +322,11 @@ impl Gtk4Platform {
                                      is_fullscreen, overlay_width, overlay_height);
 
                             window.set_default_size(overlay_width, overlay_height);
+
+                            // Sync terminal padding with overlay width
+                            let term = crate::terminal::wezterm::WeztermProtocol::new();
+                            let _ = term.set_right_padding(overlay_width as u32);
+
                             // TODO: Layer shell switching to be implemented later
                             // TODO: Positioning to be implemented later
                         }

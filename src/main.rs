@@ -9,6 +9,60 @@ use std::thread;
 use std::time::Duration;
 use std::fs::read_to_string;
 
+fn setup_padding_hook() -> Result<(), String> {
+    let user_config = std::env::var("WEZTERM_CONFIG_FILE").ok()
+        .or_else(|| {
+            let home = if cfg!(target_os = "windows") {
+                std::env::var("USERPROFILE").ok()
+            } else {
+                std::env::var("HOME").ok()
+            }?;
+            Some(if cfg!(target_os = "windows") {
+                format!("{}\\.config\\wezterm\\wezterm.lua", home)
+            } else {
+                format!("{}/.config/wezterm/wezterm.lua", home)
+            })
+        })
+        .unwrap_or_default();
+
+    std::env::set_var("WEZTCODE_USER_CONFIG", &user_config);
+
+    let temp_dir = if cfg!(target_os = "windows") {
+        std::env::var("TEMP").unwrap_or_else(|_| "C:\\Temp".to_string())
+    } else {
+        std::env::var("XDG_RUNTIME_DIR")
+            .or_else(|_| std::env::var("TMPDIR"))
+            .unwrap_or_else(|_| "/tmp".to_string())
+    };
+
+    let weztcode_dir = std::path::PathBuf::from(&temp_dir).join("weztcode");
+    std::fs::create_dir_all(&weztcode_dir)
+        .map_err(|e| format!("Failed to create temp dir: {}", e))?;
+
+    let lua_path = weztcode_dir.join(config::LUA_FILE_NAME);
+    let lua_content = include_str!("terminal/static/wezterm/weztcode.lua");
+    std::fs::write(&lua_path, lua_content)
+        .map_err(|e| format!("Failed to write Lua file: {}", e))?;
+
+    let pad_path = weztcode_dir.join(config::PAD_FILE_NAME);
+    std::fs::write(&pad_path, "0")
+        .map_err(|e| format!("Failed to write pad file: {}", e))?;
+
+    let lua_str = lua_path.to_str()
+        .ok_or_else(|| "Invalid Lua path".to_string())?;
+    let pad_str = pad_path.to_str()
+        .ok_or_else(|| "Invalid pad path".to_string())?;
+
+    std::env::set_var("WEZTERM_CONFIG_FILE", lua_str);
+    std::env::set_var("WEZTCODE_PAD_FILE", pad_str);
+
+    println!("[Main] Padding hook: WEZTERM_CONFIG_FILE={}", lua_str);
+    println!("[Main] Padding hook: WEZTCODE_PAD_FILE={}", pad_str);
+    println!("[Main] Padding hook: WEZTCODE_USER_CONFIG={}", user_config);
+
+    Ok(())
+}
+
 fn start_http_server(port: u16) -> thread::JoinHandle<()> {
     let server = tiny_http::Server::http(format!("127.0.0.1:{}", port)).unwrap();
     println!("HTTP Server iniciado en http://127.0.0.1:{}/", port);
@@ -57,6 +111,12 @@ fn main() {
     if !WeztermProtocol::is_available() {
         eprintln!("Error: wezterm no está instalado");
         std::process::exit(1);
+    }
+
+    // Configure padding hook before spawning terminal
+    if let Err(e) = setup_padding_hook() {
+        println!("[Main] Warning: padding hook setup failed: {}", e);
+        println!("[Main] Continuando sin hook de padding...");
     }
 
     // Create signal channel for toplevel_id capture
