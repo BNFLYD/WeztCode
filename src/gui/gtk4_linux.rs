@@ -4,6 +4,7 @@ use gtk4::prelude::*;
 use gtk4::{Application, ApplicationWindow, gdk};
 use gtk4_layer_shell::{Edge, Layer, LayerShell};
 use webkit6::prelude::*;
+use crate::terminal::TerminalProtocol;
 use webkit6::WebView;
 use std::cell::RefCell;
 use std::rc::Rc;
