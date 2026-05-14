@@ -53,6 +53,7 @@ fn setup_padding_hook() -> Result<(), String> {
     let pad_str = pad_path.to_str()
         .ok_or_else(|| "Invalid pad path".to_string())?;
 
+    std::env::set_var("WEZTCODE_SESSION", "true");
     std::env::set_var("WEZTERM_CONFIG_FILE", lua_str);
     std::env::set_var("WEZTCODE_PAD_FILE", pad_str);
 

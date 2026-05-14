@@ -19,20 +19,17 @@ end
 local FIXED_PADDING = 350
 local pad_applied = false
 
--- 2. Usar evento más confiable
 wezterm.on("update-status", function(window, pane)
   if pad_applied then return end
 
-  -- Método más confiable: usar el título de la pestaña/pane
-  local tab = window:active_tab()
-  local tab_title = tab:get_title() or ""
+  -- Método más confiable: variable de entorno
+  local is_weztcode = os.getenv("WEZTCODE_SESSION") == "true"
 
-  wezterm.log_info("Tab title = " .. tab_title)
+  wezterm.log_info("WEZTCODE_SESSION = " .. tostring(os.getenv("WEZTCODE_SESSION")))
 
-  -- Buscamos por una marca que ponemos al lanzar Wezterm
-  if tab_title:find("weztcode") or tab_title:find("WeztCode") then
+  if is_weztcode then
     pad_applied = true
-    wezterm.log_info("WeztCode terminal detected - Applying right padding")
+    wezterm.log_info("WeztCode session detected - Applying right padding")
 
     local overrides = window:get_config_overrides() or {}
     overrides.window_padding = wezterm.table_merge(
@@ -40,6 +37,7 @@ wezterm.on("update-status", function(window, pane)
       { right = FIXED_PADDING }
     )
     window:set_config_overrides(overrides)
+    wezterm.log_info("Padding applied successfully")
   end
 end)
 
