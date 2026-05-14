@@ -34,7 +34,7 @@ wezterm.on("update-status", function(window, pane)
     local base = user_config.window_padding or {}
     local padding = {
       left   = base.left,
-      right  = FIXED_PADDING,
+      right  = base.right + FIXED_PADDING,
       top    = base.top,
       bottom = base.bottom,
     }
