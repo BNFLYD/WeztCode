@@ -31,6 +31,12 @@ wezterm.on("update-status", function(window, pane)
     pad_applied = true
     wezterm.log_info("WeztCode session detected - Applying right padding")
 
+    local base_padding = user_config.window_padding or {}
+    wezterm.log_info("User base padding - left: " .. tostring(base_padding.left) ..
+        ", right: " .. tostring(base_padding.right) ..
+        ", top: " .. tostring(base_padding.top) ..
+        ", bottom: " .. tostring(base_padding.bottom))
+
     local overrides = window:get_config_overrides() or {}
     local padding = overrides.window_padding or {}
     padding.right = FIXED_PADDING
