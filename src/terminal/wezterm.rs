@@ -19,8 +19,18 @@ impl TerminalProtocol for WeztermProtocol {
     }
 
     fn spawn(&self, class: &str) -> Result<(Child, u32), String> {
-        let child = Command::new("wezterm")
-            .args(["start", "--class", class])
+        let editor = crate::config::props::UserProps::load()
+            .get("user_editor")
+            .map(|s| s.to_string());
+
+        let mut cmd = Command::new("wezterm");
+        cmd.arg("start").arg("--class").arg(class);
+
+        if let Some(ref prog) = editor {
+            cmd.arg(prog);
+        }
+
+        let child = cmd
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .spawn()
