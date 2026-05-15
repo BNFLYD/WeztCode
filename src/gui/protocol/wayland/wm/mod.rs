@@ -61,23 +61,23 @@ pub fn detect_window_manager() -> Option<Box<dyn WindowManager>> {
                     Some(Box::new(wlroots::WlrootsWindowManager::new()))
                 }
                 WaylandCompositor::KWin => {
-                    eprintln!("KWin Wayland support not yet implemented");
+//                     eprintln!("KWin Wayland support not yet implemented");
                     None
                 }
                 WaylandCompositor::Mutter => {
-                    eprintln!("Mutter Wayland support not yet implemented");
+//                     eprintln!("Mutter Wayland support not yet implemented");
                     None
                 }
                 WaylandCompositor::Cosmic => {
-                    eprintln!("Cosmic support not yet implemented");
+//                     eprintln!("Cosmic support not yet implemented");
                     None
                 }
                 WaylandCompositor::Weston => {
-                    eprintln!("Weston support not yet implemented");
+//                     eprintln!("Weston support not yet implemented");
                     None
                 }
                 WaylandCompositor::Unknown(_) => {
-                    eprintln!("Unknown Wayland compositor");
+//                     eprintln!("Unknown Wayland compositor");
                     None
                 }
             }
@@ -86,34 +86,34 @@ pub fn detect_window_manager() -> Option<Box<dyn WindowManager>> {
         DisplayServer::X11 => {
             match detect_x11_wm() {
                 X11WindowManager::KWin => {
-                    eprintln!("KWin X11 support not yet implemented");
+//                     eprintln!("KWin X11 support not yet implemented");
                     None
                 }
                 X11WindowManager::Mutter => {
-                    eprintln!("Mutter X11 support not yet implemented");
+//                     eprintln!("Mutter X11 support not yet implemented");
                     None
                 }
                 X11WindowManager::Metacity => {
-                    eprintln!("Metacity support not yet implemented");
+//                     eprintln!("Metacity support not yet implemented");
                     None
                 }
                 X11WindowManager::Xfwm => {
-                    eprintln!("XFWM support not yet implemented");
+//                     eprintln!("XFWM support not yet implemented");
                     None
                 }
                 X11WindowManager::Marco => {
-                    eprintln!("Marco support not yet implemented");
+//                     eprintln!("Marco support not yet implemented");
                     None
                 }
                 _ => {
-                    eprintln!("X11 EWMH support not yet implemented");
+//                     eprintln!("X11 EWMH support not yet implemented");
                     None
                 }
             }
         }
 
         DisplayServer::Unknown => {
-            eprintln!("Unknown display server");
+//             eprintln!("Unknown display server");
             None
         }
     }

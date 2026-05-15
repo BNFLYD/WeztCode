@@ -12,7 +12,7 @@ pub trait GuiPlatform {
     /// Handle WM events - platform-specific implementations should override this
     fn handle_wm_events(&self, _receiver: mpsc::Receiver<WmEvent>) {
         // Default implementation does nothing - platforms must implement
-        eprintln!("Warning: handle_wm_events not implemented for this platform");
+//         eprintln!("Warning: handle_wm_events not implemented for this platform");
     }
 }
 

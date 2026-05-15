@@ -57,16 +57,16 @@ fn setup_padding_hook() -> Result<(), String> {
     std::env::set_var("WEZTERM_CONFIG_FILE", lua_str);
     std::env::set_var("WEZTCODE_PAD_FILE", pad_str);
 
-    println!("[Main] Padding hook: WEZTERM_CONFIG_FILE={}", lua_str);
-    println!("[Main] Padding hook: WEZTCODE_PAD_FILE={}", pad_str);
-    println!("[Main] Padding hook: WEZTCODE_USER_CONFIG={}", user_config);
+//     println!("[Main] Padding hook: WEZTERM_CONFIG_FILE={}", lua_str);
+//     println!("[Main] Padding hook: WEZTCODE_PAD_FILE={}", pad_str);
+//     println!("[Main] Padding hook: WEZTCODE_USER_CONFIG={}", user_config);
 
     Ok(())
 }
 
 fn start_http_server(port: u16) -> thread::JoinHandle<()> {
     let server = tiny_http::Server::http(format!("127.0.0.1:{}", port)).unwrap();
-    println!("HTTP Server iniciado en http://127.0.0.1:{}/", port);
+//     println!("HTTP Server iniciado en http://127.0.0.1:{}/", port);
 
     thread::spawn(move || {
         for request in server.incoming_requests() {
@@ -107,17 +107,17 @@ fn start_http_server(port: u16) -> thread::JoinHandle<()> {
 }
 
 fn main() {
-    println!("WeztCode - Inicializando...");
+//     println!("WeztCode - Inicializando...");
 
     if !WeztermProtocol::is_available() {
-        eprintln!("Error: wezterm no está instalado");
+//         eprintln!("Error: wezterm no está instalado");
         std::process::exit(1);
     }
 
     // Configure padding hook before spawning terminal
     if let Err(e) = setup_padding_hook() {
-        println!("[Main] Warning: padding hook setup failed: {}", e);
-        println!("[Main] Continuando sin hook de padding...");
+//         println!("[Main] Warning: padding hook setup failed: {}", e);
+//         println!("[Main] Continuando sin hook de padding...");
     }
 
     // Create signal channel for toplevel_id capture
@@ -126,14 +126,14 @@ fn main() {
     let term = WeztermProtocol::new();
     let class = config::WINDOW_CLASS;
 
-    println!("Iniciando WezTerm...");
+//     println!("Iniciando WezTerm...");
     let target_pid = match term.spawn(class) {
         Ok((_child, pid)) => {
-            println!("[Main] WezTerm iniciado con PID: {}", pid);
+//             println!("[Main] WezTerm iniciado con PID: {}", pid);
             pid
         }
         Err(e) => {
-            eprintln!("Error al iniciar terminal: {}", e);
+//             eprintln!("Error al iniciar terminal: {}", e);
             std::process::exit(1);
         }
     };
@@ -146,7 +146,7 @@ fn main() {
     thread::sleep(Duration::from_millis(100));
 
     let frontend_url = format!("http://127.0.0.1:{}/", http_port);
-    println!("Frontend URL: {}", frontend_url);
+//     println!("Frontend URL: {}", frontend_url);
 
     // Detect window manager and setup monitoring FIRST (before creating GTK platform)
     let mut term_geometry = None;
@@ -154,7 +154,7 @@ fn main() {
     let wm = gui::protocol::wayland::wm::detect_window_manager();
 
     if let Some(wm) = wm {
-        println!("Window Manager detected: {}", wm.wm_name());
+//         println!("Window Manager detected: {}", wm.wm_name());
 
         // Get event receiver from WM (must be called before start_monitoring)
         wm_receiver = Some(wm.event_receiver());
@@ -163,26 +163,26 @@ fn main() {
         wm.set_capture_signal(capture_signal_rx);
 
         // Wait for terminal to be ready, then send capture signal
-        println!("[Main] Waiting for terminal to be ready...");
+//         println!("[Main] Waiting for terminal to be ready...");
         thread::sleep(Duration::from_millis(1200));
 
         // Send signal to start toplevel_id capture now that terminal is ready
-        println!("[Main] Sending capture signal to WM thread...");
+//         println!("[Main] Sending capture signal to WM thread...");
         let _ = capture_signal_tx.send(());
 
         // Start monitoring target window - this BLOCKS until initial geometry is captured
         // target_toplevel_id is None initially - it will be captured from the query
-        println!("[Main] Starting window monitoring and waiting for initial geometry...");
+//         println!("[Main] Starting window monitoring and waiting for initial geometry...");
         term_geometry = wm.start_monitoring(config::WINDOW_CLASS.to_string(), None);
 
         if let Some(ref geo) = term_geometry {
-            println!("[Main] Initial geometry captured: x={}, y={}, w={}, h={}",
-                     geo.x, geo.y, geo.width, geo.height);
+//             println!("[Main] Initial geometry captured: x={}, y={}, w={}, h={}",
+//                      geo.x, geo.y, geo.width, geo.height);
         } else {
-            println!("[Main] Could not capture initial geometry");
+//             println!("[Main] Could not capture initial geometry");
         }
     } else {
-        println!("No se detectó Window Manager - ejecutando en modo standalone");
+//         println!("No se detectó Window Manager - ejecutando en modo standalone");
     }
 
     // NOW create GUI platform with captured geometry available
@@ -195,10 +195,10 @@ fn main() {
 
     // Create overlay with captured geometry (or None if no WM)
     if let Err(e) = platform.create_overlay(&frontend_url, term_geometry) {
-        eprintln!("Error al crear overlay: {}", e);
+//         eprintln!("Error al crear overlay: {}", e);
         std::process::exit(1);
     }
 
-    println!("WeztCode corriendo...");
+//     println!("WeztCode corriendo...");
     platform.run();
 }

@@ -13,7 +13,7 @@ impl TerminalProtocol for WeztermProtocol {
     fn set_right_padding(&self, pixels: u32) -> Result<(), String> {
         let pad_path = std::env::var("WEZTCODE_PAD_FILE")
             .map_err(|_| "WEZTCODE_PAD_FILE not set".to_string())?;
-        println!("[WezTerm] set_right_padding: writing {} to {}", pixels, pad_path);
+//         println!("[WezTerm] set_right_padding: writing {} to {}", pixels, pad_path);
         std::fs::write(&pad_path, pixels.to_string())
             .map_err(|e| format!("Failed to write padding file: {}", e))
     }

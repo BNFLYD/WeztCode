@@ -82,15 +82,17 @@ impl SwayIpcClient {
         capture_signal_rx: mpsc::Receiver<()>,
     ) -> Result<Option<WindowGeometry>, String> {
         // Wait for signal to start monitoring (SYNCHRONOUS)
-        println!("[SwayIPC] Waiting for capture signal before starting...");
+//         println!("[SwayIPC] Waiting for capture signal before starting...");
         match capture_signal_rx.recv() {
-            Ok(_) => println!("[SwayIPC] Capture signal received, performing initial queries..."),
+            Ok(_) => {
+                // println!("[SwayIPC] Capture signal received, performing initial queries...");
+            }
             Err(e) => {
                 return Err(format!("[SwayIPC] Capture signal channel closed: {}", e));
             }
         }
 
-        println!("[SwayIPC] Monitoring app_id: {}", target_app_id);
+//         println!("[SwayIPC] Monitoring app_id: {}", target_app_id);
 
         // Mutable target_toplevel_id - can be captured from query if not provided
         let mut target_toplevel_id_opt = target_toplevel_id;
@@ -98,7 +100,7 @@ impl SwayIpcClient {
 
         // If we don't have toplevel_id yet, query for it now before starting event loop
         if target_toplevel_id_opt.is_none() {
-            println!("[SwayIPC] Performing initial query to capture toplevel_id...");
+//             println!("[SwayIPC] Performing initial query to capture toplevel_id...");
 
             let cmd = format!("swaymsg -t get_tree | grep -B5 -A15 '\"app_id\": \"{}\"'", target_app_id);
             if let Ok(output) = Command::new("sh")
@@ -110,7 +112,7 @@ impl SwayIpcClient {
                 for line in output_str.lines() {
                     if line.contains("foreign_toplevel_identifier") {
                         if let Some(id) = line.split('"').nth(3) {
-                            println!("[SwayIPC] Captured toplevel_id from initial query: {}", id);
+//                             println!("[SwayIPC] Captured toplevel_id from initial query: {}", id);
                             target_toplevel_id_opt = Some(id.to_string());
                             break;
                         }
@@ -119,13 +121,13 @@ impl SwayIpcClient {
             }
 
             if target_toplevel_id_opt.is_none() {
-                println!("[SwayIPC] Initial query did not find toplevel_id, will wait for first window event");
+//                 println!("[SwayIPC] Initial query did not find toplevel_id, will wait for first window event");
             }
         }
 
         // If we have toplevel_id, query for initial geometry
         if let Some(ref toplevel_id) = target_toplevel_id_opt {
-            println!("[SwayIPC] Querying initial geometry for toplevel_id: {}", toplevel_id);
+//             println!("[SwayIPC] Querying initial geometry for toplevel_id: {}", toplevel_id);
 
             let toplevel_str = format!("\"foreign_toplevel_identifier\": \"{}\"", toplevel_id);
             let cmd = format!("swaymsg -t get_tree | grep -B40 '{}'", toplevel_str);
@@ -186,8 +188,8 @@ impl SwayIpcClient {
                         height: wr.3,
                     };
 
-                    println!("[SwayIPC] Initial geometry captured: x={}, y={}, w={}, h={}",
-                             geometry.x, geometry.y, geometry.width, geometry.height);
+//                     println!("[SwayIPC] Initial geometry captured: x={}, y={}, w={}, h={}",
+//                              geometry.x, geometry.y, geometry.width, geometry.height);
 
                     initial_geometry = Some(geometry.clone());
 
@@ -197,7 +199,7 @@ impl SwayIpcClient {
                         geometry,
                     });
                 } else {
-                    println!("[SwayIPC] Could not parse initial geometry (rect={:?}, window_rect={:?})", rect, window_rect);
+//                     println!("[SwayIPC] Could not parse initial geometry (rect={:?}, window_rect={:?})", rect, window_rect);
                 }
             }
         }
@@ -213,7 +215,7 @@ impl SwayIpcClient {
             {
                 Ok(c) => c,
                 Err(e) => {
-                    eprintln!("[SwayIPC] Failed to spawn swaymsg: {}", e);
+//                     eprintln!("[SwayIPC] Failed to spawn swaymsg: {}", e);
                     return;
                 }
             };
@@ -221,13 +223,13 @@ impl SwayIpcClient {
             let stdout = match child.stdout.take() {
                 Some(s) => s,
                 None => {
-                    eprintln!("[SwayIPC] Failed to get stdout from swaymsg");
+//                     eprintln!("[SwayIPC] Failed to get stdout from swaymsg");
                     return;
                 }
             };
 
             let reader = BufReader::new(stdout);
-            println!("[SwayIPC] Listening for window events...");
+//             println!("[SwayIPC] Listening for window events...");
 
             // Read events line by line (each line is a JSON event)
             for line in reader.lines() {
@@ -244,43 +246,43 @@ impl SwayIpcClient {
                         } else {
                             // Not a window event - likely workspace event
                             // Verify visibility of our window
-                            println!("[SwayIPC] Workspace event detected - checking visibility");
+//                             println!("[SwayIPC] Workspace event detected - checking visibility");
                             if let Some(ref toplevel_id) = target_toplevel_id_opt {
                                 match Self::new() {
                                     Ok(client) => {
                                         match client.get_window_visibility_by_toplevel_id(toplevel_id) {
                                             Some(false) => {
                                                 // Window not visible - hide overlay
-                                                println!("[SwayIPC] Window not visible after workspace change - hiding overlay");
+//                                                 println!("[SwayIPC] Window not visible after workspace change - hiding overlay");
                                                 let _ = sender.send(WmEvent::WindowUnfocused {
                                                     app_id: target_app_id.to_string()
                                                 });
                                             }
                                             Some(true) => {
-                                                println!("[SwayIPC] Window still visible after workspace change");
+//                                                 println!("[SwayIPC] Window still visible after workspace change");
                                             }
                                             None => {
-                                                println!("[SwayIPC] ERROR: Could not query visibility after workspace change");
+//                                                 println!("[SwayIPC] ERROR: Could not query visibility after workspace change");
                                             }
                                         }
                                     }
                                     Err(e) => {
-                                        println!("[SwayIPC] ERROR: Failed to create SwayIpcClient: {}", e);
+//                                         println!("[SwayIPC] ERROR: Failed to create SwayIpcClient: {}", e);
                                     }
                                 }
                             } else {
-                                println!("[SwayIPC] WARNING: target_toplevel_id is None, cannot query visibility");
+//                                 println!("[SwayIPC] WARNING: target_toplevel_id is None, cannot query visibility");
                             }
                         }
                     }
                     Err(e) => {
-                        eprintln!("[SwayIPC] Error reading line: {}", e);
+//                         eprintln!("[SwayIPC] Error reading line: {}", e);
                         break;
                     }
                 }
             }
 
-            eprintln!("[SwayIPC] Event loop ended, swaymsg exited");
+//             eprintln!("[SwayIPC] Event loop ended, swaymsg exited");
         });
 
         Ok(initial_geometry)
@@ -312,18 +314,18 @@ impl SwayIpcClient {
         match event.change.as_str() {
             "focus" => {
                 if event.container.focused {
-                    println!("[SwayIPC] Target window FOCUSED at {:?}", geometry);
+//                     println!("[SwayIPC] Target window FOCUSED at {:?}", geometry);
                     let _ = sender.send(WmEvent::WindowFocused { app_id: event_app_id });
                     let _ = sender.send(WmEvent::GeometryChanged { app_id: target_app_id.to_string(), geometry });
                 }
             }
             "unfocus" => {
-                println!("[SwayIPC] Target window UNFOCUSED");
+//                 println!("[SwayIPC] Target window UNFOCUSED");
                 let _ = sender.send(WmEvent::WindowUnfocused { app_id: event_app_id });
             }
             "move" | "resize" | "fullscreen" => {
                 if event.container.focused {
-                    println!("[SwayIPC] Target window GEOMETRY CHANGED: {:?}", geometry);
+//                     println!("[SwayIPC] Target window GEOMETRY CHANGED: {:?}", geometry);
                     let _ = sender.send(WmEvent::GeometryChanged { app_id: target_app_id.to_string(), geometry });
                 }
             }
@@ -361,7 +363,7 @@ impl SwayIpcClient {
             match event.change.as_str() {
                 "focus" => {
                     if event.container.focused {
-                        println!("[SwayIPC] Target window FOCUSED (toplevel match)");
+//                         println!("[SwayIPC] Target window FOCUSED (toplevel match)");
                         let _ = sender.send(WmEvent::WindowFocused {
                             app_id: target_app_id.to_string()
                         });
@@ -387,54 +389,54 @@ impl SwayIpcClient {
             }
         } else if event.change.as_str() == "focus" && event.container.focused {
             // Another window gained focus - check if our window is still visible
-            println!("[SwayIPC] === TRIGGER ACTIVATED ===");
-            println!("[SwayIPC] Another window focused: app_id={:?}, toplevel_id={:?}",
-                event.container.app_id, event.container.foreign_toplevel_identifier);
+//             println!("[SwayIPC] === TRIGGER ACTIVATED ===");
+//             println!("[SwayIPC] Another window focused: app_id={:?}, toplevel_id={:?}",
+//                 event.container.app_id, event.container.foreign_toplevel_identifier);
 
             // Query sway for current tree to check our window's visibility by toplevel_id
             if let Some(toplevel_id) = target_toplevel_id {
-                println!("[SwayIPC] Querying visibility for toplevel_id: {}", toplevel_id);
+//                 println!("[SwayIPC] Querying visibility for toplevel_id: {}", toplevel_id);
 
                 match Self::new() {
                     Ok(client) => {
-                        println!("[SwayIPC] SwayIpcClient created successfully");
+//                         println!("[SwayIPC] SwayIpcClient created successfully");
 
                         match client.get_window_visibility_by_toplevel_id(toplevel_id) {
                             Some(visible) => {
-                                println!("[SwayIPC] Query result: visible={}", visible);
+//                                 println!("[SwayIPC] Query result: visible={}", visible);
 
                                 if visible {
-                                    println!("[SwayIPC] Our window is visible - keeping overlay visible");
+//                                     println!("[SwayIPC] Our window is visible - keeping overlay visible");
                                     let _ = sender.send(WmEvent::WindowFocused {
                                         app_id: target_app_id.to_string()
                                     });
                                 } else {
-                                    println!("[SwayIPC] Our window is not visible - hiding overlay");
+//                                     println!("[SwayIPC] Our window is not visible - hiding overlay");
                                     let _ = sender.send(WmEvent::WindowUnfocused {
                                         app_id: target_app_id.to_string()
                                     });
                                 }
                             }
                             None => {
-                                println!("[SwayIPC] ERROR: Window with toplevel_id {} not found in tree!", toplevel_id);
+//                                 println!("[SwayIPC] ERROR: Window with toplevel_id {} not found in tree!", toplevel_id);
                             }
                         }
                     }
                     Err(e) => {
-                        println!("[SwayIPC] ERROR: Failed to create SwayIpcClient: {}", e);
+//                         println!("[SwayIPC] ERROR: Failed to create SwayIpcClient: {}", e);
                     }
                 }
             } else {
-                println!("[SwayIPC] WARNING: target_toplevel_id is None, cannot query visibility");
+//                 println!("[SwayIPC] WARNING: target_toplevel_id is None, cannot query visibility");
             }
 
-            println!("[SwayIPC] === TRIGGER COMPLETED ===");
+//             println!("[SwayIPC] === TRIGGER COMPLETED ===");
         }
     }
 
     /// Get window visibility by foreign_toplevel_identifier using robust grep filtering
     fn get_window_visibility_by_toplevel_id(&self, toplevel_id: &str) -> Option<bool> {
-        println!("[SwayIPC] get_window_visibility_by_toplevel_id called for: {}", toplevel_id);
+//         println!("[SwayIPC] get_window_visibility_by_toplevel_id called for: {}", toplevel_id);
 
         // Use shell command with chained grep for robust filtering
         // First grep captures 20 lines after toplevel_id match, second grep extracts visible field
@@ -446,23 +448,23 @@ impl SwayIpcClient {
             .arg(&cmd)
             .output()
             .map_err(|e| {
-                println!("[SwayIPC] ERROR: Failed to run grep command: {}", e);
+//                 println!("[SwayIPC] ERROR: Failed to run grep command: {}", e);
                 e
             }).ok()?;
 
         let output_str = String::from_utf8_lossy(&output.stdout);
-        println!("[SwayIPC] grep output:\n{}", output_str);
+//         println!("[SwayIPC] grep output:\n{}", output_str);
 
         // Parse the visible line - should be something like: "visible": true,
         for line in output_str.lines() {
             if line.contains("\"visible\"") {
                 let visible = line.contains("true");
-                println!("[SwayIPC] Found visible={}", visible);
+//                 println!("[SwayIPC] Found visible={}", visible);
                 return Some(visible);
             }
         }
 
-        println!("[SwayIPC] ERROR: visible field not found in grep output");
+//         println!("[SwayIPC] ERROR: visible field not found in grep output");
         None
     }
 
@@ -483,8 +485,8 @@ impl SwayIpcClient {
             height: window_rect.height,
         };
 
-        println!("[SwayIPC] Geometry trigger - move/resize: x={}, y={}, w={}, h={}",
-            geometry.x, geometry.y, geometry.width, geometry.height);
+//         println!("[SwayIPC] Geometry trigger - move/resize: x={}, y={}, w={}, h={}",
+//             geometry.x, geometry.y, geometry.width, geometry.height);
 
         let _ = sender.send(WmEvent::GeometryChanged {
             app_id: target_app_id.to_string(),
@@ -512,8 +514,8 @@ impl SwayIpcClient {
         // Check if window is in fullscreen mode (fullscreen_mode > 0 means fullscreen)
         let is_fullscreen = event.container.fullscreen_mode.unwrap_or(0) > 0;
 
-        println!("[SwayIPC] Fullscreen trigger: is_fullscreen={}, geometry={:?}",
-            is_fullscreen, geometry);
+//         println!("[SwayIPC] Fullscreen trigger: is_fullscreen={}, geometry={:?}",
+//             is_fullscreen, geometry);
 
         let _ = sender.send(WmEvent::FullscreenChanged {
             app_id: target_app_id.to_string(),

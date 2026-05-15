@@ -36,16 +36,16 @@ impl Gtk4Platform {
             if let Some(surface) = window.surface() {
                 if let Some(monitor) = display.monitor_at_surface(&surface) {
                     let geo = monitor.geometry();
-                    println!("[GTK] Monitor detected: {}x{} at x={}, y={}",
-                             geo.width(), geo.height(), geo.x(), geo.y());
+//                     println!("[GTK] Monitor detected: {}x{} at x={}, y={}",
+//                              geo.width(), geo.height(), geo.x(), geo.y());
 
                     // Log additional monitor info
-                    println!("[GTK] Monitor scale factor: {}", monitor.scale_factor());
+//                     println!("[GTK] Monitor scale factor: {}", monitor.scale_factor());
                     if let Some(manufacturer) = monitor.manufacturer() {
-                        println!("[GTK] Monitor manufacturer: {}", manufacturer);
+//                         println!("[GTK] Monitor manufacturer: {}", manufacturer);
                     }
                     if let Some(model) = monitor.model() {
-                        println!("[GTK] Monitor model: {}", model);
+//                         println!("[GTK] Monitor model: {}", model);
                     }
 
                     return Some(WindowGeometry::new(
@@ -55,13 +55,13 @@ impl Gtk4Platform {
                         geo.height(),
                     ));
                 } else {
-                    println!("[GTK] WARNING: Could not detect monitor at surface");
+//                     println!("[GTK] WARNING: Could not detect monitor at surface");
                 }
             } else {
-                println!("[GTK] WARNING: Window has no surface yet");
+//                 println!("[GTK] WARNING: Window has no surface yet");
             }
         } else {
-            println!("[GTK] WARNING: No default display available");
+//             println!("[GTK] WARNING: No default display available");
         }
         None
     }
@@ -93,12 +93,12 @@ impl Gtk4Platform {
 
         let margin_left = 0; // Phase 3: Will calculate for left-side positioning
 
-        println!("[GTK] Canvas margins calculated: top={}, bottom={}, left={}, right={}",
-                 margin_top, margin_bottom, margin_left, margin_right);
-        println!("[GTK] Terminal position: x={}, y={}, w={}, h={}",
-                 terminal_geo.x, terminal_geo.y, terminal_geo.width, terminal_geo.height);
-        println!("[GTK] Monitor position: x={}, y={}, w={}, h={}",
-                 monitor_geo.x, monitor_geo.y, monitor_geo.width, monitor_geo.height);
+//         println!("[GTK] Canvas margins calculated: top={}, bottom={}, left={}, right={}",
+//                  margin_top, margin_bottom, margin_left, margin_right);
+//         println!("[GTK] Terminal position: x={}, y={}, w={}, h={}",
+//                  terminal_geo.x, terminal_geo.y, terminal_geo.width, terminal_geo.height);
+//         println!("[GTK] Monitor position: x={}, y={}, w={}, h={}",
+//                  monitor_geo.x, monitor_geo.y, monitor_geo.width, monitor_geo.height);
 
         (margin_top, margin_bottom, margin_left, margin_right)
     }
@@ -116,11 +116,11 @@ impl GuiPlatform for Gtk4Platform {
             // Calculate initial size based on terminal geometry if available
             let (initial_width, initial_height) = if let Some(ref geo) = term_geometry_clone {
                 let width = ((geo.width as f32) * 0.20).max(350.0) as i32;
-                println!("[GTK] Calculating initial size: terminal {}x{} -> overlay {}x{}",
-                         geo.width, geo.height, width, geo.height);
+//                 println!("[GTK] Calculating initial size: terminal {}x{} -> overlay {}x{}",
+//                          geo.width, geo.height, width, geo.height);
                 (width, geo.height)
             } else {
-                println!("[GTK] Using default size 350x600 (no terminal geometry available)");
+//                 println!("[GTK] Using default size 350x600 (no terminal geometry available)");
                 (350, 600)
             };
 
@@ -161,8 +161,8 @@ impl GuiPlatform for Gtk4Platform {
                 let (margin_top, margin_bottom, _margin_left, margin_right) =
                     Self::calculate_canvas_margins(&monitor, term_geo, overlay_width);
 
-                println!("[GTK] Using monitor geometry for margins: {}x{} (top={}, bottom={}, right={})",
-                         monitor.width, monitor.height, margin_top, margin_bottom, margin_right);
+//                 println!("[GTK] Using monitor geometry for margins: {}x{} (top={}, bottom={}, right={})",
+//                          monitor.width, monitor.height, margin_top, margin_bottom, margin_right);
                 window.set_margin(Edge::Top, margin_top);
                 window.set_margin(Edge::Bottom, margin_bottom);
                 window.set_margin(Edge::Right, margin_right);
@@ -178,13 +178,13 @@ impl GuiPlatform for Gtk4Platform {
                 *monitor_geo_ref.borrow_mut() = Some(monitor.clone());
             } else if let Some(geo) = &term_geometry {
                 // Fallback: Use terminal geometry only (existing behavior)
-                println!("[GTK] Fallback to terminal-only margins for x={}, y={}, w={}, h={}",
-                         geo.x, geo.y, geo.width, geo.height);
+//                 println!("[GTK] Fallback to terminal-only margins for x={}, y={}, w={}, h={}",
+//                          geo.x, geo.y, geo.width, geo.height);
                 window.set_margin(Edge::Top, geo.y);
                 window.set_margin(Edge::Bottom, 0);
             } else {
                 // Default values when no geometry available
-                println!("[GTK] Using default margins (no geometry available)");
+//                 println!("[GTK] Using default margins (no geometry available)");
                 window.set_margin(Edge::Top, 1);
                 window.set_margin(Edge::Bottom, 1);
             }
@@ -192,16 +192,16 @@ impl GuiPlatform for Gtk4Platform {
             // Exclusive zone -1 = margins measured from monitor edges, not from available area
             window.set_exclusive_zone(-1);
 
-            println!("GTK: Creating WebView...");
+//             println!("GTK: Creating WebView...");
             let webview = WebView::new();
 
             // Make WebView background transparent to allow GTK window transparency
             webview.set_background_color(&gdk::RGBA::new(0.0, 0.0, 0.0, 0.0));
 
-            println!("GTK: Loading URL: {}", &url);
+//             println!("GTK: Loading URL: {}", &url);
             webview.load_uri(&url);
 
-            println!("GTK: Adding WebView to window...");
+//             println!("GTK: Adding WebView to window...");
             window.set_child(Some(&webview));
 
             *window_ref.borrow_mut() = Some(window.clone());
@@ -253,45 +253,45 @@ impl Gtk4Platform {
             match receiver.try_recv() {
                 Ok(WmEvent::WindowFocused { app_id }) => {
                     // Terminal gained focus - SHOW overlay
-                    println!("[GTK] WindowFocused event received for {}", app_id);
+//                     println!("[GTK] WindowFocused event received for {}", app_id);
                     if let Ok(window_ref) = window_weak.try_borrow() {
                         if let Some(ref window) = *window_ref {
-                            println!("[GTK] Setting visible=true and presenting");
+//                             println!("[GTK] Setting visible=true and presenting");
                             window.set_visible(true);
                             window.present();
-                            println!("[GTK] Overlay should be visible now");
+//                             println!("[GTK] Overlay should be visible now");
                         } else {
-                            println!("[GTK] ERROR: Window is None");
+//                             println!("[GTK] ERROR: Window is None");
                         }
                     } else {
-                        println!("[GTK] ERROR: Failed to borrow window");
+//                         println!("[GTK] ERROR: Failed to borrow window");
                     }
                 }
                 Ok(WmEvent::WindowUnfocused { app_id }) => {
                     // Terminal lost focus - HIDE overlay
-                    println!("[GTK] WindowUnfocused event received for {}", app_id);
+//                     println!("[GTK] WindowUnfocused event received for {}", app_id);
                     if let Ok(window_ref) = window_weak.try_borrow() {
                         if let Some(ref window) = *window_ref {
-                            println!("[GTK] Setting visible=false");
+//                             println!("[GTK] Setting visible=false");
                             window.set_visible(false);
-                            println!("[GTK] Overlay should be hidden now");
+//                             println!("[GTK] Overlay should be hidden now");
                         } else {
-                            println!("[GTK] ERROR: Window is None");
+//                             println!("[GTK] ERROR: Window is None");
                         }
                     } else {
-                        println!("[GTK] ERROR: Failed to borrow window");
+//                         println!("[GTK] ERROR: Failed to borrow window");
                     }
                 }
                 Ok(WmEvent::GeometryChanged { app_id, geometry }) => {
-                    println!("[GTK] GeometryChanged for {}: {:?}", app_id, geometry);
+//                     println!("[GTK] GeometryChanged for {}: {:?}", app_id, geometry);
                     if let Ok(window_ref) = window_weak.try_borrow() {
                         if let Some(ref window) = *window_ref {
                             // Calculate proportional width: 20% of terminal width, min 350px
                             let overlay_width = ((geometry.width as f32) * 0.20).max(350.0) as i32;
                             let overlay_height = geometry.height;
 
-                            println!("[GTK] Resizing overlay to {}x{} (terminal: {}x{} at x={}, y={})",
-                                     overlay_width, overlay_height, geometry.width, geometry.height, geometry.x, geometry.y);
+//                             println!("[GTK] Resizing overlay to {}x{} (terminal: {}x{} at x={}, y={})",
+//                                      overlay_width, overlay_height, geometry.width, geometry.height, geometry.x, geometry.y);
 
                             window.set_default_size(overlay_width, overlay_height);
 
@@ -301,8 +301,8 @@ impl Gtk4Platform {
                                 let (margin_top, margin_bottom, _margin_left, margin_right) =
                                     Self::calculate_canvas_margins(&monitor, &geometry, overlay_width);
 
-                                println!("[GTK] Recalculating margins: top={}, bottom={}, right={}",
-                                         margin_top, margin_bottom, margin_right);
+//                                 println!("[GTK] Recalculating margins: top={}, bottom={}, right={}",
+//                                          margin_top, margin_bottom, margin_right);
 
                                 window.set_margin(Edge::Top, margin_top);
                                 window.set_margin(Edge::Bottom, margin_bottom);
@@ -319,14 +319,14 @@ impl Gtk4Platform {
                     }
                 }
                 Ok(WmEvent::FullscreenChanged { app_id, geometry, is_fullscreen }) => {
-                    println!("[GTK] FullscreenChanged for {}: fullscreen={}", app_id, is_fullscreen);
+//                     println!("[GTK] FullscreenChanged for {}: fullscreen={}", app_id, is_fullscreen);
                     if let Ok(window_ref) = window_weak.try_borrow() {
                         if let Some(ref window) = *window_ref {
                             let overlay_width = ((geometry.width as f32) * 0.20).max(350.0) as i32;
                             let overlay_height = geometry.height;
 
-                            println!("[GTK] Fullscreen mode: {}, resizing to {}x{}",
-                                     is_fullscreen, overlay_width, overlay_height);
+//                             println!("[GTK] Fullscreen mode: {}, resizing to {}x{}",
+//                                      is_fullscreen, overlay_width, overlay_height);
 
                             window.set_default_size(overlay_width, overlay_height);
 
@@ -346,7 +346,7 @@ impl Gtk4Platform {
                     // No events, this is normal
                 }
                 Err(std::sync::mpsc::TryRecvError::Disconnected) => {
-                    println!("[GTK] ERROR: Channel disconnected!");
+//                     println!("[GTK] ERROR: Channel disconnected!");
                     return glib::ControlFlow::Break;
                 }
                 _ => {

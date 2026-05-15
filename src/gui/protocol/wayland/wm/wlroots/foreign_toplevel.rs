@@ -102,7 +102,7 @@ impl Dispatch<wl_registry::WlRegistry, ()> for ToplevelState {
             version,
         } = event
         {
-            println!("[ForeignToplevel] Registry global: {} - {}", interface, name);
+//             println!("[ForeignToplevel] Registry global: {} - {}", interface, name);
             if interface == "zwlr_foreign_toplevel_manager_v1" {
                 let manager = registry.bind::<ZwlrForeignToplevelManagerV1, _, _>(
                     name,
@@ -111,7 +111,7 @@ impl Dispatch<wl_registry::WlRegistry, ()> for ToplevelState {
                     (),
                 );
                 state.toplevel_manager = Some(manager);
-                println!("[ForeignToplevel] Manager bound successfully");
+//                 println!("[ForeignToplevel] Manager bound successfully");
             }
         }
     }
@@ -181,19 +181,19 @@ fn parse_state(state_data: &[u8]) -> bool {
 /// Inicia monitoreo continuo de cambios de foco para el app_id especificado
 /// Envía eventos WmEvent a través del channel proporcionado
 pub fn start_focus_monitor(target_app_id: String, event_sender: mpsc::Sender<WmEvent>) -> Result<(), String> {
-    println!("[ForeignToplevel] Starting focus monitor for app_id: '{}'", target_app_id);
+//     println!("[ForeignToplevel] Starting focus monitor for app_id: '{}'", target_app_id);
 
     std::thread::spawn(move || {
-        println!("[ForeignToplevel] Monitor thread started");
+//         println!("[ForeignToplevel] Monitor thread started");
 
         let connection = match Connection::connect_to_env() {
             Ok(c) => c,
             Err(e) => {
-                eprintln!("[ForeignToplevel] Failed to connect to Wayland: {}", e);
+//                 eprintln!("[ForeignToplevel] Failed to connect to Wayland: {}", e);
                 return;
             }
         };
-        println!("[ForeignToplevel] Connected to Wayland");
+//         println!("[ForeignToplevel] Connected to Wayland");
 
         let mut state = FocusMonitorState::new(target_app_id.clone(), event_sender);
         let mut event_queue = connection.new_event_queue();
@@ -201,17 +201,17 @@ pub fn start_focus_monitor(target_app_id: String, event_sender: mpsc::Sender<WmE
 
         let display = connection.display();
         display.get_registry(&qh, ());
-        println!("[ForeignToplevel] Registry requested, entering event loop...");
+//         println!("[ForeignToplevel] Registry requested, entering event loop...");
 
         loop {
             if let Err(e) = event_queue.roundtrip(&mut state) {
-                eprintln!("[ForeignToplevel] Wayland event loop error: {}", e);
+//                 eprintln!("[ForeignToplevel] Wayland event loop error: {}", e);
                 break;
             }
             std::thread::sleep(std::time::Duration::from_millis(100));
         }
 
-        println!("[ForeignToplevel] Monitor thread exiting");
+//         println!("[ForeignToplevel] Monitor thread exiting");
     });
 
     Ok(())
@@ -247,7 +247,7 @@ impl Dispatch<wl_registry::WlRegistry, ()> for FocusMonitorState {
         qh: &QueueHandle<Self>,
     ) {
         if let wl_registry::Event::Global { name, interface, version } = event {
-            println!("[ForeignToplevel] Registry global: {} (name={})", interface, name);
+//             println!("[ForeignToplevel] Registry global: {} (name={})", interface, name);
             if interface == "zwlr_foreign_toplevel_manager_v1" {
                 let manager = registry.bind::<ZwlrForeignToplevelManagerV1, _, _>(
                     name,
@@ -256,7 +256,7 @@ impl Dispatch<wl_registry::WlRegistry, ()> for FocusMonitorState {
                     (),
                 );
                 state.toplevel_manager = Some(manager);
-                println!("[ForeignToplevel] Manager BOUND successfully!");
+//                 println!("[ForeignToplevel] Manager BOUND successfully!");
             }
         }
     }
@@ -281,7 +281,7 @@ impl Dispatch<ZwlrForeignToplevelManagerV1, ()> for FocusMonitorState {
         use wayland_protocols_wlr::foreign_toplevel::v1::client::zwlr_foreign_toplevel_manager_v1::Event;
         match event {
             Event::Toplevel { toplevel } => {
-                println!("[ForeignToplevel] New toplevel created");
+//                 println!("[ForeignToplevel] New toplevel created");
                 state.toplevels.insert(toplevel, ToplevelInfo {
                     app_id: None,
                     title: None,
@@ -306,25 +306,25 @@ impl Dispatch<ZwlrForeignToplevelHandleV1, ()> for FocusMonitorState {
         if let Some(info) = state.toplevels.get_mut(handle) {
             match event {
                 Event::AppId { ref app_id } => {
-                    println!("[ForeignToplevel] Got app_id: '{}' (target: '{}')", app_id, state.target_app_id);
+//                     println!("[ForeignToplevel] Got app_id: '{}' (target: '{}')", app_id, state.target_app_id);
                     info.app_id = Some(app_id.clone());
                 }
                 Event::Title { ref title } => {
-                    println!("[ForeignToplevel] Got title: '{}'", title);
+//                     println!("[ForeignToplevel] Got title: '{}'", title);
                     info.title = Some(title.clone());
                 }
                 Event::State { state: state_data } => {
                     let was_focused_before = info.is_focused;
                     info.is_focused = parse_state(&state_data);
 
-                    println!("[ForeignToplevel] State change - focused: {} -> {} for app_id: {:?}",
-                        was_focused_before, info.is_focused, info.app_id);
+//                     println!("[ForeignToplevel] State change - focused: {} -> {} for app_id: {:?}",
+//                         was_focused_before, info.is_focused, info.app_id);
 
                     // Check if this is our target window and focus state changed
                     if let Some(ref window_app_id) = info.app_id {
                         if window_app_id == &state.target_app_id {
                             if info.is_focused && !was_focused_before && !state.target_was_focused {
-                                println!("[ForeignToplevel] Target window FOCUSED!");
+//                                 println!("[ForeignToplevel] Target window FOCUSED!");
                                 let _ = state.event_sender.send(
                                     WmEvent::WindowFocused {
                                         app_id: state.target_app_id.clone()
@@ -332,7 +332,7 @@ impl Dispatch<ZwlrForeignToplevelHandleV1, ()> for FocusMonitorState {
                                 );
                                 state.target_was_focused = true;
                             } else if !info.is_focused && (was_focused_before || state.target_was_focused) {
-                                println!("[ForeignToplevel] Target window UNFOCUSED!");
+//                                 println!("[ForeignToplevel] Target window UNFOCUSED!");
                                 let _ = state.event_sender.send(
                                     WmEvent::WindowUnfocused {
                                         app_id: state.target_app_id.clone()
@@ -344,10 +344,10 @@ impl Dispatch<ZwlrForeignToplevelHandleV1, ()> for FocusMonitorState {
                     }
                 }
                 Event::Closed => {
-                    println!("[ForeignToplevel] Toplevel closed - app_id: {:?}", info.app_id);
+//                     println!("[ForeignToplevel] Toplevel closed - app_id: {:?}", info.app_id);
                     if info.app_id.as_ref() == Some(&state.target_app_id) {
                         if state.target_was_focused {
-                            println!("[ForeignToplevel] Target window closed!");
+//                             println!("[ForeignToplevel] Target window closed!");
                             let _ = state.event_sender.send(
                                 WmEvent::WindowUnfocused {
                                     app_id: state.target_app_id.clone()
