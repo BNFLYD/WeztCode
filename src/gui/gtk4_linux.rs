@@ -131,6 +131,14 @@ impl GuiPlatform for Gtk4Platform {
                 .default_height(initial_height)
                 .build();
 
+            // Enable per-pixel alpha and visual transparency so compositor treats clicks correctly
+            window.set_app_paintable(true);
+            if let Some(display) = gdk::Display::default() {
+                if let Some(visual) = display.rgba_visual() {
+                    window.set_visual(Some(&visual));
+                }
+            }
+
             // Make window transparent for rounded corners
             window.set_css_classes(&[&"transparent-window"]);
             let css_provider = gtk4::CssProvider::new();
@@ -145,6 +153,7 @@ impl GuiPlatform for Gtk4Platform {
 
             window.init_layer_shell();
             window.set_layer(Layer::Overlay);
+            window.set_keyboard_interactivity(true);
             window.set_anchor(Edge::Right, true);
             // Anchor to top and bottom to adapt to margins
             window.set_anchor(Edge::Top, true);
@@ -197,6 +206,17 @@ impl GuiPlatform for Gtk4Platform {
 
             // Make WebView background transparent to allow GTK window transparency
             webview.set_background_color(&gdk::RGBA::new(0.0, 0.0, 0.0, 0.0));
+
+            // Enable focus on click so WebView receives keyboard/mouse input
+            webview.set_can_focus(true);
+            webview.set_focus_on_click(true);
+
+            // Gesture controller to capture clicks and prevent pass-through to terminal
+            let gesture = gtk4::GestureClick::new();
+            gesture.connect_pressed(gtk4::glib::clone!(@weak webview => move |_, _, _, _| {
+                webview.grab_focus();
+            }));
+            webview.add_controller(gesture);
 
 //             println!("GTK: Loading URL: {}", &url);
             webview.load_uri(&url);
