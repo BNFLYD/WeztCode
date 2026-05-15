@@ -180,11 +180,8 @@ fn handle_editor_open(rel_path: &str, root: &Path) -> tiny_http::Response<std::i
         return json_error("Not a file");
     }
 
-    let esc = full_path.to_string_lossy();
-    let cmd = format!(":e {}\r", esc);
-
-    match std::process::Command::new("wezterm")
-        .args(["cli", "send-text", "--no-paste", &cmd])
+    match std::process::Command::new("nvim")
+        .args(["--remote", &full_path.to_string_lossy()])
         .output()
     {
         Ok(o) if o.status.success() => {
@@ -192,9 +189,9 @@ fn handle_editor_open(rel_path: &str, root: &Path) -> tiny_http::Response<std::i
         }
         Ok(o) => {
             let stderr = String::from_utf8_lossy(&o.stderr);
-            json_error(&format!("send-text failed: {}", stderr))
+            json_error(&format!("nvim --remote failed: {}", stderr))
         }
-        Err(e) => json_error(&format!("Failed to run wezterm cli: {}", e)),
+        Err(e) => json_error(&format!("Failed to run nvim: {}", e)),
     }
 }
 

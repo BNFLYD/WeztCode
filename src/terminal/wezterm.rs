@@ -35,6 +35,7 @@ impl TerminalProtocol for WeztermProtocol {
 
         if let Some(ref prog) = editor {
             cmd.arg(prog);
+            cmd.arg("--listen").arg("/tmp/weztcode-nvim.sock");
         }
 
         let child = cmd
