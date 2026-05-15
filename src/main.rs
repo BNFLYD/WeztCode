@@ -171,22 +171,22 @@ fn handle_read(rel_path: &str, root: &Path) -> tiny_http::Response<std::io::Curs
 }
 
 fn handle_editor_open(rel_path: &str, root: &Path) -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
-    println!("[editor_open] rel_path={:?}, root={:?}", rel_path, root);
+    eprintln!("[editor_open] rel_path={:?}, root={:?}", rel_path, root);
 
     let full_path = match crate::config::fs::sanitize_path(rel_path, root) {
         Ok(p) => p,
         Err(e) => {
-            println!("[editor_open] sanitize_path error: {}", e);
+            eprintln!("[editor_open] sanitize_path error: {}", e);
             return json_error(&e);
         }
     };
 
     if !full_path.is_file() {
-        println!("[editor_open] not a file: {:?}", full_path);
+        eprintln!("[editor_open] not a file: {:?}", full_path);
         return json_error("Not a file");
     }
 
-    println!("[editor_open] opening file: {:?}", full_path);
+    eprintln!("[editor_open] opening file: {:?}", full_path);
 
     match std::process::Command::new("nvim")
         .args([
@@ -196,16 +196,16 @@ fn handle_editor_open(rel_path: &str, root: &Path) -> tiny_http::Response<std::i
         .output()
     {
         Ok(o) if o.status.success() => {
-            println!("[editor_open] success");
+            eprintln!("[editor_open] success");
             json_response(&serde_json::json!({ "ok": true }))
         }
         Ok(o) => {
             let stderr = String::from_utf8_lossy(&o.stderr);
-            println!("[editor_open] nvim failed: {}", stderr);
+            eprintln!("[editor_open] nvim failed: {}", stderr);
             json_error(&format!("nvim --remote failed: {}", stderr))
         }
         Err(e) => {
-            println!("[editor_open] failed to run nvim: {}", e);
+            eprintln!("[editor_open] failed to run nvim: {}", e);
             json_error(&format!("Failed to run nvim: {}", e))
         }
     }
