@@ -22,7 +22,7 @@ export default {
           contrast: '#efede3',
           detail: '#c5bfae',
           warn: '#ac57ff',
-          err: '#ff3370',
+          err: '#fc3e57',
         },
         // Background colors
         back: {
