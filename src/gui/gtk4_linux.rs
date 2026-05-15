@@ -2,7 +2,7 @@ use crate::gui::GuiPlatform;
 use crate::gui::protocol::wayland::wm::WindowGeometry;
 use gtk4::prelude::*;
 use gtk4::{Application, ApplicationWindow, gdk};
-use gtk4_layer_shell::{Edge, Layer, LayerShell};
+use gtk4_layer_shell::{Edge, KeyboardMode, Layer, LayerShell};
 use webkit6::prelude::*;
 use crate::terminal::TerminalProtocol;
 use webkit6::WebView;
@@ -131,14 +131,6 @@ impl GuiPlatform for Gtk4Platform {
                 .default_height(initial_height)
                 .build();
 
-            // Enable per-pixel alpha and visual transparency so compositor treats clicks correctly
-            window.set_app_paintable(true);
-            if let Some(display) = gdk::Display::default() {
-                if let Some(visual) = display.rgba_visual() {
-                    window.set_visual(Some(&visual));
-                }
-            }
-
             // Make window transparent for rounded corners
             window.set_css_classes(&[&"transparent-window"]);
             let css_provider = gtk4::CssProvider::new();
@@ -153,7 +145,7 @@ impl GuiPlatform for Gtk4Platform {
 
             window.init_layer_shell();
             window.set_layer(Layer::Overlay);
-            window.set_keyboard_interactivity(true);
+            window.set_keyboard_mode(KeyboardMode::OnDemand);
             window.set_anchor(Edge::Right, true);
             // Anchor to top and bottom to adapt to margins
             window.set_anchor(Edge::Top, true);
@@ -212,10 +204,11 @@ impl GuiPlatform for Gtk4Platform {
             webview.set_focus_on_click(true);
 
             // Gesture controller to capture clicks and prevent pass-through to terminal
+            let webview_for_gesture = webview.clone();
             let gesture = gtk4::GestureClick::new();
-            gesture.connect_pressed(gtk4::glib::clone!(@weak webview => move |_, _, _, _| {
-                webview.grab_focus();
-            }));
+            gesture.connect_pressed(move |_, _, _, _| {
+                webview_for_gesture.grab_focus();
+            });
             webview.add_controller(gesture);
 
 //             println!("GTK: Loading URL: {}", &url);
