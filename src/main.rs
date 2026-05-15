@@ -118,10 +118,10 @@ fn handle_api(request: tiny_http::Request, url: &str) {
         .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
 
     let response: tiny_http::Response<std::io::Cursor<Vec<u8>>> = if url.starts_with("/api/fs/ls") {
-        let rel_path = parse_query_param(url, "path").unwrap_or("/");
+        let rel_path = parse_query_param(url, "path").unwrap_or_else(|| "/".to_string());
         handle_ls(&rel_path, &root)
     } else if url.starts_with("/api/fs/read") {
-        let rel_path = parse_query_param(url, "path").unwrap_or("");
+        let rel_path = parse_query_param(url, "path").unwrap_or_else(|| String::new());
         handle_read(&rel_path, &root)
     } else {
         json_error("Unknown API endpoint")
