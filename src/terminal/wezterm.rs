@@ -19,12 +19,19 @@ impl TerminalProtocol for WeztermProtocol {
     }
 
     fn spawn(&self, class: &str) -> Result<(Child, u32), String> {
-        let editor = crate::config::props::UserProps::load()
-            .get("user_editor")
+        let props = crate::config::props::UserProps::load();
+
+        let editor = props.get("user_editor").map(|s| s.to_string());
+        let current_dir = props.get("current_dir")
+            .filter(|s| !s.is_empty())
             .map(|s| s.to_string());
 
         let mut cmd = Command::new("wezterm");
         cmd.arg("start").arg("--class").arg(class);
+
+        if let Some(ref dir) = current_dir {
+            cmd.arg("--cwd").arg(dir);
+        }
 
         if let Some(ref prog) = editor {
             cmd.arg(prog);
