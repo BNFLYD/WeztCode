@@ -1,0 +1,94 @@
+use std::fs;
+use std::path::{Path, PathBuf};
+
+#[derive(serde::Serialize)]
+pub struct FsEntry {
+    pub name: String,
+    pub path: String,
+    pub entry_type: String,
+    pub size: Option<u64>,
+    pub modified: Option<String>,
+}
+
+pub fn list_dir(rel_path: &str, root: &Path) -> Result<Vec<FsEntry>, String> {
+    let dir_path = sanitize_path(rel_path, root)?;
+
+    let read_dir = fs::read_dir(&dir_path)
+        .map_err(|e| format!("Cannot read directory: {}", e))?;
+
+    let mut entries = Vec::new();
+    for entry in read_dir {
+        let entry = entry.map_err(|e| format!("Cannot read entry: {}", e))?;
+        let name = entry.file_name().to_string_lossy().to_string();
+        let metadata = entry.metadata().ok();
+
+        let entry_type = if entry.file_type().ok().map(|t| t.is_dir()).unwrap_or(false) {
+            "dir".to_string()
+        } else {
+            "file".to_string()
+        };
+
+        let rel = PathBuf::from(rel_path).join(&name);
+        let rel_str = rel.to_string_lossy().to_string().replace('\\', "/");
+
+        let size = metadata.as_ref().and_then(|m| {
+            if m.is_file() { Some(m.len()) } else { None }
+        });
+
+        let modified = metadata.and_then(|m| {
+            m.modified().ok().map(|t| {
+                let duration = t.duration_since(std::time::UNIX_EPOCH).unwrap_or_default();
+                let secs = duration.as_secs();
+                let millis = duration.subsec_millis();
+                format!("{}", secs * 1000 + millis as u64)
+            })
+        });
+
+        entries.push(FsEntry {
+            name,
+            path: rel_str,
+            entry_type,
+            size,
+            modified,
+        });
+    }
+
+    entries.sort_by(|a, b| {
+        if a.entry_type != b.entry_type {
+            if a.entry_type == "dir" { std::cmp::Ordering::Less }
+            else { std::cmp::Ordering::Greater }
+        } else {
+            a.name.to_lowercase().cmp(&b.name.to_lowercase())
+        }
+    });
+
+    Ok(entries)
+}
+
+pub fn read_file(rel_path: &str, root: &Path) -> Result<String, String> {
+    let file_path = sanitize_path(rel_path, root)?;
+
+    if !file_path.is_file() {
+        return Err("Not a file".to_string());
+    }
+
+    fs::read_to_string(&file_path)
+        .map_err(|e| format!("Cannot read file: {}", e))
+}
+
+fn sanitize_path(requested: &str, root: &Path) -> Result<PathBuf, String> {
+    let requested = requested.trim_start_matches('/');
+    let joined = root.join(requested);
+
+    let canonical = joined.canonicalize()
+        .map_err(|_| "Path not found".to_string())?;
+
+    let root_canonical = root.canonicalize()
+        .map_err(|_| "Root path not found".to_string())?;
+
+    if !canonical.starts_with(&root_canonical) {
+        return Err("Path traversal detected".to_string());
+    }
+
+    Ok(canonical)
+}

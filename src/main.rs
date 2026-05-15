@@ -8,6 +8,7 @@ use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 use std::fs::read_to_string;
+use std::path::{Path, PathBuf};
 
 fn setup_padding_hook() -> Result<(), String> {
     let user_config = std::env::var("WEZTERM_CONFIG_FILE").ok()
@@ -66,44 +67,131 @@ fn setup_padding_hook() -> Result<(), String> {
 
 fn start_http_server(port: u16) -> thread::JoinHandle<()> {
     let server = tiny_http::Server::http(format!("127.0.0.1:{}", port)).unwrap();
-//     println!("HTTP Server iniciado en http://127.0.0.1:{}/", port);
 
     thread::spawn(move || {
         for request in server.incoming_requests() {
-            let url = request.url();
-            let path = if url == "/" {
-                "frontend/dist/index.html"
-            } else {
-                &format!("frontend/dist{}", url)
-            };
+            let url = request.url().to_string();
 
-            let content_type = if path.ends_with(".js") {
-                "application/javascript"
-            } else if path.ends_with(".css") {
-                "text/css"
-            } else if path.ends_with(".html") {
-                "text/html"
+            if url.starts_with("/api/") {
+                handle_api(request, &url);
             } else {
-                "application/octet-stream"
-            };
+                let path = if url == "/" {
+                    "frontend/dist/index.html".to_string()
+                } else {
+                    format!("frontend/dist{}", url)
+                };
 
-            match read_to_string(path) {
-                Ok(content) => {
-                    let response = tiny_http::Response::from_string(content)
-                        .with_header(tiny_http::Header {
-                            field: "Content-Type".parse().unwrap(),
-                            value: content_type.parse().unwrap(),
-                        });
-                    request.respond(response).unwrap();
-                }
-                Err(_) => {
-                    let response = tiny_http::Response::from_string("Not found")
-                        .with_status_code(404);
-                    request.respond(response).unwrap();
+                let content_type = if path.ends_with(".js") {
+                    "application/javascript"
+                } else if path.ends_with(".css") {
+                    "text/css"
+                } else if path.ends_with(".html") {
+                    "text/html"
+                } else {
+                    "application/octet-stream"
+                };
+
+                match read_to_string(&path) {
+                    Ok(content) => {
+                        let response = tiny_http::Response::from_string(content)
+                            .with_header(tiny_http::Header {
+                                field: "Content-Type".parse().unwrap(),
+                                value: content_type.parse().unwrap(),
+                            });
+                        let _ = request.respond(response);
+                    }
+                    Err(_) => {
+                        let response = tiny_http::Response::from_string("Not found")
+                            .with_status_code(404);
+                        let _ = request.respond(response);
+                    }
                 }
             }
         }
     })
+}
+
+fn handle_api(request: tiny_http::Request, url: &str) {
+    let root = crate::config::props::UserProps::load()
+        .get("current_dir")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
+
+    let response: tiny_http::Response<std::io::Cursor<Vec<u8>>> = if url.starts_with("/api/fs/ls") {
+        let rel_path = parse_query_param(url, "path").unwrap_or("/");
+        handle_ls(&rel_path, &root)
+    } else if url.starts_with("/api/fs/read") {
+        let rel_path = parse_query_param(url, "path").unwrap_or("");
+        handle_read(&rel_path, &root)
+    } else {
+        json_error("Unknown API endpoint")
+    };
+
+    let _ = request.respond(response);
+}
+
+fn handle_ls(rel_path: &str, root: &Path) -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
+    match crate::config::fs::list_dir(rel_path, root) {
+        Ok(files) => {
+            let display_path = if rel_path.is_empty() || rel_path == "/" {
+                "/".to_string()
+            } else {
+                rel_path.trim_start_matches('/').to_string()
+            };
+            let data = serde_json::json!({
+                "ok": true,
+                "data": {
+                    "path": display_path,
+                    "files": files
+                }
+            });
+            json_response(&data)
+        }
+        Err(e) => json_error(&e)
+    }
+}
+
+fn handle_read(rel_path: &str, root: &Path) -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
+    match crate::config::fs::read_file(rel_path, root) {
+        Ok(content) => {
+            let data = serde_json::json!({
+                "ok": true,
+                "data": {
+                    "path": rel_path,
+                    "content": content
+                }
+            });
+            json_response(&data)
+        }
+        Err(e) => json_error(&e)
+    }
+}
+
+fn parse_query_param(url: &str, key: &str) -> Option<String> {
+    let query = url.split('?').nth(1)?;
+    for pair in query.split('&') {
+        let mut parts = pair.splitn(2, '=');
+        if parts.next()? == key {
+            return parts.next().map(|s| s.to_string());
+        }
+    }
+    None
+}
+
+fn json_response(data: &serde_json::Value) -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
+    let body = serde_json::to_string(data).unwrap_or_default();
+    tiny_http::Response::from_string(body)
+        .with_header(
+            tiny_http::Header {
+                field: "Content-Type".parse().unwrap(),
+                value: "application/json".parse().unwrap(),
+            }
+        )
+}
+
+fn json_error(msg: &str) -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
+    let data = serde_json::json!({ "ok": false, "error": msg });
+    json_response(&data)
 }
 
 fn main() {

@@ -1,3 +1,4 @@
+pub mod fs;
 pub mod props;
 
 use once_cell::sync::Lazy;

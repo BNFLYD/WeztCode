@@ -1,62 +1,131 @@
 <script>
   import Icon from "@iconify/svelte";
 
-  let expanded_folders = new Set();
+  let current_path = "/";
+  let entries = [];
+  let loading = true;
+  let error = null;
+  let expanded = new Map();
 
-  const files = [
-    { name: "App.svelte", icon: "📄", level: 0 },
-    { name: "components", icon: "📁", level: 0, folder: true },
-    { name: "button.svelte", icon: "📄", level: 1 },
-    { name: "card.svelte", icon: "📄", level: 1 },
-    { name: "hooks", icon: "📁", level: 0, folder: true },
-    { name: "app.svelte.ts", icon: "📄", level: 1 },
-  ];
-
-  function toggle_folder(name) {
-    if (expanded_folders.has(name)) {
-      expanded_folders.delete(name);
-    } else {
-      expanded_folders.add(name);
+  async function load_dir(path) {
+    loading = true;
+    error = null;
+    try {
+      const res = await fetch(`/api/fs/ls?path=${encodeURIComponent(path)}`);
+      const json = await res.json();
+      if (json.ok) {
+        entries = json.data.files;
+        current_path = json.data.path;
+      } else {
+        error = json.error;
+      }
+    } catch (e) {
+      error = e.message;
     }
-    expanded_folders = expanded_folders;
+    loading = false;
   }
 
-  function get_explorer_items() {
-    return files.map((file, idx) => ({
-      ...file,
-      key: `${file.name}-${idx}`,
-      isExpanded: expanded_folders.has(file.name),
-    }));
+  function toggle_dir(name) {
+    const full_path = current_path === "/"
+      ? name
+      : `${current_path}/${name}`;
+    if (expanded.has(full_path)) {
+      expanded.delete(full_path);
+      expanded = new Map(expanded);
+    } else {
+      fetch(`/api/fs/ls?path=${encodeURIComponent(full_path)}`)
+        .then(r => r.json())
+        .then(json => {
+          if (json.ok) {
+            expanded.set(full_path, json.data.files);
+            expanded = new Map(expanded);
+          }
+        });
+    }
   }
 
-  $: explorer_items = get_explorer_items();
+  function is_image(name) {
+    return /\.(png|jpg|jpeg|gif|svg|webp)$/i.test(name);
+  }
+
+  function is_text(name) {
+    return /\.(rs|toml|lua|js|ts|svelte|css|html|md|json|txt|yaml|yml|xml|sh|py|rb|go|c|h|cpp|hpp)$/i.test(name);
+  }
+
+  function file_icon(name) {
+    if (name.endsWith(".rs")) return "devicon-plain:rust";
+    if (name.endsWith(".js") || name.endsWith(".ts")) return "devicon-plain:javascript";
+    if (name.endsWith(".svelte")) return "devicon-plain:svelte";
+    if (name.endsWith(".lua")) return "devicon-plain:lua";
+    if (name.endsWith(".css") || name.endsWith(".html")) return "devicon-plain:html5";
+    if (name.endsWith(".md")) return "devicon-plain:markdown";
+    if (name.endsWith(".json")) return "devicon-plain:json";
+    if (name.endsWith(".toml")) return "devicon-plain:toml";
+    if (name.endsWith(".py")) return "devicon-plain:python";
+    return "lucide:file";
+  }
+
+  function dir_icon() {
+    return "lucide:folder";
+  }
+
+  function open_dir(name) {
+    load_dir(current_path === "/" ? name : `${current_path}/${name}`);
+  }
+
+  function go_up() {
+    if (current_path === "/") return;
+    const parts = current_path.split("/").filter(Boolean);
+    parts.pop();
+    load_dir(parts.length === 0 ? "/" : "/" + parts.join("/"));
+  }
+
+  load_dir("/");
 </script>
 
 <div class="flex flex-col gap-1 py-4">
-  {#each explorer_items as item (item.key)}
-    <div style="padding-left: {item.level * 16}px">
-      {#if item.folder}
-        <button
-          class="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-accent/20 transition-colors group text-md text-print font-semibold"
-          on:click={() => toggle_folder(item.name)}
-        >
-          <span
-            class="text-print transition-transform"
-            class:rotate-[-90deg]={!item.isExpanded}
-          >
-            <Icon icon="lucide:chevron-down" class="w-4 h-4" />
-          </span>
-          <span class="text-print/80 group-hover:text-print">{item.icon}</span>
-          <span class="text-print/80 group-hover:text-print">{item.name}</span>
-        </button>
-      {:else}
-        <div
-          class="flex items-center gap-2 px-3 py-2 rounded hover:bg-accent-detail/20 transition-colors text-sm"
-        >
-          <span class="text-print">{item.icon}</span>
-          <span class="text-print/70">{item.name}</span>
-        </div>
-      {/if}
+  <div class="flex items-center gap-2 px-3 py-2 text-xs text-print/50 border-b border-accent-detail/20 mb-2">
+    <button on:click={go_up} class="hover:text-print transition-colors" disabled={current_path === "/"}>
+      <Icon icon="lucide:arrow-up" class="w-4 h-4" />
+    </button>
+    <span class="font-mono truncate">{current_path}</span>
+  </div>
+
+  {#if loading}
+    <div class="flex items-center justify-center py-8">
+      <span class="text-print/50 text-sm">Loading...</span>
     </div>
-  {/each}
+  {:else if error}
+    <div class="flex items-center justify-center py-8">
+      <span class="text-accent-err text-sm">{error}</span>
+    </div>
+  {:else if entries.length === 0}
+    <div class="flex items-center justify-center py-8">
+      <span class="text-print/50 text-sm">Empty directory</span>
+    </div>
+  {:else}
+    {#each entries as entry (entry.path)}
+      <div class="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-accent/10 transition-colors text-sm group">
+        {#if entry.entry_type === "dir"}
+          <button
+            class="flex items-center gap-2 flex-1 text-left"
+            on:click={() => open_dir(entry.name)}
+          >
+            <span class="text-print/70">
+              <Icon icon={dir_icon()} class="w-4 h-4" />
+            </span>
+            <span class="text-print font-medium">{entry.name}</span>
+          </button>
+        {:else}
+          <span class="text-print/70">
+            <Icon icon={file_icon(entry.name)} class="w-4 h-4" />
+          </span>
+          <span class="text-print/70 flex-1 truncate">{entry.name}</span>
+          {#if entry.size}
+            <span class="text-print/30 text-xs">{Math.round(entry.size / 1024)}KB</span>
+          {/if}
+        {/if}
+      </div>
+    {/each}
+  {/if}
 </div>
