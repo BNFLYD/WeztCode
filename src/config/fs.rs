@@ -76,7 +76,7 @@ pub fn read_file(rel_path: &str, root: &Path) -> Result<String, String> {
         .map_err(|e| format!("Cannot read file: {}", e))
 }
 
-fn sanitize_path(requested: &str, root: &Path) -> Result<PathBuf, String> {
+pub fn sanitize_path(requested: &str, root: &Path) -> Result<PathBuf, String> {
     let requested = requested.trim_start_matches('/');
     let joined = root.join(requested);
 

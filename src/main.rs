@@ -123,6 +123,9 @@ fn handle_api(request: tiny_http::Request, url: &str) {
     } else if url.starts_with("/api/fs/read") {
         let rel_path = parse_query_param(url, "path").unwrap_or_else(|| String::new());
         handle_read(&rel_path, &root)
+    } else if url.starts_with("/api/editor/open") {
+        let rel_path = parse_query_param(url, "path").unwrap_or_else(|| String::new());
+        handle_editor_open(&rel_path, &root)
     } else {
         json_error("Unknown API endpoint")
     };
@@ -164,6 +167,34 @@ fn handle_read(rel_path: &str, root: &Path) -> tiny_http::Response<std::io::Curs
             json_response(&data)
         }
         Err(e) => json_error(&e)
+    }
+}
+
+fn handle_editor_open(rel_path: &str, root: &Path) -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
+    let full_path = match crate::config::fs::sanitize_path(rel_path, root) {
+        Ok(p) => p,
+        Err(e) => return json_error(&e),
+    };
+
+    if !full_path.is_file() {
+        return json_error("Not a file");
+    }
+
+    let esc = full_path.to_string_lossy();
+    let cmd = format!(":e {}\r", esc);
+
+    match std::process::Command::new("wezterm")
+        .args(["cli", "send-text", "--no-paste", &cmd])
+        .output()
+    {
+        Ok(o) if o.status.success() => {
+            json_response(&serde_json::json!({ "ok": true }))
+        }
+        Ok(o) => {
+            let stderr = String::from_utf8_lossy(&o.stderr);
+            json_error(&format!("send-text failed: {}", stderr))
+        }
+        Err(e) => json_error(&format!("Failed to run wezterm cli: {}", e)),
     }
 }
 

@@ -69,6 +69,10 @@
     return "lucide:folder";
   }
 
+  function open_file(path) {
+    fetch(`/api/editor/open?path=${encodeURIComponent(path)}`);
+  }
+
   function open_dir(name) {
     load_dir(current_path === "/" ? name : `${current_path}/${name}`);
   }
@@ -117,13 +121,18 @@
             <span class="text-print font-medium">{entry.name}</span>
           </button>
         {:else}
-          <span class="text-print/70">
-            <Icon icon={file_icon(entry.name)} class="w-4 h-4" />
-          </span>
-          <span class="text-print/70 flex-1 truncate">{entry.name}</span>
-          {#if entry.size}
-            <span class="text-print/30 text-xs">{Math.round(entry.size / 1024)}KB</span>
-          {/if}
+          <button
+            class="flex items-center gap-2 flex-1 text-left"
+            on:click={() => open_file(entry.path)}
+          >
+            <span class="text-print/70">
+              <Icon icon={file_icon(entry.name)} class="w-4 h-4" />
+            </span>
+            <span class="text-print/70 flex-1 truncate">{entry.name}</span>
+            {#if entry.size}
+              <span class="text-print/30 text-xs">{Math.round(entry.size / 1024)}KB</span>
+            {/if}
+          </button>
         {/if}
       </div>
     {/each}
