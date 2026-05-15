@@ -181,7 +181,10 @@ fn handle_editor_open(rel_path: &str, root: &Path) -> tiny_http::Response<std::i
     }
 
     match std::process::Command::new("nvim")
-        .args(["--remote", &full_path.to_string_lossy()])
+        .args([
+            "--server", "/tmp/weztcode-nvim.sock",
+            "--remote", &full_path.to_string_lossy()
+        ])
         .output()
     {
         Ok(o) if o.status.success() => {
