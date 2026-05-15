@@ -2,4 +2,4 @@
 -- Editá este archivo para personalizar el comportamiento de la app.
 
 user_editor = "nvim"
-current_dir = ""
+current_dir = "/home/mori/Projects/Rust/GTK4/WeztCode"
