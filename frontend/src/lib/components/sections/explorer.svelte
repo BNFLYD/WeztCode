@@ -138,8 +138,7 @@
       {#each entries as entry, index (entry.path)}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <div
-          class="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent/10 transition-colors text-lg group cursor-pointer"
-          class:bg-accent/20={cursor_index === index}
+          class={"flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent/10 transition-colors text-lg group cursor-pointer" + (cursor_index === index ? " bg-accent/20" : "")}
           on:click={() => {
             if (entry.entry_type === "dir") open_dir(entry.name);
             else open_file(entry.path);
