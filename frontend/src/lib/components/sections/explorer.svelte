@@ -77,7 +77,6 @@
   }
 
   function handle_keydown(e) {
-    if (!list_ref?.contains(e.target)) return;
     switch (e.key) {
       case "j":
       case "ArrowDown":
@@ -114,9 +113,12 @@
   }
 </script>
 
-<svelte:window on:keydown={handle_keydown} />
-
-<div class="flex flex-col gap-1 py-4">
+<div
+  class="flex flex-col gap-1 py-4"
+  tabindex="-1"
+  bind:this={list_ref}
+  on:keydown={handle_keydown}
+>
   <div class="flex items-center gap-2 px-3 py-2 text-xs text-print/50 border-b border-accent-detail/20 mb-2">
     <button on:click={go_up} class="hover:text-print transition-colors" disabled={current_path === "/"}>
       <Icon icon="lucide:arrow-up" class="w-4 h-4" />
@@ -137,34 +139,31 @@
       <span class="text-print/50 text-lg">Empty directory</span>
     </div>
   {:else}
-    <!-- svelte-ignore a11y-no-static-element-interactions -->
-    <div class="flex flex-col gap-1" tabindex="-1" bind:this={list_ref}>
-      {#each entries as entry, index (entry.path)}
-        <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <div
-          class={"flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent/10 transition-colors text-lg group cursor-pointer" + (cursor_index === index ? " bg-accent/20" : "")}
-          on:click={() => {
-            if (entry.entry_type === "dir") open_dir(entry.name);
-            else open_file(entry.path);
-            list_ref?.focus();
-          }}
-        >
-          {#if entry.entry_type === "dir"}
-            <span class="text-accent-detail">
-              <Icon icon={dir_icon()} class="w-4 h-4" />
-            </span>
-            <span class="text-print font-medium">{entry.name}</span>
-          {:else}
-            <span class="text-accent-detail">
-              <Icon icon={file_icon(entry.name)} class="w-4 h-4" />
-            </span>
-            <span class="text-print/70 flex-1 truncate">{entry.name}</span>
-            {#if entry.size}
-              <span class="text-print/30 text-xs">{Math.round(entry.size / 1024)}KB</span>
-            {/if}
+    {#each entries as entry, index (entry.path)}
+      <!-- svelte-ignore a11y-click-events-have-key-events -->
+      <div
+        class={"flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent/5 transition-colors text-lg group cursor-pointer" + (cursor_index === index ? " bg-accent/10" : "")}
+        on:click={() => {
+          if (entry.entry_type === "dir") open_dir(entry.name);
+          else open_file(entry.path);
+          list_ref?.focus();
+        }}
+      >
+        {#if entry.entry_type === "dir"}
+          <span class="text-accent-detail">
+            <Icon icon={dir_icon()} class="w-4 h-4" />
+          </span>
+          <span class="text-print font-medium">{entry.name}</span>
+        {:else}
+          <span class="text-accent-detail">
+            <Icon icon={file_icon(entry.name)} class="w-4 h-4" />
+          </span>
+          <span class="text-print/70 flex-1 truncate">{entry.name}</span>
+          {#if entry.size}
+            <span class="text-print/30 text-xs">{Math.round(entry.size / 1024)}KB</span>
           {/if}
-        </div>
-      {/each}
-    </div>
+        {/if}
+      </div>
+    {/each}
   {/if}
 </div>
