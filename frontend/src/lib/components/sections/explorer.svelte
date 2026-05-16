@@ -5,11 +5,13 @@
   let entries = [];
   let loading = true;
   let error = null;
-  let expanded = new Map();
+  let cursor_index = 0;
+  let list_ref;
 
   async function load_dir(path) {
     loading = true;
     error = null;
+    cursor_index = 0;
     try {
       const res = await fetch(`/api/fs/ls?path=${encodeURIComponent(path)}`);
       const json = await res.json();
@@ -25,33 +27,6 @@
     loading = false;
   }
 
-  function toggle_dir(name) {
-    const full_path = current_path === "/"
-      ? name
-      : `${current_path}/${name}`;
-    if (expanded.has(full_path)) {
-      expanded.delete(full_path);
-      expanded = new Map(expanded);
-    } else {
-      fetch(`/api/fs/ls?path=${encodeURIComponent(full_path)}`)
-        .then(r => r.json())
-        .then(json => {
-          if (json.ok) {
-            expanded.set(full_path, json.data.files);
-            expanded = new Map(expanded);
-          }
-        });
-    }
-  }
-
-  function is_image(name) {
-    return /\.(png|jpg|jpeg|gif|svg|webp)$/i.test(name);
-  }
-
-  function is_text(name) {
-    return /\.(rs|toml|lua|js|ts|svelte|css|html|md|json|txt|yaml|yml|xml|sh|py|rb|go|c|h|cpp|hpp)$/i.test(name);
-  }
-
   function file_icon(name) {
     if (name.endsWith(".rs")) return "devicon-plain:rust";
     if (name.endsWith(".js") || name.endsWith(".ts")) return "devicon-plain:javascript";
@@ -62,11 +37,11 @@
     if (name.endsWith(".json")) return "devicon-plain:json";
     if (name.endsWith(".toml")) return "devicon-plain:toml";
     if (name.endsWith(".py")) return "devicon-plain:python";
-    return "lucide:file";
+    return "tabler:file-filled";
   }
 
   function dir_icon() {
-    return "lucide:folder";
+    return "mdi:folder";
   }
 
   function open_file(path) {
@@ -84,8 +59,58 @@
     load_dir(parts.length === 0 ? "/" : "/" + parts.join("/"));
   }
 
+  function move_cursor(delta) {
+    const new_index = cursor_index + delta;
+    if (new_index < 0 || new_index >= entries.length) return;
+    cursor_index = new_index;
+    if (list_ref) {
+      const child = list_ref.children[cursor_index];
+      if (child) child.scrollIntoView({ block: "nearest" });
+    }
+  }
+
+  function activate_current() {
+    const entry = entries[cursor_index];
+    if (!entry) return;
+    if (entry.entry_type === "dir") open_dir(entry.name);
+    else open_file(entry.path);
+  }
+
+  function handle_keydown(e) {
+    if (!list_ref?.contains(e.target)) return;
+    switch (e.key) {
+      case "j":
+      case "ArrowDown":
+        e.preventDefault();
+        move_cursor(1);
+        break;
+      case "k":
+      case "ArrowUp":
+        e.preventDefault();
+        move_cursor(-1);
+        break;
+      case "l":
+      case "ArrowRight":
+        e.preventDefault();
+        activate_current();
+        break;
+      case "h":
+      case "ArrowLeft":
+        e.preventDefault();
+        go_up();
+        break;
+      case "Enter":
+      case " ":
+        e.preventDefault();
+        activate_current();
+        break;
+    }
+  }
+
   load_dir("/");
 </script>
+
+<svelte:window on:keydown={handle_keydown} />
 
 <div class="flex flex-col gap-1 py-4">
   <div class="flex items-center gap-2 px-3 py-2 text-xs text-print/50 border-b border-accent-detail/20 mb-2">
@@ -108,27 +133,25 @@
       <span class="text-print/50 text-lg">Empty directory</span>
     </div>
   {:else}
-    {#each entries as entry (entry.path)}
-      <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent/10 transition-colors text-lg group">
-        {#if entry.entry_type === "dir"}
-          <button
-            class="flex items-center gap-2 flex-1 text-left"
-            tabindex="0"
-            on:click={() => open_dir(entry.name)}
-            on:keydown={(e) => { if (e.key === 'Enter') open_dir(entry.name); }}
-          >
+    <!-- svelte-ignore a11y-no-static-element-interactions -->
+    <div class="flex flex-col gap-1" tabindex="-1" bind:this={list_ref}>
+      {#each entries as entry, index (entry.path)}
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
+        <div
+          class="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent/10 transition-colors text-lg group cursor-pointer"
+          class:bg-accent/20={cursor_index === index}
+          on:click={() => {
+            if (entry.entry_type === "dir") open_dir(entry.name);
+            else open_file(entry.path);
+            list_ref?.focus();
+          }}
+        >
+          {#if entry.entry_type === "dir"}
             <span class="text-accent-detail">
               <Icon icon={dir_icon()} class="w-4 h-4" />
             </span>
             <span class="text-print font-medium">{entry.name}</span>
-          </button>
-        {:else}
-          <button
-            class="flex items-center gap-2 flex-1 text-left"
-            tabindex="0"
-            on:click={() => open_file(entry.path)}
-            on:keydown={(e) => { if (e.key === 'Enter') open_file(entry.path); }}
-          >
+          {:else}
             <span class="text-accent-detail">
               <Icon icon={file_icon(entry.name)} class="w-4 h-4" />
             </span>
@@ -136,9 +159,9 @@
             {#if entry.size}
               <span class="text-print/30 text-xs">{Math.round(entry.size / 1024)}KB</span>
             {/if}
-          </button>
-        {/if}
-      </div>
-    {/each}
+          {/if}
+        </div>
+      {/each}
+    </div>
   {/if}
 </div>
