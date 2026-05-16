@@ -108,6 +108,10 @@
   }
 
   load_dir("/");
+
+  $: if (list_ref && !loading) {
+    list_ref.focus();
+  }
 </script>
 
 <svelte:window on:keydown={handle_keydown} />
