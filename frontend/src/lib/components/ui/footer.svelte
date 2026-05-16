@@ -15,7 +15,7 @@
 </script>
 
 <div
-  class="border border-accent-detail rounded-2xl bg-back-deep flex flex-col py-2 px-0 mb-5 mx-4"
+  class="border border-accent-detail rounded-xl bg-back-deep flex flex-col py-2 px-0 mb-5 mx-4"
 >
   <div class="flex w-full justify-between px-4 py-2">
     {#each sections as section}
