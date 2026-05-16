@@ -1,6 +1,8 @@
 <script>
   import Icon from "@iconify/svelte";
 
+  export let active_section = "explorer";
+
   let current_path = "/";
   let entries = [];
   let loading = true;
@@ -77,6 +79,8 @@
   }
 
   function handle_keydown(e) {
+    if (!document.hasFocus()) return;
+    if (active_section !== "explorer") return;
     switch (e.key) {
       case "j":
       case "ArrowDown":
@@ -107,18 +111,11 @@
   }
 
   load_dir("/");
-
-  $: if (list_ref && !loading) {
-    list_ref.focus();
-  }
 </script>
 
-<div
-  class="flex flex-col gap-1 py-4"
-  tabindex="-1"
-  bind:this={list_ref}
-  on:keydown={handle_keydown}
->
+<svelte:window on:keydown={handle_keydown} />
+
+<div class="flex flex-col gap-1 py-4">
   <div class="flex items-center gap-2 px-3 py-2 text-xs text-print/50 border-b border-accent-detail/20 mb-2">
     <button on:click={go_up} class="hover:text-print transition-colors" disabled={current_path === "/"}>
       <Icon icon="lucide:arrow-up" class="w-4 h-4" />
@@ -146,7 +143,6 @@
         on:click={() => {
           if (entry.entry_type === "dir") open_dir(entry.name);
           else open_file(entry.path);
-          list_ref?.focus();
         }}
       >
         {#if entry.entry_type === "dir"}

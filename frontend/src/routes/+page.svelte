@@ -18,7 +18,7 @@
   </div>
   <div class="flex-1 overflow-y-auto px-5">
     {#if active_section === "explorer"}
-      <ExplorerSection />
+      <ExplorerSection {active_section} />
     {:else if active_section === "chat"}
       <ChatSection />
     {:else if active_section === "git"}
