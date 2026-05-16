@@ -113,7 +113,9 @@
         {#if entry.entry_type === "dir"}
           <button
             class="flex items-center gap-2 flex-1 text-left"
+            tabindex="0"
             on:click={() => open_dir(entry.name)}
+            on:keydown={(e) => { if (e.key === 'Enter') open_dir(entry.name); }}
           >
             <span class="text-print/70">
               <Icon icon={dir_icon()} class="w-4 h-4" />
@@ -123,7 +125,9 @@
         {:else}
           <button
             class="flex items-center gap-2 flex-1 text-left"
+            tabindex="0"
             on:click={() => open_file(entry.path)}
+            on:keydown={(e) => { if (e.key === 'Enter') open_file(entry.path); }}
           >
             <span class="text-print/70">
               <Icon icon={file_icon(entry.name)} class="w-4 h-4" />
