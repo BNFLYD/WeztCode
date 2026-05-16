@@ -182,30 +182,24 @@ fn handle_editor_open(rel_path: &str, root: &Path) -> tiny_http::Response<std::i
     };
 
     if !full_path.is_file() {
-        eprintln!("[editor_open] not a file: {:?}", full_path);
         return json_error("Not a file");
     }
-
-    eprintln!("[editor_open] opening file: {:?}", full_path);
 
     match std::process::Command::new("nvim")
         .args([
             "--server", "/tmp/weztcode-nvim.sock",
-            "--remote-tab", &full_path.to_string_lossy()
+            "--remote", &full_path.to_string_lossy()
         ])
         .output()
     {
         Ok(o) if o.status.success() => {
-            eprintln!("[editor_open] success");
             json_response(&serde_json::json!({ "ok": true }))
         }
         Ok(o) => {
             let stderr = String::from_utf8_lossy(&o.stderr);
-            eprintln!("[editor_open] nvim failed: {}", stderr);
             json_error(&format!("nvim --remote failed: {}", stderr))
         }
         Err(e) => {
-            eprintln!("[editor_open] failed to run nvim: {}", e);
             json_error(&format!("Failed to run nvim: {}", e))
         }
     }

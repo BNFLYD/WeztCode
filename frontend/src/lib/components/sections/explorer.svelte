@@ -97,19 +97,19 @@
 
   {#if loading}
     <div class="flex items-center justify-center py-8">
-      <span class="text-print/50 text-sm">Loading...</span>
+      <span class="text-print/50 text-md">Loading...</span>
     </div>
   {:else if error}
     <div class="flex items-center justify-center py-8">
-      <span class="text-accent-err text-sm">{error}</span>
+      <span class="text-accent-err text-md">{error}</span>
     </div>
   {:else if entries.length === 0}
     <div class="flex items-center justify-center py-8">
-      <span class="text-print/50 text-sm">Empty directory</span>
+      <span class="text-print/50 text-md">Empty directory</span>
     </div>
   {:else}
     {#each entries as entry (entry.path)}
-      <div class="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-accent/10 transition-colors text-sm group">
+      <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent/10 transition-colors text-sm group">
         {#if entry.entry_type === "dir"}
           <button
             class="flex items-center gap-2 flex-1 text-left"
@@ -117,7 +117,7 @@
             on:click={() => open_dir(entry.name)}
             on:keydown={(e) => { if (e.key === 'Enter') open_dir(entry.name); }}
           >
-            <span class="text-print/70">
+            <span class="text-accent">
               <Icon icon={dir_icon()} class="w-4 h-4" />
             </span>
             <span class="text-print font-medium">{entry.name}</span>
