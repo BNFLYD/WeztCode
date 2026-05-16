@@ -117,7 +117,7 @@
             on:click={() => open_dir(entry.name)}
             on:keydown={(e) => { if (e.key === 'Enter') open_dir(entry.name); }}
           >
-            <span class="text-accent">
+            <span class="text-accent-detail">
               <Icon icon={dir_icon()} class="w-4 h-4" />
             </span>
             <span class="text-print font-medium">{entry.name}</span>
