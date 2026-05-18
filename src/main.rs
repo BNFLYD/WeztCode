@@ -126,6 +126,9 @@ fn handle_api(request: tiny_http::Request, url: &str) {
     } else if url.starts_with("/api/editor/open") {
         let rel_path = parse_query_param(url, "path").unwrap_or_else(|| String::new());
         handle_editor_open(&rel_path, &root)
+    } else if url.starts_with("/api/fs/create") {
+        let rel_path = parse_query_param(url, "path").unwrap_or_else(|| String::new());
+        handle_create(&rel_path, &root)
     } else {
         json_error("Unknown API endpoint")
     };
@@ -202,6 +205,13 @@ fn handle_editor_open(rel_path: &str, root: &Path) -> tiny_http::Response<std::i
         Err(e) => {
             json_error(&format!("Failed to run nvim: {}", e))
         }
+    }
+}
+
+fn handle_create(rel_path: &str, root: &Path) -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
+    match crate::config::fs::create_entry(rel_path, root) {
+        Ok(_) => json_response(&serde_json::json!({ "ok": true })),
+        Err(e) => json_error(&e)
     }
 }
 

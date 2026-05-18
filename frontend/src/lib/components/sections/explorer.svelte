@@ -11,6 +11,8 @@
   let cursor_index = 0;
   let list_ref;
   let window_has_focus = true;
+  let creating = false;
+  let create_name = "";
 
   async function load_dir(path) {
     loading = true;
@@ -54,6 +56,23 @@
 
   function open_dir(name) {
     load_dir(current_path === "/" ? name : `${current_path}/${name}`);
+  }
+
+  async function create_entry() {
+    const name = create_name.trim();
+    if (!name) { creating = false; return; }
+    const target = current_path === "/"
+      ? name
+      : `${current_path}/${name}`;
+    const res = await fetch(`/api/fs/create?path=${encodeURIComponent(target)}`);
+    const json = await res.json();
+    creating = false;
+    create_name = "";
+    if (json.ok) {
+      await load_dir(current_path);
+    } else {
+      error = json.error;
+    }
   }
 
   function go_up() {
@@ -113,7 +132,28 @@
         e.preventDefault();
         go_up();
         break;
+      case "Escape":
+        if (creating) {
+          e.preventDefault();
+          creating = false;
+          create_name = "";
+        }
+        break;
+      case "a":
+      case "A":
+        e.preventDefault();
+        creating = true;
+        create_name = "";
+        break;
       case "Enter":
+        if (creating) {
+          e.preventDefault();
+          create_entry();
+        } else {
+          e.preventDefault();
+          activate_current();
+        }
+        break;
       case " ":
         e.preventDefault();
         activate_current();
@@ -135,7 +175,20 @@
     <button on:click={go_up} class="hover:text-print transition-colors" disabled={current_path === "/"}>
       <Icon icon="lucide:arrow-up" class="w-4 h-4" />
     </button>
-    <span class="font-mono truncate">{current_path}</span>
+    {#if creating}
+      <span class="font-mono truncate flex items-center gap-1 text-print">
+        <span class="text-accent">add:</span>
+        <input
+          bind:value={create_name}
+          placeholder={current_path}
+          class="bg-transparent outline-none text-print font-mono flex-1 min-w-0"
+          autofocus
+          on:blur={() => { if (!create_name.trim()) creating = false; }}
+        />
+      </span>
+    {:else}
+      <span class="font-mono truncate">{current_path}</span>
+    {/if}
   </div>
 
   <div class="flex-1 overflow-y-auto min-h-0" bind:this={list_ref}>

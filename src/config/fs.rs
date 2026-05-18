@@ -1,4 +1,4 @@
-use std::fs;
+use std::fs::{self, File};
 use std::path::{Path, PathBuf};
 
 #[derive(serde::Serialize)]
@@ -74,6 +74,30 @@ pub fn read_file(rel_path: &str, root: &Path) -> Result<String, String> {
 
     fs::read_to_string(&file_path)
         .map_err(|e| format!("Cannot read file: {}", e))
+}
+
+pub fn create_entry(rel_path: &str, root: &Path) -> Result<(), String> {
+    let requested = rel_path.trim_start_matches('/');
+    let root_canonical = root.canonicalize()
+        .map_err(|_| "Root path not found".to_string())?;
+
+    // Build full path from root + requested, without requiring the path to exist
+    let full_path = root_canonical.join(requested);
+
+    // Verify the parent directory exists and is within the root
+    let parent = full_path.parent().ok_or("Invalid path".to_string())?;
+    let parent_canonical = parent.canonicalize()
+        .map_err(|_| "Parent directory does not exist".to_string())?;
+    if !parent_canonical.starts_with(&root_canonical) {
+        return Err("Path traversal detected".to_string());
+    }
+
+    if rel_path.ends_with('/') {
+        fs::create_dir(&full_path).map_err(|e| format!("Cannot create directory: {}", e))?;
+    } else {
+        File::create(&full_path).map_err(|e| format!("Cannot create file: {}", e))?;
+    }
+    Ok(())
 }
 
 pub fn sanitize_path(requested: &str, root: &Path) -> Result<PathBuf, String> {
