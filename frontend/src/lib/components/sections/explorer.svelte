@@ -125,7 +125,7 @@
 
 <svelte:window on:keydown={handle_keydown} />
 
-<div class="flex flex-col gap-1 py-4 h-full">
+<div class="flex flex-col gap-1 py-2 h-full">
   <div class="flex items-center gap-2 px-3 py-2 text-sm text-accent-detail/50 border-b border-accent-detail/20 mb-2 flex-shrink-0">
     <button on:click={go_up} class="hover:text-print transition-colors" disabled={current_path === "/"}>
       <Icon icon="lucide:arrow-up" class="w-4 h-4" />
