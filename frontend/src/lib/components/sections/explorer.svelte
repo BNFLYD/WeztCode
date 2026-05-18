@@ -1,4 +1,5 @@
 <script>
+  import { afterUpdate } from "svelte";
   import Icon from "@iconify/svelte";
 
   export let active_section = "explorer";
@@ -65,11 +66,20 @@
     const new_index = cursor_index + delta;
     if (new_index < 0 || new_index >= entries.length) return;
     cursor_index = new_index;
-    if (list_ref) {
-      const child = list_ref.children[cursor_index];
-      if (child) child.scrollIntoView({ block: "nearest" });
-    }
+    scroll_to_cursor();
   }
+
+  function scroll_to_cursor() {
+    if (!list_ref) return;
+    const child = list_ref.querySelector(`[data-index="${cursor_index}"]`);
+    if (child) child.scrollIntoView({ block: "nearest" });
+  }
+
+  afterUpdate(() => {
+    if (!loading && list_ref && entries.length > 0) {
+      scroll_to_cursor();
+    }
+  });
 
   function activate_current() {
     const entry = entries[cursor_index];
@@ -115,7 +125,7 @@
 
 <svelte:window on:keydown={handle_keydown} />
 
-<div class="flex flex-col gap-1 py-4">
+<div class="flex flex-col gap-1 py-4" bind:this={list_ref}>
   <div class="flex items-center gap-2 px-3 py-2 text-xs text-print/50 border-b border-accent-detail/20 mb-2">
     <button on:click={go_up} class="hover:text-print transition-colors" disabled={current_path === "/"}>
       <Icon icon="lucide:arrow-up" class="w-4 h-4" />
@@ -140,6 +150,7 @@
       <!-- svelte-ignore a11y-click-events-have-key-events -->
       <div
         class={"flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent/5 transition-colors text-lg group cursor-pointer" + (cursor_index === index ? " bg-accent/10" : "")}
+        data-index={index}
         on:click={() => {
           if (entry.entry_type === "dir") open_dir(entry.name);
           else open_file(entry.path);
