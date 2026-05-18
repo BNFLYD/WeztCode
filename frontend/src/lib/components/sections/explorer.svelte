@@ -10,6 +10,7 @@
   let error = null;
   let cursor_index = 0;
   let list_ref;
+  let window_has_focus = true;
 
   async function load_dir(path) {
     loading = true;
@@ -123,7 +124,11 @@
   load_dir("/");
 </script>
 
-<svelte:window on:keydown={handle_keydown} />
+<svelte:window
+  on:keydown={handle_keydown}
+  on:focus={() => window_has_focus = true}
+  on:blur={() => window_has_focus = false}
+/>
 
 <div class="flex flex-col gap-1 py-2 h-full">
   <div class="flex items-center gap-2 px-3 py-2 text-sm text-accent-detail/50 border-b border-accent-detail/20 mb-2 flex-shrink-0">
@@ -150,12 +155,13 @@
       {#each entries as entry, index (entry.path)}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <div
-          class={"flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent/5 transition-colors text-lg group cursor-pointer" + (cursor_index === index ? " bg-accent/10" : "")}
+          class={"flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent/5 transition-colors text-lg group cursor-pointer" + (cursor_index === index && window_has_focus ? " bg-accent/10" : "")}
           data-index={index}
-          on:click={() => {
-            if (entry.entry_type === "dir") open_dir(entry.name);
-            else open_file(entry.path);
-          }}
+        on:click={() => {
+          cursor_index = index;
+          if (entry.entry_type === "dir") open_dir(entry.name);
+          else open_file(entry.path);
+        }}
         >
           {#if entry.entry_type === "dir"}
             <span class="text-accent-detail">
