@@ -10,7 +10,7 @@
   let error = null;
   let cursor_index = 0;
   let list_ref;
-  let window_has_focus = true;
+  let window_has_focus = document.hasFocus();
   let creating = false;
   let create_name = "";
 
