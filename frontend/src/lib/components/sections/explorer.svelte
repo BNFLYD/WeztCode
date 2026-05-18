@@ -111,6 +111,19 @@
   function handle_keydown(e) {
     if (!document.hasFocus()) return;
     if (active_section !== "explorer") return;
+
+    if (creating) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        create_entry();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        creating = false;
+        create_name = "";
+      }
+      return;
+    }
+
     switch (e.key) {
       case "j":
       case "ArrowDown":
@@ -132,13 +145,6 @@
         e.preventDefault();
         go_up();
         break;
-      case "Escape":
-        if (creating) {
-          e.preventDefault();
-          creating = false;
-          create_name = "";
-        }
-        break;
       case "a":
       case "A":
         e.preventDefault();
@@ -146,13 +152,8 @@
         create_name = "";
         break;
       case "Enter":
-        if (creating) {
-          e.preventDefault();
-          create_entry();
-        } else {
-          e.preventDefault();
-          activate_current();
-        }
+        e.preventDefault();
+        activate_current();
         break;
       case " ":
         e.preventDefault();
