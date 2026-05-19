@@ -6,7 +6,7 @@
 
   export let active_section;
   export let on_section_change;
-  export let active_channel = null;
+  export let channel = null;
   export let on_channel_close;
 
   const sections = [
@@ -185,12 +185,12 @@
       {sections.find((s) => s.id === active_section)?.label}
     </div>
   </div>
-  {#if active_channel?.id === 'explorer'}
+  {#if channel?.id === 'explorer'}
     <ExplorerChannel
-      icon={active_channel.props.icon}
-      name={active_channel.props.name}
-      on_confirm={active_channel.props.on_confirm}
-      on_cancel={active_channel.props.on_cancel}
+      icon={channel.props.icon}
+      name={channel.props.name}
+      on_confirm={channel.props.on_confirm}
+      on_cancel={channel.props.on_cancel}
       on_close={on_channel_close}
     />
   {/if}

@@ -3,7 +3,7 @@
   import Icon from "@iconify/svelte";
 
   export let active_section = "explorer";
-  export let active_channel = null;
+  export let channel = null;
   export let on_channel;
   export let on_channel_close;
 
@@ -149,14 +149,14 @@
       return;
     }
 
-    if (active_channel) {
+    if (channel) {
       if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
-        active_channel.props.on_confirm();
+        channel.props.on_confirm();
         on_channel_close();
       } else if (e.key === "Escape") {
         e.preventDefault();
-        active_channel.props.on_cancel();
+        channel.props.on_cancel();
         on_channel_close();
       }
       return;
