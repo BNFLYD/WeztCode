@@ -282,7 +282,7 @@
       <div class="bg-back border border-accent-detail rounded-lg p-4 shadow-lg mx-8 w-auto min-w-[150px]">
         <div class="flex justify-between">
           <p class="text-lg text-bold text-print">[ Eliminar ]</p>
-          <button on:click={cancel_delete} class="text-sm mx-2 rounded-md bg-back text-accent-detail hover:bg-accent-detail hover:text-back transition-colors border border-accent-detail">
+          <button on:click={cancel_delete} class="aspect-square text-sm mx-2 rounded-md bg-back text-accent-detail hover:bg-accent-detail hover:text-back transition-colors border border-accent-detail">
             x
           </button>
         </div>
