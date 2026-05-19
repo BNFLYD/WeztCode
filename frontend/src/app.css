@@ -27,7 +27,7 @@
 
 @layer components {
   /* Base button glow pseudo-element - hidden by default, fast fade out */
-  .bg-accent-detail::after {
+  .bg-inner-glow::after {
     content: "";
     position: absolute;
     inset: 0;

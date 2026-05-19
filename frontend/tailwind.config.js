@@ -18,7 +18,7 @@ export default {
       colors: {
         // Accent colors
         accent: {
-          DEFAULT: '#ac57ff',
+          DEFAULT: '#00ffdd',
           contrast: '#efede3',
           detail: '#c5bfae',
           warn: '#ac57ff',
@@ -31,7 +31,7 @@ export default {
         },
         // Text colors
         print: {
-          DEFAULT: '#d0d0d0',
+          DEFAULT: '#c5bfae',
           contrast: '#efede3',
           tag: '#c5bfae',
         },
