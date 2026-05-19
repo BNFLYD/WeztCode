@@ -19,7 +19,7 @@
     setTimeout(() => {
       active_channel = ch;
       is_distorting = false;
-    }, 600);
+    }, 300);
   }
 
   function handle_channel_close() {
@@ -28,7 +28,7 @@
     setTimeout(() => {
       active_channel = null;
       is_distorting = false;
-    }, 600);
+    }, 300);
   }
 </script>
 
