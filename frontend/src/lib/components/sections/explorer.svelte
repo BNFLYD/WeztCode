@@ -1,9 +1,11 @@
 <script>
   import { afterUpdate } from "svelte";
   import Icon from "@iconify/svelte";
-  import { dialog } from "$lib/stores/dialog";
 
   export let active_section = "explorer";
+  export let active_channel = null;
+  export let on_channel;
+  export let on_channel_close;
 
   let current_path = "/";
   let entries = [];
@@ -79,19 +81,22 @@
   function confirm_delete() {
     const entry = entries[cursor_index];
     if (!entry) return;
-    dialog.set({
-      icon: entry.entry_type === "dir" ? dir_icon() : file_icon(entry.name),
-      name: entry.name,
-      on_confirm: async () => {
-        const res = await fetch(`/api/fs/delete?path=${encodeURIComponent(entry.path)}`);
-        const json = await res.json();
-        if (json.ok) {
-          await load_dir(current_path);
-        } else {
-          error = json.error;
-        }
-      },
-      on_cancel: () => {}
+    on_channel({
+      id: "explorer",
+      props: {
+        icon: entry.entry_type === "dir" ? dir_icon() : file_icon(entry.name),
+        name: entry.name,
+        on_confirm: async () => {
+          const res = await fetch(`/api/fs/delete?path=${encodeURIComponent(entry.path)}`);
+          const json = await res.json();
+          if (json.ok) {
+            await load_dir(current_path);
+          } else {
+            error = json.error;
+          }
+        },
+        on_cancel: () => {}
+      }
     });
   }
 
@@ -144,15 +149,15 @@
       return;
     }
 
-    if ($dialog) {
+    if (active_channel) {
       if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
-        $dialog.on_confirm();
-        dialog.set(null);
+        active_channel.props.on_confirm();
+        on_channel_close();
       } else if (e.key === "Escape") {
         e.preventDefault();
-        $dialog.on_cancel();
-        dialog.set(null);
+        active_channel.props.on_cancel();
+        on_channel_close();
       }
       return;
     }

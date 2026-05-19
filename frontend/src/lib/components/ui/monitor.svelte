@@ -2,10 +2,12 @@
   import { onMount, onDestroy } from "svelte";
   import { get_colors } from "$lib/theme";
   import Icon from "@iconify/svelte";
-  import { dialog } from "$lib/stores/dialog";
+  import ExplorerChannel from "./channels/explorer_channel.svelte";
 
   export let active_section;
   export let on_section_change;
+  export let active_channel = null;
+  export let on_channel_close;
 
   const sections = [
     { id: "explorer", icon: "solar:code-2-bold", label: "コード" },
@@ -183,29 +185,13 @@
       {sections.find((s) => s.id === active_section)?.label}
     </div>
   </div>
-  {#if $dialog}
-    <div class="absolute inset-0 flex items-center justify-center bg-black/60 z-50 rounded-2xl">
-      <div class="bg-back border border-accent-detail/30 rounded-xl p-4 shadow-lg mx-4 w-auto min-w-[200px]">
-        <p class="text-lg text-accent-detail mb-4"> Eliminar </p>
-        <div class="flex items-center gap-2 mb-3 text-print">
-          <Icon icon={$dialog.icon} class="w-5 h-5 text-accent-detail" />
-          <span class="font-mono text-sm truncate">{$dialog.name}?</span>
-        </div>
-        <div class="flex gap-2 justify-end">
-          <button
-            on:click={() => { $dialog.on_confirm(); dialog.set(null); }}
-            class="px-4 rounded-lg bg-back text-accent-detail hover:bg-accent-detail hover:text-back transition-colors text-sm border border-accent-detail"
-          >
-            Si
-          </button>
-          <button
-            on:click={() => { $dialog.on_cancel(); dialog.set(null); }}
-            class="px-4 rounded-lg bg-back text-accent-detail hover:bg-accent-detail hover:text-back transition-colors text-sm border border-accent-detail"
-          >
-            No
-          </button>
-        </div>
-      </div>
-    </div>
+  {#if active_channel?.id === 'explorer'}
+    <ExplorerChannel
+      icon={active_channel.props.icon}
+      name={active_channel.props.name}
+      on_confirm={active_channel.props.on_confirm}
+      on_cancel={active_channel.props.on_cancel}
+      on_close={on_channel_close}
+    />
   {/if}
 </div>

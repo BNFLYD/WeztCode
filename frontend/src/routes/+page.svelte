@@ -10,15 +10,24 @@
   import { Footer, Monitor } from "$lib/components/ui";
 
   let active_section = "explorer";
+  let active_channel = null;
+
+  function handle_channel(ch) {
+    active_channel = ch;
+  }
+
+  function handle_channel_close() {
+    active_channel = null;
+  }
 </script>
 
 <div class="h-[100vh] flex flex-col bg-back-deep rounded-l-3xl overflow-hidden">
   <div class="px-7 pt-5">
-    <Monitor {active_section} on_section_change={(id) => (active_section = id)}  />
+    <Monitor {active_section} {active_channel} on_channel_close={handle_channel_close} on_section_change={(id) => (active_section = id)}  />
   </div>
   <div class="flex-1 overflow-y-auto px-5">
     {#if active_section === "explorer"}
-      <ExplorerSection {active_section} />
+      <ExplorerSection {active_section} {active_channel} on_channel={handle_channel} on_channel_close={handle_channel_close} />
     {:else if active_section === "chat"}
       <ChatSection />
     {:else if active_section === "git"}
