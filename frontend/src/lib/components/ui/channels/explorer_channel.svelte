@@ -9,7 +9,7 @@
 </script>
 
 <div class="absolute inset-0 flex items-center justify-center">
-  <div class="text-lg text-print font-sans bg-back-deep rounded-xl p-4 shadow-lg mx-4 w-auto min-w-[200px]">
+  <div class="text-lg text-print font-sans bg-back-deep rounded-xl p-4 shadow-lg mx-7 w-auto min-w-[200px]">
     <p class="mb-1">Queres borrar</p>
     <div class="flex items-center gap-2 text-print mb-4 ml-2">
       <Icon icon={icon} class="w-5 h-5 text-accent-detail"/>
