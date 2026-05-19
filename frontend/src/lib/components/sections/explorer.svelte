@@ -13,6 +13,8 @@
   let window_has_focus = true;
   let creating = false;
   let create_name = "";
+  let deleting = false;
+  let delete_target = null;
 
   async function load_dir(path) {
     loading = true;
@@ -75,6 +77,31 @@
     }
   }
 
+  function confirm_delete() {
+    const entry = entries[cursor_index];
+    if (!entry) return;
+    delete_target = entry;
+    deleting = true;
+  }
+
+  async function do_delete() {
+    if (!delete_target) return;
+    const res = await fetch(`/api/fs/delete?path=${encodeURIComponent(delete_target.path)}`);
+    const json = await res.json();
+    deleting = false;
+    delete_target = null;
+    if (json.ok) {
+      await load_dir(current_path);
+    } else {
+      error = json.error;
+    }
+  }
+
+  function cancel_delete() {
+    deleting = false;
+    delete_target = null;
+  }
+
   function go_up() {
     if (current_path === "/") return;
     const parts = current_path.split("/").filter(Boolean);
@@ -124,6 +151,17 @@
       return;
     }
 
+    if (deleting) {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        do_delete();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        cancel_delete();
+      }
+      return;
+    }
+
     switch (e.key) {
       case "j":
       case "ArrowDown":
@@ -144,6 +182,11 @@
       case "ArrowLeft":
         e.preventDefault();
         go_up();
+        break;
+      case "d":
+      case "D":
+        e.preventDefault();
+        confirm_delete();
         break;
       case "a":
       case "A":
@@ -171,7 +214,7 @@
   on:blur={() => window_has_focus = false}
 />
 
-<div class="flex flex-col gap-1 py-2 h-full">
+<div class="flex flex-col gap-1 py-2 h-full relative">
   <div class="flex items-center gap-2 px-3 py-2 text-sm text-accent-detail/50 border-b border-accent-detail/20 mb-2 flex-shrink-0">
     <button on:click={go_up} class="hover:text-print transition-colors" disabled={current_path === "/"}>
       <Icon icon="lucide:arrow-up" class="w-4 h-4" />
@@ -234,5 +277,24 @@
         </div>
       {/each}
     {/if}
+  {#if deleting && delete_target}
+    <div class="absolute inset-0 flex items-center justify-center bg-black/60 z-20 rounded-lg">
+      <div class="bg-back-deep border border-accent-detail/30 rounded-xl p-4 shadow-lg mx-4 w-auto min-w-[200px]">
+        <div class="flex items-center gap-2 mb-3 text-print">
+          <Icon icon={delete_target.entry_type === "dir" ? dir_icon() : file_icon(delete_target.name)} class="w-5 h-5 text-accent-detail" />
+          <span class="font-mono text-sm truncate">{delete_target.name}</span>
+        </div>
+        <p class="text-sm text-print/70 mb-4">Queres borrar?</p>
+        <div class="flex gap-2 justify-end">
+          <button on:click={do_delete} class="px-3 py-1 rounded-lg bg-accent/20 text-accent hover:bg-accent/30 transition-colors text-sm">
+            Si
+          </button>
+          <button on:click={cancel_delete} class="px-3 py-1 rounded-lg bg-accent-err/20 text-accent-err hover:bg-accent-err/30 transition-colors text-sm">
+            No
+          </button>
+        </div>
+      </div>
+    </div>
+  {/if}
   </div>
 </div>

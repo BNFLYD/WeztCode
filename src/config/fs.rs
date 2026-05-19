@@ -100,6 +100,18 @@ pub fn create_entry(rel_path: &str, root: &Path) -> Result<(), String> {
     Ok(())
 }
 
+pub fn delete_entry(rel_path: &str, root: &Path) -> Result<(), String> {
+    let full_path = sanitize_path(rel_path, root)?;
+    if full_path.is_dir() {
+        fs::remove_dir_all(&full_path)
+            .map_err(|e| format!("Cannot delete directory: {}", e))?;
+    } else {
+        fs::remove_file(&full_path)
+            .map_err(|e| format!("Cannot delete file: {}", e))?;
+    }
+    Ok(())
+}
+
 pub fn sanitize_path(requested: &str, root: &Path) -> Result<PathBuf, String> {
     let requested = requested.trim_start_matches('/');
     let joined = root.join(requested);
