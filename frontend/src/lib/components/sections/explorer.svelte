@@ -1,6 +1,7 @@
 <script>
   import { afterUpdate } from "svelte";
   import Icon from "@iconify/svelte";
+  import { dialog } from "$lib/stores/dialog";
 
   export let active_section = "explorer";
 
@@ -13,8 +14,6 @@
   let window_has_focus = true;
   let creating = false;
   let create_name = "";
-  let deleting = false;
-  let delete_target = null;
 
   async function load_dir(path) {
     loading = true;
@@ -80,26 +79,20 @@
   function confirm_delete() {
     const entry = entries[cursor_index];
     if (!entry) return;
-    delete_target = entry;
-    deleting = true;
-  }
-
-  async function do_delete() {
-    if (!delete_target) return;
-    const res = await fetch(`/api/fs/delete?path=${encodeURIComponent(delete_target.path)}`);
-    const json = await res.json();
-    deleting = false;
-    delete_target = null;
-    if (json.ok) {
-      await load_dir(current_path);
-    } else {
-      error = json.error;
-    }
-  }
-
-  function cancel_delete() {
-    deleting = false;
-    delete_target = null;
+    dialog.set({
+      icon: entry.entry_type === "dir" ? dir_icon() : file_icon(entry.name),
+      name: entry.name,
+      on_confirm: async () => {
+        const res = await fetch(`/api/fs/delete?path=${encodeURIComponent(entry.path)}`);
+        const json = await res.json();
+        if (json.ok) {
+          await load_dir(current_path);
+        } else {
+          error = json.error;
+        }
+      },
+      on_cancel: () => {}
+    });
   }
 
   function go_up() {
@@ -151,13 +144,15 @@
       return;
     }
 
-    if (deleting) {
+    if ($dialog) {
       if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
-        do_delete();
+        $dialog.on_confirm();
+        dialog.set(null);
       } else if (e.key === "Escape") {
         e.preventDefault();
-        cancel_delete();
+        $dialog.on_cancel();
+        dialog.set(null);
       }
       return;
     }
@@ -277,29 +272,5 @@
         </div>
       {/each}
     {/if}
-  {#if deleting && delete_target}
-    <div class="absolute inset-0 flex items-center justify-center bg-black/60 z-20 rounded-lg">
-      <div class="bg-back border border-accent-detail rounded-lg p-4 shadow-lg mx-8 w-auto min-w-[150px]">
-        <div class="flex justify-between">
-          <p class="text-lg text-bold text-print">[ Eliminar ]</p>
-          <button on:click={cancel_delete} class="aspect-square text-sm mx-2 rounded-md bg-back text-accent-detail hover:bg-accent-detail hover:text-back transition-colors border border-accent-detail">
-            x
-          </button>
-        </div>
-        <div class="flex items-center justify-center gap-2 mb-3 text-accent-detail">
-          <Icon icon={delete_target.entry_type === "dir" ? dir_icon() : file_icon(delete_target.name)} class="w-5 h-5 text-accent-detail" />
-          <span class="text-lg truncate text-center">{delete_target.name}?</span>
-        </div>
-        <div class="flex gap-2 pt-2 justify-between mx-1">
-          <button on:click={do_delete} class="px-5 rounded-md bg-back text-accent-detail hover:bg-accent-detail hover:text-back transition-colors border border-accent-detail text-sm">
-            Si
-          </button>
-          <button on:click={cancel_delete} class="px-5 rounded-md bg-back text-accent-detail hover:bg-accent-detail hover:text-back transition-colors border border-accent-detail text-sm">
-            No
-          </button>
-        </div>
-      </div>
-    </div>
-  {/if}
   </div>
 </div>
