@@ -282,7 +282,7 @@
       <div class="bg-back border border-accent-detail rounded-lg p-4 shadow-lg mx-8 w-auto min-w-[150px]">
         <div class="flex justify-between">
           <p class="text-lg text-bold text-print">[ Eliminar ]</p>
-          <button on:click={cancel_delete} class="text-sm rounded-md bg-back text-accent-detail hover:bg-accent-detail hover:text-back transition-colors border border-accent-detail">
+          <button on:click={cancel_delete} class="text-sm mx-2 rounded-md bg-back text-accent-detail hover:bg-accent-detail hover:text-back transition-colors border border-accent-detail">
             x
           </button>
         </div>
@@ -290,11 +290,11 @@
           <Icon icon={delete_target.entry_type === "dir" ? dir_icon() : file_icon(delete_target.name)} class="w-5 h-5 text-accent-detail" />
           <span class="text-lg truncate text-center">{delete_target.name}?</span>
         </div>
-        <div class="flex gap-2 pt-2 justify-between mx-2">
-          <button on:click={do_delete} class="px-5 py-1 rounded-md bg-back text-accent-detail hover:bg-accent-detail hover:text-back transition-colors border border-accent-detail text-sm">
+        <div class="flex gap-2 pt-2 justify-between mx-1">
+          <button on:click={do_delete} class="px-5 rounded-md bg-back text-accent-detail hover:bg-accent-detail hover:text-back transition-colors border border-accent-detail text-sm">
             Si
           </button>
-          <button on:click={cancel_delete} class="px-5 py-1 rounded-md bg-back text-accent-detail hover:bg-accent-detail hover:text-back transition-colors border border-accent-detail text-sm">
+          <button on:click={cancel_delete} class="px-5 rounded-md bg-back text-accent-detail hover:bg-accent-detail hover:text-back transition-colors border border-accent-detail text-sm">
             No
           </button>
         </div>
