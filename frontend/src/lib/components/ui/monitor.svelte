@@ -5,7 +5,6 @@
 
   export let active_section;
   export let on_section_change;
-  export let channel = null;
   export let on_channel_close;
 
   const sections = [
@@ -109,7 +108,7 @@
           ctx.fillStyle = `rgba(255, 255, 255, ${Math.random() * 0.3 + 0.1})`;
           ctx.fillRect(0, 0, css_w, css_h);
         }
-      } else if (!channel) {
+      } else if (!active_channel) {
         ctx.strokeStyle = colors.detail;
         ctx.lineWidth = 2;
         ctx.beginPath();
