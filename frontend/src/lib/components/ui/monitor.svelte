@@ -1,7 +1,6 @@
 <script>
   import { onMount, onDestroy } from "svelte";
   import { get_colors } from "$lib/theme";
-  import Icon from "@iconify/svelte";
   import ExplorerChannel from "./channels/explorer_channel.svelte";
 
   export let active_section;
@@ -110,7 +109,7 @@
           ctx.fillStyle = `rgba(255, 255, 255, ${Math.random() * 0.3 + 0.1})`;
           ctx.fillRect(0, 0, css_w, css_h);
         }
-      } else if (!active_channel) {
+      } else if (!channel) {
         ctx.strokeStyle = colors.detail;
         ctx.lineWidth = 2;
         ctx.beginPath();
@@ -159,20 +158,11 @@
           class="absolute inset-0 font-mono text-sm text-print-contrast flex flex-col"
         >
           <slot />
-          {#if channel?.id === 'explorer'}
-            <ExplorerChannel
-              icon={channel.props.icon}
-              name={channel.props.name}
-              on_confirm={channel.props.on_confirm}
-              on_cancel={channel.props.on_cancel}
-              on_close={on_channel_close}
-            />
-          {/if}
         </div>
       {/if}
 
       <div
-        class="absolute inset-0 pointer-events-none z-30"
+        class="absolute inset-0 pointer-events-none z-30 bg-back"
         style="background: repeating-linear-gradient(
           0deg,
           rgba(255, 255, 255, 0.09) 0px,
@@ -194,4 +184,13 @@
       {sections.find((s) => s.id === active_section)?.label}
     </div>
   </div>
+  {#if active_channel?.id === 'explorer'}
+    <ExplorerChannel
+      icon={active_channel.props.icon}
+      name={active_channel.props.name}
+      on_confirm={active_channel.props.on_confirm}
+      on_cancel={active_channel.props.on_cancel}
+      on_close={on_channel_close}
+    />
+  {/if}
 </div>
