@@ -50,6 +50,14 @@
   }
 }
 
+.truncate-start {
+       overflow: hidden;
+       text-overflow: ellipsis;
+       white-space: nowrap;
+       direction: rtl;
+       text-align: left;
+     }
+
 @layer base {
   * {
     @apply border-[#2ca798]/30;
