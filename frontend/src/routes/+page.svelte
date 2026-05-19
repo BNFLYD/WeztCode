@@ -31,8 +31,8 @@
       active_channel = null;
       setTimeout(() => {
         is_distorting = false;
-      }, 200);
-    }, 300);
+      }, 300);
+    }, 200);
   }
 </script>
 
