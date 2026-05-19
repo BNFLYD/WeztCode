@@ -159,6 +159,15 @@
           class="absolute inset-0 font-mono text-sm text-print-contrast flex flex-col"
         >
           <slot />
+          {#if channel?.id === 'explorer'}
+            <ExplorerChannel
+              icon={channel.props.icon}
+              name={channel.props.name}
+              on_confirm={channel.props.on_confirm}
+              on_cancel={channel.props.on_cancel}
+              on_close={on_channel_close}
+            />
+          {/if}
         </div>
       {/if}
 
@@ -185,13 +194,4 @@
       {sections.find((s) => s.id === active_section)?.label}
     </div>
   </div>
-  {#if channel?.id === 'explorer'}
-    <ExplorerChannel
-      icon={channel.props.icon}
-      name={channel.props.name}
-      on_confirm={channel.props.on_confirm}
-      on_cancel={channel.props.on_cancel}
-      on_close={on_channel_close}
-    />
-  {/if}
 </div>
