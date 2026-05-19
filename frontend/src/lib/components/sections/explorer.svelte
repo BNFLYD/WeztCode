@@ -279,17 +279,17 @@
     {/if}
   {#if deleting && delete_target}
     <div class="absolute inset-0 flex items-center justify-center bg-black/60 z-20 rounded-lg">
-      <div class="bg-back-deep border border-accent-detail/30 rounded-xl p-4 shadow-lg mx-4 w-auto min-w-[200px]">
-        <p class="text-md text-print mb-4">Queres borrar</p>
-        <div class="flex items-center gap-2 mb-3 text-accent-detail">
+      <div class="bg-back-deep border border-accent-detail/30 rounded-lg p-4 shadow-lg mx-4 w-auto min-w-[200px]">
+        <p class="text-md text-print mb-4">[Eliminar]</p>
+        <div class="flex items-center justify-center gap-2 mb-3 text-accent-detail">
           <Icon icon={delete_target.entry_type === "dir" ? dir_icon() : file_icon(delete_target.name)} class="w-5 h-5 text-accent-detail" />
-          <span class="font-mono text-sm truncate text-center">{delete_target.name}</span>
+          <span class="font-mono text-sm truncate text-center">{delete_target.name}?</span>
         </div>
-        <div class="flex gap-2 justify-center">
-          <button on:click={do_delete} class="px-3 py-1 rounded-lg bg-back text-accent-detail hover:bg-accent-detail hover:text-back transition-colors border border-accent-detail text-sm">
+        <div class="flex gap-2 pt-2 justify-between">
+          <button on:click={do_delete} class="px-5 py-1 rounded-md bg-back text-accent-detail hover:bg-accent-detail hover:text-back transition-colors border border-accent-detail text-sm">
             Si
           </button>
-          <button on:click={cancel_delete} class="px-5 py-1 rounded-lg bg-back text-accent-detail hover:bg-accent-detail hover:text-back transition-colors border border-accent-detail text-sm">
+          <button on:click={cancel_delete} class="px-5 py-1 rounded-md bg-back text-accent-detail hover:bg-accent-detail hover:text-back transition-colors border border-accent-detail text-sm">
             No
           </button>
         </div>
