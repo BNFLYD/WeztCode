@@ -279,8 +279,8 @@
     {/if}
   {#if deleting && delete_target}
     <div class="absolute inset-0 flex items-center justify-center bg-black/60 z-20 rounded-lg">
-      <div class="bg-back-deep border border-accent-detail/30 rounded-lg p-4 shadow-lg mx-4 w-auto min-w-[200px]">
-        <p class="text-md text-print mb-4">[Eliminar]</p>
+      <div class="bg-back border border-accent-detail rounded-lg p-4 shadow-lg mx-4 w-auto min-w-[200px]">
+        <p class="text-lg text-bold text-print mb-4">[Eliminar]</p>
         <div class="flex items-center justify-center gap-2 mb-3 text-accent-detail">
           <Icon icon={delete_target.entry_type === "dir" ? dir_icon() : file_icon(delete_target.name)} class="w-5 h-5 text-accent-detail" />
           <span class="font-mono text-sm truncate text-center">{delete_target.name}?</span>
