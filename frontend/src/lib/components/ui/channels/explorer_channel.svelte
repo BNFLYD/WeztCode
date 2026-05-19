@@ -13,18 +13,18 @@
     <p class="text-sm text-print mb-2">Queres borrar</p>
     <div class="flex items-center gap-2 mb-3 text-print font-sans mb-4 ml-2">
       <Icon icon={icon} class="w-5 h-5 text-accent-detail"/>
-      <span class="text-sm truncate">{name}?</span>
+      <span class="text-md truncate">{name}?</span>
     </div>
-    <div class="flex px-4 gap-2 justify-between">
+    <div class="flex px-4 gap-2 justify-between font-sans">
       <button
         on:click={() => { on_confirm(); on_close(); }}
-        class="px-4 rounded-md bg-back text-print hover:bg-accent-detail hover:text-back transition-colors border border-accent-detail text-sm"
+        class="px-4 rounded-md bg-back text-print hover:bg-accent-detail hover:text-back transition-colors border border-accent-detail text-md"
       >
         Si
       </button>
       <button
         on:click={() => { on_cancel(); on_close(); }}
-        class="px-4 rounded-md bg-back text-print hover:bg-accent-detail hover:text-back transition-colors border border-accent-detail text-sm"
+        class="px-4 rounded-md bg-back text-print hover:bg-accent-detail hover:text-back transition-colors border border-accent-detail text-md"
       >
         No
       </button>
