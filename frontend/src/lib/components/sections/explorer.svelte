@@ -285,7 +285,7 @@
           <Icon icon={delete_target.entry_type === "dir" ? dir_icon() : file_icon(delete_target.name)} class="w-5 h-5 text-accent-detail" />
           <span class="font-mono text-sm truncate text-center">{delete_target.name}?</span>
         </div>
-        <div class="flex gap-2 pt-2 justify-between">
+        <div class="flex gap-2 pt-2 justify-between mx-4">
           <button on:click={do_delete} class="px-5 py-1 rounded-md bg-back text-accent-detail hover:bg-accent-detail hover:text-back transition-colors border border-accent-detail text-sm">
             Si
           </button>
