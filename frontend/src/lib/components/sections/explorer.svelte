@@ -281,8 +281,8 @@
     <div class="absolute inset-0 flex items-center justify-center bg-black/60 z-20 rounded-lg">
       <div class="bg-back border border-accent-detail rounded-lg p-4 shadow-lg mx-4 w-auto min-w-[200px]">
         <div class="flex justify-between">
-          <p class="text-lg text-bold text-print mb-4">[ Eliminar ]</p>
-          <button on:click={cancel_delete} class="px-1 my-1 font-mono text-sm rounded-md bg-back text-accent-detail hover:bg-accent-detail hover:text-back transition-colors border border-accent-detail">
+          <p class="text-lg text-bold text-print">[ Eliminar ]</p>
+          <button on:click={cancel_delete} class="font-mono text-sm rounded-md bg-back text-accent-detail hover:bg-accent-detail hover:text-back transition-colors border border-accent-detail">
             x
           </button>
         </div>
