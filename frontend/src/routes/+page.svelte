@@ -18,7 +18,9 @@
     is_distorting = true;
     setTimeout(() => {
       active_channel = ch;
-      is_distorting = false;
+      setTimeout(() => {
+        is_distorting = false;
+      }, 200);
     }, 300);
   }
 
@@ -27,7 +29,9 @@
     is_distorting = true;
     setTimeout(() => {
       active_channel = null;
-      is_distorting = false;
+      setTimeout(() => {
+        is_distorting = false;
+      }, 200);
     }, 300);
   }
 </script>

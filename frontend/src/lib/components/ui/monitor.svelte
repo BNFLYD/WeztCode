@@ -16,7 +16,6 @@
     { id: "term", icon: "devicon-plain:bash", label: "ターミナル" },
     { id: "settings", icon: "hugeicons:settings-03", label: "設定" },
   ];
-  export let active_channel = null;
   export let is_distorting = false;
 
   let canvas_ref = null;
@@ -147,7 +146,7 @@
   <div
     class="aspect-square m-1 relative rounded-[14px] bg-accent-detail overflow-hidden"
   >
-    <div class="w-full h-full bg-back-deep">
+    <div class="w-full h-full bg-back">
       <canvas
         bind:this={canvas_ref}
         class="w-full h-full"
@@ -162,7 +161,7 @@
       {/if}
 
       <div
-        class="absolute inset-0 pointer-events-none z-30 bg-back"
+        class="absolute inset-0 pointer-events-none z-30"
         style="background: repeating-linear-gradient(
           0deg,
           rgba(255, 255, 255, 0.09) 0px,
@@ -184,12 +183,12 @@
       {sections.find((s) => s.id === active_section)?.label}
     </div>
   </div>
-  {#if active_channel?.id === 'explorer'}
+  {#if channel?.id === 'explorer'}
     <ExplorerChannel
-      icon={active_channel.props.icon}
-      name={active_channel.props.name}
-      on_confirm={active_channel.props.on_confirm}
-      on_cancel={active_channel.props.on_cancel}
+      icon={channel.props.icon}
+      name={channel.props.name}
+      on_confirm={channel.props.on_confirm}
+      on_cancel={channel.props.on_cancel}
       on_close={on_channel_close}
     />
   {/if}
