@@ -185,7 +185,7 @@
   </div>
   {#if $dialog}
     <div class="absolute inset-0 flex items-center justify-center bg-black/60 z-50 rounded-2xl">
-      <div class="bg-back-deep border border-accent-detail/30 rounded-xl p-4 shadow-lg mx-4 w-auto min-w-[200px]">
+      <div class="bg-back border border-accent-detail/30 rounded-xl p-4 shadow-lg mx-4 w-auto min-w-[200px]">
         <p class="text-lg text-accent-detail mb-4">[ Eliminar ]</p>
         <div class="flex items-center gap-2 mb-3 text-print">
           <Icon icon={$dialog.icon} class="w-5 h-5 text-accent-detail" />
@@ -194,13 +194,13 @@
         <div class="flex gap-2 justify-end">
           <button
             on:click={() => { $dialog.on_confirm(); dialog.set(null); }}
-            class="px-4 rounded-lg bg-back text-accent-detail hover:bg-accent-detail hover:text-back transition-colors text-sm"
+            class="px-4 rounded-lg bg-back text-accent-detail hover:bg-accent-detail hover:text-back transition-colors text-sm border border-accent-detail"
           >
             Si
           </button>
           <button
             on:click={() => { $dialog.on_cancel(); dialog.set(null); }}
-            class="px-4 rounded-lg bg-back text-accent-detail hover:bg-accent-detail hover:text-back transition-colors text-sm"
+            class="px-4 rounded-lg bg-back text-accent-detail hover:bg-accent-detail hover:text-back transition-colors text-sm border border-accent-detail"
           >
             No
           </button>
