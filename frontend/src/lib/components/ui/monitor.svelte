@@ -25,9 +25,9 @@
 
   const update_colors = () => {
     colors = {
-      back: get_colors('--color-back', '#0d0d0d'),
-      accent: get_colors('--color-accent', '#00ffdd'),
-      detail: get_colors('--color-accent-detail', '#ffffff'),
+      back: get_colors("--color-back", "#0d0d0d"),
+      accent: get_colors("--color-accent", "#00ffdd"),
+      detail: get_colors("--color-accent-detail", "#ffffff"),
     };
   };
 
@@ -47,7 +47,7 @@
     canvas_ref.width = rect.width * dpr;
     canvas_ref.height = rect.height * dpr;
 
-    window.addEventListener('theme-change', update_colors);
+    window.addEventListener("theme-change", update_colors);
 
     const ro = new ResizeObserver(() => {
       const dpr = devicePixelRatio || 1;
@@ -97,9 +97,16 @@
           const x = Math.random() * iw;
           const y = Math.random() * ih;
           const w = Math.random() * 20 * dpr + 5 * dpr;
-          for (let px = Math.floor(x); px < Math.floor(x) + w && px < iw; px++) {
+          for (
+            let px = Math.floor(x);
+            px < Math.floor(x) + w && px < iw;
+            px++
+          ) {
             const idx = (Math.floor(y) * iw + px) * 4;
-            data[idx] = 255; data[idx+1] = 255; data[idx+2] = 255; data[idx+3] = 255;
+            data[idx] = 255;
+            data[idx + 1] = 255;
+            data[idx + 2] = 255;
+            data[idx + 3] = 255;
           }
         }
         ctx.putImageData(imageData, 0, 0);
@@ -118,7 +125,8 @@
         const center_y = css_h / 2;
 
         for (let x = 0; x < css_w; x++) {
-          const y = center_y + Math.sin((x + elapsed * 0.12) * frequency) * amplitude;
+          const y =
+            center_y + Math.sin((x + elapsed * 0.12) * frequency) * amplitude;
           if (x === 0) {
             ctx.moveTo(x, y);
           } else {
@@ -138,19 +146,18 @@
     if (animation_id) {
       cancelAnimationFrame(animation_id);
     }
-    window.removeEventListener('theme-change', update_colors);
+    window.removeEventListener("theme-change", update_colors);
   });
 </script>
 
-<div class="w-full h-full relative rounded-2xl border border-accent-detail/40 bg-accent-detail">
+<div
+  class="w-full h-full relative rounded-2xl border border-accent-detail/40 bg-accent-detail"
+>
   <div
     class="aspect-square m-1 relative rounded-[14px] bg-accent-detail overflow-hidden"
   >
     <div class="w-full h-full bg-back-deep">
-      <canvas
-        bind:this={canvas_ref}
-        class="w-full h-full"
-      ></canvas>
+      <canvas bind:this={canvas_ref} class="w-full h-full"></canvas>
 
       {#if !is_distorting}
         <div
@@ -184,27 +191,33 @@
     </div>
   </div>
   {#if $dialog}
-    <div class="absolute inset-0 flex items-center justify-center bg-black/60 z-50 rounded-2xl">
-      <div class="bg-back border border-accent-detail/30 rounded-xl p-4 shadow-lg mx-4 w-auto min-w-[200px]">
-        <p class="text-lg text-accent-detail mb-4">[ Eliminar ]</p>
-        <div class="flex items-center gap-2 mb-3 text-print">
-          <Icon icon={$dialog.icon} class="w-5 h-5 text-accent-detail" />
-          <span class="font-mono text-sm truncate">{$dialog.name}?</span>
-        </div>
-        <div class="flex gap-2 justify-end">
-          <button
-            on:click={() => { $dialog.on_confirm(); dialog.set(null); }}
-            class="px-4 rounded-lg bg-back text-accent-detail hover:bg-accent-detail hover:text-back transition-colors text-sm border border-accent-detail"
-          >
-            Si
-          </button>
-          <button
-            on:click={() => { $dialog.on_cancel(); dialog.set(null); }}
-            class="px-4 rounded-lg bg-back text-accent-detail hover:bg-accent-detail hover:text-back transition-colors text-sm border border-accent-detail"
-          >
-            No
-          </button>
-        </div>
+    <div
+      class="bg-back border border-accent-detail/30 rounded-xl p-4 shadow-lg mx-4 w-auto min-w-[200px]"
+    >
+      <p class="text-lg text-accent-detail mb-4">[ Eliminar ]</p>
+      <div class="flex items-center gap-2 mb-3 text-print">
+        <Icon icon={$dialog.icon} class="w-5 h-5 text-accent-detail" />
+        <span class="font-mono text-sm truncate">{$dialog.name}?</span>
+      </div>
+      <div class="flex gap-2 justify-end">
+        <button
+          on:click={() => {
+            $dialog.on_confirm();
+            dialog.set(null);
+          }}
+          class="px-4 rounded-lg bg-back text-accent-detail hover:bg-accent-detail hover:text-back transition-colors text-sm border border-accent-detail"
+        >
+          Si
+        </button>
+        <button
+          on:click={() => {
+            $dialog.on_cancel();
+            dialog.set(null);
+          }}
+          class="px-4 rounded-lg bg-back text-accent-detail hover:bg-accent-detail hover:text-back transition-colors text-sm border border-accent-detail"
+        >
+          No
+        </button>
       </div>
     </div>
   {/if}
