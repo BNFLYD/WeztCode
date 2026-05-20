@@ -7,6 +7,9 @@
   export let on_section_change;
   export let channel = null;
   export let on_channel_close;
+  export let preview_image = null;
+
+  $: preview_name = preview_image ? preview_image.split('/').pop() : '';
 
   const sections = [
     { id: "explorer", icon: "solar:code-2-bold", label: "コード" },
@@ -157,6 +160,17 @@
           class="absolute inset-0 font-mono text-sm text-print-contrast flex flex-col"
         >
           <slot />
+        </div>
+      {/if}
+
+      {#if preview_image && !is_distorting}
+        <img
+          src="/api/fs/image?path={encodeURIComponent(preview_image)}"
+          class="absolute inset-0 w-full h-full object-contain z-10"
+          alt={preview_name}
+        />
+        <div class="absolute bottom-0 left-0 right-0 z-20">
+          <ExplorerChannel mode="preview" name={preview_name} on_close={() => preview_image = null} />
         </div>
       {/if}
 

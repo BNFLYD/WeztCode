@@ -12,6 +12,7 @@
   let active_section = "explorer";
   let active_channel = null;
   let is_distorting = false;
+  let preview_image = null;
 
   function handle_channel(ch) {
     if (is_distorting) return;
@@ -36,11 +37,11 @@
 
 <div class="h-[100vh] flex flex-col bg-back-deep rounded-l-3xl overflow-hidden">
   <div class="px-7 pt-5">
-    <Monitor {active_section} channel={active_channel} {is_distorting} on_channel_close={handle_channel_close} on_section_change={(id) => (active_section = id)}  />
+    <Monitor {active_section} channel={active_channel} {is_distorting} {preview_image} on_channel_close={handle_channel_close} on_section_change={(id) => (active_section = id)}  />
   </div>
   <div class="flex-1 overflow-y-auto px-5">
     {#if active_section === "explorer"}
-      <ExplorerSection {active_section} channel={active_channel} on_channel={handle_channel} on_channel_close={handle_channel_close} />
+      <ExplorerSection {active_section} channel={active_channel} on_channel={handle_channel} on_channel_close={handle_channel_close} on_image_preview={(path) => preview_image = path} />
     {:else if active_section === "chat"}
       <ChatSection />
     {:else if active_section === "git"}

@@ -76,6 +76,17 @@ pub fn read_file(rel_path: &str, root: &Path) -> Result<String, String> {
         .map_err(|e| format!("Cannot read file: {}", e))
 }
 
+pub fn read_image_bytes(rel_path: &str, root: &Path) -> Result<Vec<u8>, String> {
+    let file_path = sanitize_path(rel_path, root)?;
+
+    if !file_path.is_file() {
+        return Err("Not a file".to_string());
+    }
+
+    fs::read(&file_path)
+        .map_err(|e| format!("Cannot read image file: {}", e))
+}
+
 pub fn create_entry(rel_path: &str, root: &Path) -> Result<(), String> {
     let requested = rel_path.trim_start_matches('/');
     let root_canonical = root.canonicalize()

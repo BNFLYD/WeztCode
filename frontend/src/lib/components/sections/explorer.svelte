@@ -6,6 +6,7 @@
   export let channel = null;
   export let on_channel;
   export let on_channel_close;
+  export let on_image_preview = () => {};
 
   let current_path = "/";
   let entries = [];
@@ -33,6 +34,7 @@
     loading = true;
     error = null;
     cursor_index = 0;
+    on_image_preview(null);
     try {
       const res = await fetch(`/api/fs/ls?path=${encodeURIComponent(path)}`, { signal });
       const json = await res.json();
@@ -65,6 +67,10 @@
 
   function dir_icon() {
     return "mdi:folder";
+  }
+
+  function is_image(name) {
+    return /\.(png|jpg|jpeg|gif|webp|svg|bmp|ico)$/i.test(name);
   }
 
   function open_file(path) {
@@ -179,6 +185,12 @@
     if (new_index < 0 || new_index >= entries.length) return;
     cursor_index = new_index;
     scroll_to_cursor();
+    const entry = entries[cursor_index];
+    if (entry && entry.entry_type === 'file' && is_image(entry.name)) {
+      on_image_preview(entry.path);
+    } else {
+      on_image_preview(null);
+    }
   }
 
   function scroll_to_cursor() {

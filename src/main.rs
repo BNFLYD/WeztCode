@@ -140,6 +140,9 @@ fn handle_api(request: tiny_http::Request, url: &str) {
         let rel_path = parse_query_param(url, "path").unwrap_or_else(|| String::new());
         let dest = parse_query_param(url, "dest").unwrap_or_else(|| String::new());
         handle_move(&rel_path, &dest, &root)
+    } else if url.starts_with("/api/fs/image") {
+        let rel_path = parse_query_param(url, "path").unwrap_or_else(|| String::new());
+        handle_image(rel_path, &root)
     } else {
         json_error("Unknown API endpoint")
     };
@@ -244,6 +247,53 @@ fn handle_move(rel_path: &str, dest: &str, root: &Path) -> tiny_http::Response<s
     match crate::config::fs::move_entry(rel_path, dest, root) {
         Ok(_) => json_response(&serde_json::json!({ "ok": true })),
         Err(e) => json_error(&e)
+    }
+}
+
+fn handle_image(rel_path: String, root: &Path) -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
+    let full_path = match crate::config::fs::sanitize_path(&rel_path, root) {
+        Ok(p) => p,
+        Err(e) => return json_response(&serde_json::json!({ "ok": false, "error": e })),
+    };
+
+    if !full_path.is_file() {
+        return json_response(&serde_json::json!({ "ok": false, "error": "Not a file" }));
+    }
+
+    let ext = full_path.extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+
+    let content_type = match ext.as_str() {
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "gif" => "image/gif",
+        "webp" => "image/webp",
+        "svg" => "image/svg+xml",
+        "bmp" => "image/bmp",
+        "ico" => "image/x-icon",
+        _ => "application/octet-stream",
+    };
+
+    match crate::config::fs::read_image_bytes(&rel_path, root) {
+        Ok(bytes) => {
+            let len = bytes.len();
+            let cursor = std::io::Cursor::new(bytes);
+            tiny_http::Response::new(
+                tiny_http::StatusCode(200),
+                vec![
+                    tiny_http::Header {
+                        field: "Content-Type".parse().unwrap(),
+                        value: content_type.parse().unwrap(),
+                    },
+                ],
+                cursor,
+                Some(len),
+                None,
+            )
+        }
+        Err(e) => json_response(&serde_json::json!({ "ok": false, "error": e })),
     }
 }
 
