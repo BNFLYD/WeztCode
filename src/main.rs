@@ -329,7 +329,7 @@ fn url_decode(s: &str) -> String {
         } else {
             let mut buf = [0u8; 4];
             let encoded = c.encode_utf8(&mut buf);
-            bytes.extend_from_slice(encoded);
+            bytes.extend_from_slice(encoded.as_bytes());
         }
     }
     String::from_utf8_lossy(&bytes).into_owned()
