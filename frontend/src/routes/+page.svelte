@@ -26,12 +26,10 @@
 
   function handle_channel_close() {
     if (is_distorting) return;
+    active_channel = null;
     is_distorting = true;
     setTimeout(() => {
-      active_channel = null;
-      setTimeout(() => {
-        is_distorting = false;
-      }, 10);
+      is_distorting = false;
     }, 300);
   }
 </script>
