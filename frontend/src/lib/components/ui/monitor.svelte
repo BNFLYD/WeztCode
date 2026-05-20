@@ -169,6 +169,7 @@
           src="/api/fs/image?path={encodeURIComponent(preview_image)}"
           class="absolute inset-0 w-full h-full object-contain z-10"
           alt={preview_name}
+          onerror={(e) => console.error('[preview] img error:', e.target.src)}
         />
         <div class="absolute bottom-0 left-0 right-0 z-20">
           <ExplorerChannel mode="preview" name={preview_name} on_close={on_preview_close} />

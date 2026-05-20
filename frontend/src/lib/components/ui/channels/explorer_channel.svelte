@@ -50,6 +50,7 @@
       class="text-lg text-print font-sans bg-back-deep rounded-lg p-4 shadow-lg mx-7 w-auto min-w-[200px] outline-none"
     >
       <div class="flex items-center">
+      <div class="relative">
         <p class="mb-1">Queres borrar</p>
         <button
           on:click={() => { on_cancel(); on_close(); }}
@@ -57,6 +58,7 @@
         >
           <Icon icon="lucide:x" class="w-4 h-4" />
         </button>
+        </div>
       </div>
       <div class="flex items-center gap-2 text-print mb-4 ml-2">
         <Icon icon={icon} class="w-5 h-5 text-accent-detail"/>

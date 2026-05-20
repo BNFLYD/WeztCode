@@ -276,9 +276,12 @@ fn handle_image(rel_path: String, root: &Path) -> tiny_http::Response<std::io::C
         _ => "application/octet-stream",
     };
 
+    eprintln!("[image] path={:?}, ext={:?}, content_type={}", rel_path, ext, content_type);
+
     match crate::config::fs::read_image_bytes(&rel_path, root) {
         Ok(bytes) => {
             let len = bytes.len();
+            eprintln!("[image] read ok: {} bytes", len);
             let cursor = std::io::Cursor::new(bytes);
             tiny_http::Response::new(
                 tiny_http::StatusCode(200),
@@ -293,7 +296,10 @@ fn handle_image(rel_path: String, root: &Path) -> tiny_http::Response<std::io::C
                 None,
             )
         }
-        Err(e) => json_response(&serde_json::json!({ "ok": false, "error": e })),
+        Err(e) => {
+            eprintln!("[image] read error: {}", e);
+            json_response(&serde_json::json!({ "ok": false, "error": e }))
+        },
     }
 }
 
