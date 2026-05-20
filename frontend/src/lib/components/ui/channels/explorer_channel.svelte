@@ -14,6 +14,7 @@
   function handle_keydown(e) {
     switch (e.key) {
       case "Enter":
+      case " ":
         if (selected === "si") { on_confirm(); on_close(); }
         else { on_cancel(); on_close(); }
         break;
