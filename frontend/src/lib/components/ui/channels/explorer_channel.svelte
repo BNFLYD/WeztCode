@@ -49,7 +49,15 @@
       on:keydown={handle_keydown}
       class="text-lg text-print font-sans bg-back-deep rounded-lg p-4 shadow-lg mx-7 w-auto min-w-[200px] outline-none"
     >
-      <p class="mb-1">Queres borrar</p>
+      <div class="flex items-center">
+        <p class="mb-1">Queres borrar</p>
+        <button
+          on:click={() => { on_cancel(); on_close(); }}
+          class="text-print/60 hover:text-print transition-colors shrink-0 absolute top-2 right-2"
+        >
+          <Icon icon="lucide:x" class="w-4 h-4" />
+        </button>
+      </div>
       <div class="flex items-center gap-2 text-print mb-4 ml-2">
         <Icon icon={icon} class="w-5 h-5 text-accent-detail"/>
         <span class="font-bold truncate">{name}?</span>
@@ -84,11 +92,5 @@
   <div class="flex items-center gap-2 px-3 py-1.5 bg-back-deep/80 rounded-md text-sm">
     <Icon icon="lucide:image" class="w-4 h-4 text-accent-detail shrink-0" />
     <span class="text-print font-medium truncate flex-1">{name}</span>
-    <button
-      on:click={on_close}
-      class="text-accent-detail/60 hover:text-accent-detail transition-colors shrink-0"
-    >
-      <Icon icon="lucide:x" class="w-4 h-4" />
-    </button>
   </div>
 {/if}

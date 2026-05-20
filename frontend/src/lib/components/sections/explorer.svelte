@@ -62,6 +62,8 @@
     if (name.endsWith(".json")) return "devicon-plain:json";
     if (name.endsWith(".toml")) return "devicon-plain:toml";
     if (name.endsWith(".py")) return "devicon-plain:python";
+    if (name.endsWith(".png") || name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".webp") || name.endsWith(".svg") || name.endsWith(".bmp") || name.endsWith(".ico")) return "garden:file-image-fill-12";
+    if (name.endsWith(".gif")) return "fluent:gif-16-filled";
     return "tabler:file-filled";
   }
 
