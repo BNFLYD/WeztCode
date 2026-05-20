@@ -18,6 +18,9 @@
   let create_name = "";
   let renaming = false;
   let rename_name = "";
+  let clipboard = null;
+  let moving = false;
+  let move_name = "";
 
   async function load_dir(path) {
     loading = true;
@@ -89,6 +92,43 @@
     const json = await res.json();
     renaming = false;
     rename_name = "";
+    if (json.ok) {
+      await load_dir(current_path);
+    } else {
+      error = json.error;
+    }
+  }
+
+  function cut_entry() {
+    const entry = entries[cursor_index];
+    if (!entry) return;
+    clipboard = { entry, operation: "cut" };
+  }
+
+  async function paste_entry() {
+    if (!clipboard || clipboard.operation !== "cut") return;
+    const name = clipboard.entry.name;
+    const target = current_path === "/" ? name : `${current_path}/${name}`;
+    const res = await fetch(`/api/fs/move?path=${encodeURIComponent(clipboard.entry.path)}&dest=${encodeURIComponent(target)}`);
+    const json = await res.json();
+    if (json.ok) {
+      clipboard = null;
+      await load_dir(current_path);
+    } else {
+      error = json.error;
+    }
+  }
+
+  async function move_entry() {
+    const name = move_name.trim();
+    if (!name) { moving = false; return; }
+    const entry = entries[cursor_index];
+    if (!entry) { moving = false; return; }
+    const target = current_path === "/" ? name : `${current_path}/${name}`;
+    const res = await fetch(`/api/fs/move?path=${encodeURIComponent(entry.path)}&dest=${encodeURIComponent(target)}`);
+    const json = await res.json();
+    moving = false;
+    move_name = "";
     if (json.ok) {
       await load_dir(current_path);
     } else {
@@ -179,8 +219,20 @@
       return;
     }
 
+    if (moving) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        move_entry();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        moving = false;
+        move_name = "";
+      }
+      return;
+    }
+
     if (channel) {
-      if (["h","l","j","k","ArrowLeft","ArrowRight","ArrowUp","ArrowDown","d","D","a","A","Enter"," ","Escape"].includes(e.key)) {
+      if (["h","l","j","k","ArrowLeft","ArrowRight","ArrowUp","ArrowDown","d","D","a","A","r","R","x","X","p","P","m","M","Enter"," ","Escape"].includes(e.key)) {
         e.preventDefault();
       }
       return;
@@ -213,6 +265,23 @@
         if (!entries[cursor_index]) break;
         renaming = true;
         rename_name = entries[cursor_index].name;
+        break;
+      case "x":
+      case "X":
+        e.preventDefault();
+        cut_entry();
+        break;
+      case "p":
+      case "P":
+        e.preventDefault();
+        paste_entry();
+        break;
+      case "m":
+      case "M":
+        e.preventDefault();
+        if (!entries[cursor_index]) break;
+        moving = true;
+        move_name = entries[cursor_index].name;
         break;
       case "d":
       case "D":
@@ -272,6 +341,17 @@
           on:blur={() => { if (!rename_name.trim()) renaming = false; }}
         />
       </span>
+    {:else if moving}
+      <span class="font-mono truncate flex items-center gap-1 text-print">
+        <span class="text-accent">mv:</span>
+        <input
+          bind:value={move_name}
+          placeholder={entries[cursor_index]?.name ?? ""}
+          class="bg-transparent outline-none text-print font-mono flex-1 min-w-0"
+          autofocus
+          on:blur={() => { if (!move_name.trim()) moving = false; }}
+        />
+      </span>
     {:else}
       <span class="font-mono truncate">{current_path}</span>
     {/if}
@@ -294,7 +374,9 @@
       {#each entries as entry, index (entry.path)}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <div
-          class={"flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent/5 transition-colors text-lg group cursor-pointer" + (cursor_index === index && window_has_focus ? " bg-accent/10" : "")}
+          class={"flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent/5 transition-colors text-lg group cursor-pointer"
+            + (cursor_index === index && window_has_focus ? " bg-accent/10" : "")
+            + (clipboard?.entry.path === entry.path ? " opacity-40" : "")}
           data-index={index}
         on:click={() => {
           cursor_index = index;
@@ -304,12 +386,20 @@
         >
           {#if entry.entry_type === "dir"}
             <span class="text-accent-detail">
-              <Icon icon={dir_icon()} class="w-4 h-4" />
+              {#if clipboard?.entry.path === entry.path}
+                <Icon icon="mdi:content-cut" class="w-4 h-4" />
+              {:else}
+                <Icon icon={dir_icon()} class="w-4 h-4" />
+              {/if}
             </span>
             <span class="text-print font-medium">{entry.name}</span>
           {:else}
             <span class="text-accent-detail">
-              <Icon icon={file_icon(entry.name)} class="w-4 h-4" />
+              {#if clipboard?.entry.path === entry.path}
+                <Icon icon="mdi:content-cut" class="w-4 h-4" />
+              {:else}
+                <Icon icon={file_icon(entry.name)} class="w-4 h-4" />
+              {/if}
             </span>
             <span class="text-print/70 flex-1 truncate">{entry.name}</span>
             {#if entry.size}

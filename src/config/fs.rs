@@ -130,6 +130,37 @@ pub fn rename_entry(rel_path: &str, new_name: &str, root: &Path) -> Result<(), S
     Ok(())
 }
 
+pub fn move_entry(rel_path: &str, dest: &str, root: &Path) -> Result<(), String> {
+    let full_path = sanitize_path(rel_path, root)?;
+
+    let root_canonical = root.canonicalize()
+        .map_err(|_| "Root path not found".to_string())?;
+
+    let dest_requested = dest.trim_start_matches('/');
+    let dest_path = root_canonical.join(dest_requested);
+
+    let dest_parent = dest_path.parent().ok_or("Invalid destination")?;
+    let dest_parent_canonical = if dest_parent.exists() {
+        dest_parent.canonicalize().map_err(|_| "Cannot resolve destination parent")?
+    } else {
+        fs::create_dir_all(dest_parent)
+            .map_err(|e| format!("Cannot create destination directory: {}", e))?;
+        dest_parent.canonicalize().map_err(|_| "Cannot resolve destination parent")?
+    };
+
+    if !dest_parent_canonical.starts_with(&root_canonical) {
+        return Err("Path traversal detected".to_string());
+    }
+
+    let safe_dest = dest_parent_canonical.join(
+        dest_path.file_name().ok_or("Invalid destination filename")?
+    );
+
+    fs::rename(&full_path, &safe_dest)
+        .map_err(|e| format!("Cannot move: {}", e))?;
+    Ok(())
+}
+
 pub fn sanitize_path(requested: &str, root: &Path) -> Result<PathBuf, String> {
     let requested = requested.trim_start_matches('/');
     let joined = root.join(requested);
