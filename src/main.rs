@@ -132,6 +132,10 @@ fn handle_api(request: tiny_http::Request, url: &str) {
     } else if url.starts_with("/api/fs/delete") {
         let rel_path = parse_query_param(url, "path").unwrap_or_else(|| String::new());
         handle_delete(&rel_path, &root)
+    } else if url.starts_with("/api/fs/rename") {
+        let rel_path = parse_query_param(url, "path").unwrap_or_else(|| String::new());
+        let new_name = parse_query_param(url, "name").unwrap_or_else(|| String::new());
+        handle_rename(&rel_path, &new_name, &root)
     } else {
         json_error("Unknown API endpoint")
     };
@@ -220,6 +224,13 @@ fn handle_create(rel_path: &str, root: &Path) -> tiny_http::Response<std::io::Cu
 
 fn handle_delete(rel_path: &str, root: &Path) -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
     match crate::config::fs::delete_entry(rel_path, root) {
+        Ok(_) => json_response(&serde_json::json!({ "ok": true })),
+        Err(e) => json_error(&e)
+    }
+}
+
+fn handle_rename(rel_path: &str, new_name: &str, root: &Path) -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
+    match crate::config::fs::rename_entry(rel_path, new_name, root) {
         Ok(_) => json_response(&serde_json::json!({ "ok": true })),
         Err(e) => json_error(&e)
     }

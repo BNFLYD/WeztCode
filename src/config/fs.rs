@@ -112,6 +112,24 @@ pub fn delete_entry(rel_path: &str, root: &Path) -> Result<(), String> {
     Ok(())
 }
 
+pub fn rename_entry(rel_path: &str, new_name: &str, root: &Path) -> Result<(), String> {
+    let full_path = sanitize_path(rel_path, root)?;
+    let root_canonical = root.canonicalize()
+        .map_err(|_| "Root path not found".to_string())?;
+    let parent = full_path.parent().ok_or("Invalid path".to_string())?;
+    let new_path = parent.join(new_name);
+
+    let parent_canonical = parent.canonicalize()
+        .map_err(|_| "Parent directory does not exist".to_string())?;
+    if !parent_canonical.starts_with(&root_canonical) {
+        return Err("Path traversal detected".to_string());
+    }
+
+    fs::rename(&full_path, &new_path)
+        .map_err(|e| format!("Cannot rename: {}", e))?;
+    Ok(())
+}
+
 pub fn sanitize_path(requested: &str, root: &Path) -> Result<PathBuf, String> {
     let requested = requested.trim_start_matches('/');
     let joined = root.join(requested);

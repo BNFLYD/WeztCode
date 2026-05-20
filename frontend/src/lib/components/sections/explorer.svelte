@@ -16,6 +16,8 @@
   let window_has_focus = true;
   let creating = false;
   let create_name = "";
+  let renaming = false;
+  let rename_name = "";
 
   async function load_dir(path) {
     loading = true;
@@ -71,6 +73,22 @@
     const json = await res.json();
     creating = false;
     create_name = "";
+    if (json.ok) {
+      await load_dir(current_path);
+    } else {
+      error = json.error;
+    }
+  }
+
+  async function rename_entry() {
+    const name = rename_name.trim();
+    if (!name) { renaming = false; return; }
+    const entry = entries[cursor_index];
+    if (!entry) { renaming = false; return; }
+    const res = await fetch(`/api/fs/rename?path=${encodeURIComponent(entry.path)}&name=${encodeURIComponent(name)}`);
+    const json = await res.json();
+    renaming = false;
+    rename_name = "";
     if (json.ok) {
       await load_dir(current_path);
     } else {
@@ -149,6 +167,18 @@
       return;
     }
 
+    if (renaming) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        rename_entry();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        renaming = false;
+        rename_name = "";
+      }
+      return;
+    }
+
     if (channel) {
       if (["h","l","j","k","ArrowLeft","ArrowRight","ArrowUp","ArrowDown","d","D","a","A","Enter"," ","Escape"].includes(e.key)) {
         e.preventDefault();
@@ -176,6 +206,13 @@
       case "ArrowLeft":
         e.preventDefault();
         go_up();
+        break;
+      case "r":
+      case "R":
+        e.preventDefault();
+        if (!entries[cursor_index]) break;
+        renaming = true;
+        rename_name = entries[cursor_index].name;
         break;
       case "d":
       case "D":
@@ -222,6 +259,17 @@
           class="bg-transparent outline-none text-print font-mono flex-1 min-w-0"
           autofocus
           on:blur={() => { if (!create_name.trim()) creating = false; }}
+        />
+      </span>
+    {:else if renaming}
+      <span class="font-mono truncate flex items-center gap-1 text-print">
+        <span class="text-accent">upd:</span>
+        <input
+          bind:value={rename_name}
+          placeholder={entries[cursor_index]?.name ?? ""}
+          class="bg-transparent outline-none text-print font-mono flex-1 min-w-0"
+          autofocus
+          on:blur={() => { if (!rename_name.trim()) renaming = false; }}
         />
       </span>
     {:else}
