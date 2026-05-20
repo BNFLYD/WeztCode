@@ -1,4 +1,5 @@
 <script>
+  import { onMount } from "svelte";
   import Icon from "@iconify/svelte";
 
   export let icon = "";
@@ -8,10 +9,43 @@
   export let on_close = () => {};
 
   let selected = "si";
+  let dialog_ref;
+
+  function handle_keydown(e) {
+    switch (e.key) {
+      case "Enter":
+        if (selected === "si") { on_confirm(); on_close(); }
+        else { on_cancel(); on_close(); }
+        break;
+      case "Escape":
+        on_cancel();
+        on_close();
+        break;
+      case "ArrowLeft":
+      case "h":
+        selected = "si";
+        break;
+      case "ArrowRight":
+      case "l":
+        selected = "no";
+        break;
+    }
+  }
+
+  onMount(() => {
+    dialog_ref?.focus();
+  });
 </script>
 
 <div class="absolute inset-0 flex items-center justify-center">
-  <div class="text-lg text-print font-sans bg-back-deep rounded-lg p-4 shadow-lg mx-7 w-auto min-w-[200px]">
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div
+    bind:this={dialog_ref}
+    tabindex="0"
+    role="dialog"
+    on:keydown={handle_keydown}
+    class="text-lg text-print font-sans bg-back-deep rounded-lg p-4 shadow-lg mx-7 w-auto min-w-[200px] outline-none"
+  >
     <p class="mb-1">Queres borrar</p>
     <div class="flex items-center gap-2 text-print mb-4 ml-2">
       <Icon icon={icon} class="w-5 h-5 text-accent-detail"/>

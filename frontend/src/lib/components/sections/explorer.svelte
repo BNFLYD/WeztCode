@@ -150,14 +150,8 @@
     }
 
     if (channel) {
-      if (e.key === "Enter" || e.key === " ") {
+      if (["h","l","j","k","ArrowLeft","ArrowRight","ArrowUp","ArrowDown","d","D","a","A","Enter"," ","Escape"].includes(e.key)) {
         e.preventDefault();
-        channel.props.on_confirm();
-        on_channel_close();
-      } else if (e.key === "Escape") {
-        e.preventDefault();
-        channel.props.on_cancel();
-        on_channel_close();
       }
       return;
     }
