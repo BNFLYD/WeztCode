@@ -7,6 +7,7 @@
   export let on_section_change;
   export let channel = null;
   export let on_channel_close;
+  export let on_preview_close = () => {};
   export let preview_image = null;
 
   $: preview_name = preview_image ? preview_image.split('/').pop() : '';
@@ -170,7 +171,7 @@
           alt={preview_name}
         />
         <div class="absolute bottom-0 left-0 right-0 z-20">
-          <ExplorerChannel mode="preview" name={preview_name} on_close={() => preview_image = null} />
+          <ExplorerChannel mode="preview" name={preview_name} on_close={on_preview_close} />
         </div>
       {/if}
 
