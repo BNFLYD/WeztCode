@@ -1,5 +1,5 @@
 <script>
-  import { afterUpdate } from "svelte";
+  import { afterUpdate, onDestroy } from "svelte";
   import Icon from "@iconify/svelte";
 
   export let active_section = "explorer";
@@ -16,18 +16,25 @@
   let window_has_focus = true;
   let creating = false;
   let create_name = "";
+  let create_input;
   let renaming = false;
   let rename_name = "";
+  let rename_input;
   let clipboard = null;
   let moving = false;
   let move_name = "";
+  let move_input;
+  let controller = null;
 
   async function load_dir(path) {
+    if (controller) controller.abort();
+    controller = new AbortController();
+    const signal = controller.signal;
     loading = true;
     error = null;
     cursor_index = 0;
     try {
-      const res = await fetch(`/api/fs/ls?path=${encodeURIComponent(path)}`);
+      const res = await fetch(`/api/fs/ls?path=${encodeURIComponent(path)}`, { signal });
       const json = await res.json();
       if (json.ok) {
         entries = json.data.files;
@@ -36,9 +43,11 @@
         error = json.error;
       }
     } catch (e) {
-      error = e.message;
+      if (e.name !== "AbortError") {
+        error = e.message;
+      }
     }
-    loading = false;
+    if (!signal.aborted) loading = false;
   }
 
   function file_icon(name) {
@@ -179,9 +188,16 @@
   }
 
   afterUpdate(() => {
-    if (!loading && list_ref && entries.length > 0) {
+    if (creating && create_input) create_input.focus();
+    else if (renaming && rename_input) rename_input.focus();
+    else if (moving && move_input) move_input.focus();
+    else if (!loading && list_ref && entries.length > 0) {
       scroll_to_cursor();
     }
+  });
+
+  onDestroy(() => {
+    if (controller) controller.abort();
   });
 
   function activate_current() {
@@ -310,7 +326,10 @@
 
 <svelte:window
   on:keydown={handle_keydown}
-  on:focus={() => window_has_focus = true}
+  on:focus={() => {
+    window_has_focus = true;
+    if (!loading) load_dir(current_path);
+  }}
   on:blur={() => window_has_focus = false}
 />
 
@@ -324,9 +343,9 @@
         <span class="text-accent">add:</span>
         <input
           bind:value={create_name}
+          bind:this={create_input}
           placeholder={current_path}
           class="bg-transparent outline-none text-print font-mono flex-1 min-w-0"
-          autofocus
           on:blur={() => { if (!create_name.trim()) creating = false; }}
         />
       </span>
@@ -335,9 +354,9 @@
         <span class="text-accent">upd:</span>
         <input
           bind:value={rename_name}
+          bind:this={rename_input}
           placeholder={entries[cursor_index]?.name ?? ""}
           class="bg-transparent outline-none text-print font-mono flex-1 min-w-0"
-          autofocus
           on:blur={() => { if (!rename_name.trim()) renaming = false; }}
         />
       </span>
@@ -346,9 +365,9 @@
         <span class="text-accent">mv:</span>
         <input
           bind:value={move_name}
+          bind:this={move_input}
           placeholder={entries[cursor_index]?.name ?? ""}
           class="bg-transparent outline-none text-print font-mono flex-1 min-w-0"
-          autofocus
           on:blur={() => { if (!move_name.trim()) moving = false; }}
         />
       </span>
