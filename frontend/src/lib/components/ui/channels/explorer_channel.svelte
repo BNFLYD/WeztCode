@@ -21,7 +21,6 @@
       <button
         on:click={() => { on_confirm(); on_close(); }}
         on:mouseenter={() => selected = "si"}
-        on:mouseleave={() => selected = "si"}
         class="px-5 rounded-sm transition-colors border border-accent-detail"
         class:bg-accent-detail={selected === "si"}
         class:text-back={selected === "si"}
@@ -33,7 +32,6 @@
       <button
         on:click={() => { on_cancel(); on_close(); }}
         on:mouseenter={() => selected = "no"}
-        on:mouseleave={() => selected = "si"}
         class="px-5 rounded-sm transition-colors border border-accent-detail"
         class:bg-accent-detail={selected === "no"}
         class:text-back={selected === "no"}
