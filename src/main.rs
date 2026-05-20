@@ -316,21 +316,23 @@ fn parse_query_param(url: &str, key: &str) -> Option<String> {
 }
 
 fn url_decode(s: &str) -> String {
-    let mut result = String::new();
+    let mut bytes: Vec<u8> = Vec::new();
     let mut chars = s.chars();
     while let Some(c) = chars.next() {
         if c == '%' {
             let hex: String = chars.by_ref().take(2).collect();
             if let Ok(byte) = u8::from_str_radix(&hex, 16) {
-                result.push(byte as char);
+                bytes.push(byte);
             }
         } else if c == '+' {
-            result.push(' ');
+            bytes.push(b' ');
         } else {
-            result.push(c);
+            let mut buf = [0u8; 4];
+            let encoded = c.encode_utf8(&mut buf);
+            bytes.extend_from_slice(encoded);
         }
     }
-    result
+    String::from_utf8_lossy(&bytes).into_owned()
 }
 
 fn json_response(data: &serde_json::Value) -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
