@@ -27,6 +27,20 @@
   let move_input;
   let controller = null;
 
+  $: {
+    const entry = entries[cursor_index];
+    if (entry && entry.entry_type === 'file') {
+      const icon = file_icon(entry.name);
+      if (icon === "garden:file-image-fill-12" || icon === "fluent:gif-16-filled") {
+        on_image_preview(entry.path);
+      } else {
+        on_image_preview(null);
+      }
+    } else {
+      on_image_preview(null);
+    }
+  }
+
   async function load_dir(path) {
     if (controller) controller.abort();
     controller = new AbortController();
@@ -34,7 +48,6 @@
     loading = true;
     error = null;
     cursor_index = 0;
-    on_image_preview(null);
     try {
       const res = await fetch(`/api/fs/ls?path=${encodeURIComponent(path)}`, { signal });
       const json = await res.json();
@@ -69,10 +82,6 @@
 
   function dir_icon() {
     return "mdi:folder";
-  }
-
-  function is_image(name) {
-    return /\.(png|jpg|jpeg|gif|webp|svg|bmp|ico)$/i.test(name);
   }
 
   function open_file(path) {
@@ -187,12 +196,6 @@
     if (new_index < 0 || new_index >= entries.length) return;
     cursor_index = new_index;
     scroll_to_cursor();
-    const entry = entries[cursor_index];
-    if (entry && entry.entry_type === 'file' && is_image(entry.name)) {
-      on_image_preview(entry.path);
-    } else {
-      on_image_preview(null);
-    }
   }
 
   function scroll_to_cursor() {

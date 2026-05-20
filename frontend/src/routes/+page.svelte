@@ -13,12 +13,9 @@
   let active_channel = null;
   let is_distorting = false;
   let preview_image = null;
-  let preview_timeout = null;
   let channel_timeout = null;
 
   function handle_channel(ch) {
-    if (preview_timeout) clearTimeout(preview_timeout);
-    preview_timeout = null;
     preview_image = null;
     if (channel_timeout) return;
     if (active_channel) return;
@@ -45,21 +42,7 @@
   }
 
   function handle_preview(path) {
-    if (channel_timeout) return;
-    if (is_distorting && active_channel?.id !== "preview") return;
-    if (preview_timeout) clearTimeout(preview_timeout);
-    preview_timeout = null;
     preview_image = path;
-    if (!path) {
-      is_distorting = true;
-      setTimeout(() => { is_distorting = false; }, 150);
-    } else {
-      is_distorting = true;
-      preview_timeout = setTimeout(() => {
-        is_distorting = false;
-        preview_timeout = null;
-      }, 80);
-    }
   }
 </script>
 
