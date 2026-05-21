@@ -1,69 +1,10 @@
 <script>
   import { onMount, onDestroy } from "svelte";
   import { get_colors } from "$lib/theme";
-  import ExplorerChannel from "./channels/explorer_channel.svelte";
 
   export let active_section;
-  export let on_section_change;
-  export let channel_active = false;
-
-  let active_channel = null;
-
-  $: channel_active = !!active_channel;
-  let is_distorting = false;
-  let channel_timeout = null;
-  let preview_image = null;
-  let preview_timeout = null;
-
-  $: preview_name = preview_image ? preview_image.split('/').pop() : '';
-
-  export function handle_channel(ch) {
-    if (!ch) {
-      preview_image = null;
-      return;
-    }
-    if (ch.id === 'preview') {
-      if (preview_timeout) clearTimeout(preview_timeout);
-      preview_image = ch.props.path;
-      is_distorting = true;
-      preview_timeout = setTimeout(() => {
-        is_distorting = false;
-        preview_timeout = null;
-      }, 80);
-      return;
-    }
-    preview_image = null;
-    if (channel_timeout) return;
-    if (active_channel) return;
-    is_distorting = true;
-    channel_timeout = setTimeout(() => {
-      active_channel = ch;
-      channel_timeout = null;
-      setTimeout(() => {
-        is_distorting = false;
-      }, 200);
-    }, 300);
-  }
-
-  export function handle_channel_close() {
-    preview_image = null;
-    if (is_distorting) return;
-    if (channel_timeout) clearTimeout(channel_timeout);
-    channel_timeout = null;
-    active_channel = null;
-    is_distorting = true;
-    channel_timeout = setTimeout(() => {
-      is_distorting = false;
-      channel_timeout = null;
-    }, 300);
-  }
-
-  function handle_preview_close() {
-    preview_image = null;
-    is_distorting = false;
-    if (preview_timeout) clearTimeout(preview_timeout);
-    preview_timeout = null;
-  }
+  export let active_channel = null;
+  export let is_distorting = false;
 
   const sections = [
     { id: "explorer", icon: "solar:code-2-bold", label: "コード" },
@@ -164,7 +105,7 @@
           ctx.fillStyle = `rgba(255, 255, 255, ${Math.random() * 0.3 + 0.1})`;
           ctx.fillRect(0, 0, css_w, css_h);
         }
-      } else if (!active_channel && !preview_image) {
+      } else if (!active_channel) {
         ctx.strokeStyle = colors.detail;
         ctx.lineWidth = 2;
         ctx.beginPath();
@@ -231,6 +172,16 @@
         class="absolute inset-0 pointer-events-none z-30"
         style="background: radial-gradient(ellipse at center, transparent 70%, rgba(0, 0, 0, 0.2) 100%)"
       ></div>
+
+      {#if active_channel}
+        <div class="absolute inset-0 z-10">
+          <svelte:component
+            this={active_channel.component}
+            active_section={active_section}
+            {...active_channel.props}
+          />
+        </div>
+      {/if}
     </div>
 
     <div
@@ -239,14 +190,4 @@
       {sections.find((s) => s.id === active_section)?.label}
     </div>
   </div>
-  {#if active_channel?.id === 'explorer'}
-    <ExplorerChannel
-      {active_section}
-      icon={active_channel.props.icon}
-      name={active_channel.props.name}
-      on_confirm={active_channel.props.on_confirm}
-      on_cancel={active_channel.props.on_cancel}
-      on_close={handle_channel_close}
-    />
-  {/if}
 </div>

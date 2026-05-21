@@ -10,23 +10,17 @@
   import { Footer, Monitor } from "$lib/components/ui";
 
   let active_section = "explorer";
-  let monitor;
-  let channel_active = false;
-
-  function handle_channel_update(ch) {
-    monitor?.handle_channel(ch);
-  }
-
-
+  let active_channel = null;
+  let is_distorting = false;
 </script>
 
 <div class="h-[100vh] flex flex-col bg-back-deep rounded-l-3xl overflow-hidden">
   <div class="px-7 pt-5">
-    <Monitor bind:this={monitor} bind:channel_active {active_section} on_section_change={(id) => (active_section = id)} />
+    <Monitor {active_section} bind:active_channel bind:is_distorting on_section_change={(id) => (active_section = id)} />
   </div>
   <div class="flex-1 overflow-y-auto px-5">
     {#if active_section === "explorer"}
-      <ExplorerSection {active_section} on_channel_update={handle_channel_update} {channel_active} />
+      <ExplorerSection {active_section} bind:active_channel bind:is_distorting />
     {:else if active_section === "chat"}
       <ChatSection />
     {:else if active_section === "git"}

@@ -1,10 +1,11 @@
 <script>
   import { afterUpdate, onDestroy } from "svelte";
   import Icon from "@iconify/svelte";
+  import ExplorerChannel from "$lib/components/ui/channels/explorer_channel.svelte";
 
   export let active_section = "explorer";
-  export let on_channel_update = () => {};
-  export let channel_active = false;
+  export let active_channel = null;
+  export let is_distorting = false;
 
   let current_path = "/";
   let entries = [];
@@ -25,18 +26,89 @@
   let move_input;
   let controller = null;
 
+  let channel_obj = null;
+  let channel_timeout = null;
+  let preview_data = null;
+  let preview_timeout = null;
+
+  $: channel_active = !!(channel_obj || preview_data);
+
+  $: if (channel_obj) {
+    active_channel = { component: ExplorerChannel, props: channel_obj.props };
+  } else if (preview_data) {
+    active_channel = {
+      component: ExplorerChannel,
+      props: {
+        mode: "preview",
+        image_path: preview_data.image_path,
+        icon: preview_data.icon,
+        name: preview_data.name,
+        on_close: handle_preview_close
+      }
+    };
+  } else {
+    active_channel = null;
+  }
+
   $: {
     const entry = entries[cursor_index];
     if (entry && entry.entry_type === 'file') {
       const icon = file_icon(entry.name);
       if (icon === "garden:file-image-fill-12" || icon === "fluent:gif-16-filled") {
-        on_channel_update({ id: 'preview', props: { path: entry.path } });
+        handle_channel({ id: 'preview', props: { path: entry.path, icon, name: entry.name } });
       } else {
-        on_channel_update(null);
+        handle_channel(null);
       }
     } else {
-      on_channel_update(null);
+      handle_channel(null);
     }
+  }
+
+  function handle_channel(ch) {
+    if (!ch) {
+      preview_data = null;
+      return;
+    }
+    if (ch.id === 'preview') {
+      if (preview_timeout) clearTimeout(preview_timeout);
+      preview_data = { image_path: ch.props.path, icon: ch.props.icon, name: ch.props.name };
+      is_distorting = true;
+      preview_timeout = setTimeout(() => {
+        is_distorting = false;
+        preview_timeout = null;
+      }, 80);
+      return;
+    }
+    preview_data = null;
+    if (channel_timeout) return;
+    if (channel_obj) return;
+    is_distorting = true;
+    channel_timeout = setTimeout(() => {
+      channel_obj = { props: ch.props };
+      channel_timeout = null;
+      setTimeout(() => {
+        is_distorting = false;
+      }, 200);
+    }, 300);
+  }
+
+  function handle_channel_close() {
+    preview_data = null;
+    if (channel_timeout) clearTimeout(channel_timeout);
+    channel_timeout = null;
+    channel_obj = null;
+    is_distorting = true;
+    channel_timeout = setTimeout(() => {
+      is_distorting = false;
+      channel_timeout = null;
+    }, 300);
+  }
+
+  function handle_preview_close() {
+    preview_data = null;
+    is_distorting = false;
+    if (preview_timeout) clearTimeout(preview_timeout);
+    preview_timeout = null;
   }
 
   async function load_dir(path) {
@@ -163,9 +235,10 @@
   function confirm_delete() {
     const entry = entries[cursor_index];
     if (!entry) return;
-    on_channel_update({
+    handle_channel({
       id: "explorer",
       props: {
+        mode: "confirm",
         icon: entry.entry_type === "dir" ? dir_icon() : file_icon(entry.name),
         name: entry.name,
         on_confirm: async () => {
@@ -177,7 +250,8 @@
             error = json.error;
           }
         },
-        on_cancel: () => {}
+        on_cancel: () => {},
+        on_close: handle_channel_close
       }
     });
   }
@@ -213,6 +287,17 @@
 
   onDestroy(() => {
     if (controller) controller.abort();
+    if (channel_timeout) {
+      clearTimeout(channel_timeout);
+      channel_timeout = null;
+    }
+    if (preview_timeout) {
+      clearTimeout(preview_timeout);
+      preview_timeout = null;
+    }
+    channel_obj = null;
+    preview_data = null;
+    is_distorting = false;
   });
 
   function activate_current() {

@@ -6,6 +6,7 @@
   export let icon = "";
   export let name = "";
   export let active_section = "explorer";
+  export let image_path = "";
   export let on_confirm = () => {};
   export let on_cancel = () => {};
   export let on_close = () => {};
@@ -62,11 +63,11 @@
       bind:this={dialog_ref}
       tabindex="0"
       role="dialog"
-      on:keydown={handle_keydown}
+      onkeydown={handle_keydown}
       class="relative text-lg text-print font-sans bg-back-deep rounded-lg p-4 shadow-lg mx-7 w-auto min-w-[200px] outline-none"
     >
       <button
-        on:click={() => {
+        onclick={() => {
           on_close();
         }}
         class="text-print/60 hover:text-print transition-colors shrink-0 absolute top-4 right-5"
@@ -80,11 +81,11 @@
       </div>
       <div class="flex px-2 gap-2 justify-between font-sans font-bold text-sm">
         <button
-          on:click={() => {
+          onclick={() => {
             on_confirm();
             on_close();
           }}
-          on:mouseenter={() => (selected = "si")}
+          onmouseenter={() => (selected = "si")}
           class="px-5 rounded-sm transition-colors border border-accent-detail"
           class:bg-accent-detail={selected === "si"}
           class:text-back={selected === "si"}
@@ -94,11 +95,11 @@
           Si
         </button>
         <button
-          on:click={() => {
+          onclick={() => {
             on_cancel();
             on_close();
           }}
-          on:mouseenter={() => (selected = "no")}
+          onmouseenter={() => (selected = "no")}
           class="px-5 rounded-sm transition-colors border border-accent-detail"
           class:bg-accent-detail={selected === "no"}
           class:text-back={selected === "no"}
@@ -111,8 +112,16 @@
     </div>
   </div>
 {:else if mode === "preview"}
+  {#if image_path}
+    <img
+      src="/api/fs/image?path={encodeURIComponent(image_path)}"
+      class="absolute inset-0 w-full h-full object-contain z-10"
+      alt={name}
+      onerror={(e) => console.error('[preview] img error:', e.target.src)}
+    />
+  {/if}
   <div
-    class="flex items-center gap-2 px-3 py-1.5 bg-back-deep/80 rounded-md text-sm"
+    class="absolute bottom-0 left-0 right-0 z-20 flex items-center gap-2 px-3 py-1.5 bg-back-deep/80 rounded-md text-sm"
   >
     <Icon {icon} class="w-4 h-4 text-accent-detail shrink-0" />
     <span class="text-print font-medium truncate flex-1">{name}</span>
