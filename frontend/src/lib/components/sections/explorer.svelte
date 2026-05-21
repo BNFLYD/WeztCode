@@ -440,7 +440,7 @@
     </button>
     {#if creating}
       <span class="font-mono truncate flex items-center gap-1 text-print">
-        <span class="text-accent">add:</span>
+        <span class="text-print">add:</span>
         <input
           bind:value={create_name}
           bind:this={create_input}
@@ -451,7 +451,7 @@
       </span>
     {:else if renaming}
       <span class="font-mono truncate flex items-center gap-1 text-print">
-        <span class="text-accent">upd:</span>
+        <span class="text-print">upd:</span>
         <input
           bind:value={rename_name}
           bind:this={rename_input}
@@ -462,7 +462,7 @@
       </span>
     {:else if moving}
       <span class="font-mono truncate flex items-center gap-1 text-print">
-        <span class="text-accent">mv:</span>
+        <span class="text-print">mv:</span>
         <input
           bind:value={move_name}
           bind:this={move_input}
