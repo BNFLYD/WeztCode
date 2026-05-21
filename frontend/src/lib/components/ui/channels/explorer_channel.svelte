@@ -62,10 +62,9 @@
     >
       <button
         on:click={() => {
-          on_cancel();
           on_close();
         }}
-        class="text-print/60 hover:text-print transition-colors shrink-0 absolute top-2 right-2"
+        class="text-print/60 hover:text-print transition-colors shrink-0 absolute top-4 right-5"
       >
         <Icon icon="lucide:x" class="w-4 h-4" />
       </button>
