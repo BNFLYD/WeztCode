@@ -5,8 +5,11 @@
 
   export let active_section;
   export let on_section_change;
+  export let channel_active = false;
 
   let active_channel = null;
+
+  $: channel_active = !!active_channel;
   let is_distorting = false;
   let channel_timeout = null;
   let preview_image = null;

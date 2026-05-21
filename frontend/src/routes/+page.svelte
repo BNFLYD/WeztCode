@@ -15,18 +15,14 @@
 
   function handle_channel_update(ch) {
     monitor?.handle_channel(ch);
-    channel_active = ch?.id === 'explorer';
   }
 
-  function handle_channel_close() {
-    monitor?.handle_channel_close();
-    channel_active = false;
-  }
+
 </script>
 
 <div class="h-[100vh] flex flex-col bg-back-deep rounded-l-3xl overflow-hidden">
   <div class="px-7 pt-5">
-    <Monitor bind:this={monitor} {active_section} on_section_change={(id) => (active_section = id)} />
+    <Monitor bind:this={monitor} bind:channel_active {active_section} on_section_change={(id) => (active_section = id)} />
   </div>
   <div class="flex-1 overflow-y-auto px-5">
     {#if active_section === "explorer"}
