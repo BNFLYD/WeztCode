@@ -7,9 +7,9 @@
   const sections = [
     { id: "explorer", icon: "solar:code-2-bold", label: "ARCHIVOS" },
     { id: "chat", icon: "mingcute:chat-4-line", label: "CHAT" },
-    { id: "git", icon: "mynaui:git-commit", label: "GIT" },
-    { id: "view", icon: "streamline-plump:web", label: "VISUALIZAR" },
     { id: "term", icon: "devicon-plain:bash", label: "TERMINAL" },
+    { id: "view", icon: "streamline-plump:web", label: "VISUALIZAR" },
+    { id: "git", icon: "mynaui:git-commit", label: "GIT" },
     { id: "settings", icon: "hugeicons:settings-03", label: "CONFIGURACION" },
   ];
 </script>

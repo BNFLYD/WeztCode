@@ -224,7 +224,7 @@
           onerror={(e) => console.error('[preview] img error:', e.target.src)}
         />
         <div class="absolute bottom-0 left-0 right-0 z-20">
-          <ExplorerChannel mode="preview" name={preview_name} on_close={handle_preview_close} />
+          <ExplorerChannel mode="preview" name={preview_name} {active_section} on_close={handle_preview_close} />
         </div>
       {/if}
 
@@ -253,6 +253,7 @@
   </div>
   {#if active_channel?.id === 'explorer'}
     <ExplorerChannel
+      {active_section}
       icon={active_channel.props.icon}
       name={active_channel.props.name}
       on_confirm={active_channel.props.on_confirm}

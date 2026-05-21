@@ -5,6 +5,7 @@
   export let mode = "confirm";
   export let icon = "";
   export let name = "";
+  export let active_section = "explorer";
   export let on_confirm = () => {};
   export let on_cancel = () => {};
   export let on_close = () => {};
@@ -15,6 +16,10 @@
   $: on_active_channel = !!(name && (mode === "confirm" || mode === "preview"));
 
   $: if (!on_active_channel && name !== undefined) {
+    on_close();
+  }
+
+  $: if (active_section !== "explorer" && on_active_channel) {
     on_close();
   }
 
