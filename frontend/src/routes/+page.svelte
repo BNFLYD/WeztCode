@@ -15,7 +15,7 @@
 
   function handle_channel_update(ch) {
     monitor?.handle_channel(ch);
-    channel_active = ch !== null;
+    channel_active = ch?.id === 'explorer';
   }
 
   function handle_channel_close() {
