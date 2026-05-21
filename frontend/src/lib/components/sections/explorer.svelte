@@ -3,10 +3,8 @@
   import Icon from "@iconify/svelte";
 
   export let active_section = "explorer";
-  export let channel = null;
-  export let on_channel;
-  export let on_channel_close;
-  export let on_image_preview = () => {};
+  export let on_channel_update = () => {};
+  export let channel_active = false;
 
   let current_path = "/";
   let entries = [];
@@ -32,12 +30,12 @@
     if (entry && entry.entry_type === 'file') {
       const icon = file_icon(entry.name);
       if (icon === "garden:file-image-fill-12" || icon === "fluent:gif-16-filled") {
-        on_image_preview(entry.path);
+        on_channel_update({ id: 'preview', props: { path: entry.path } });
       } else {
-        on_image_preview(null);
+        on_channel_update(null);
       }
     } else {
-      on_image_preview(null);
+      on_channel_update(null);
     }
   }
 
@@ -165,7 +163,7 @@
   function confirm_delete() {
     const entry = entries[cursor_index];
     if (!entry) return;
-    on_channel({
+    on_channel_update({
       id: "explorer",
       props: {
         icon: entry.entry_type === "dir" ? dir_icon() : file_icon(entry.name),
@@ -264,7 +262,7 @@
       return;
     }
 
-    if (channel) {
+    if (channel_active) {
       if (["h","l","j","k","ArrowLeft","ArrowRight","ArrowUp","ArrowDown","d","D","a","A","r","R","x","X","p","P","m","M","Enter"," ","Escape"].includes(e.key)) {
         e.preventDefault();
       }

@@ -5,12 +5,62 @@
 
   export let active_section;
   export let on_section_change;
-  export let channel = null;
-  export let on_channel_close;
-  export let on_preview_close = () => {};
-  export let preview_image = null;
+
+  let active_channel = null;
+  let is_distorting = false;
+  let channel_timeout = null;
+  let preview_image = null;
+  let preview_timeout = null;
 
   $: preview_name = preview_image ? preview_image.split('/').pop() : '';
+
+  export function handle_channel(ch) {
+    if (!ch) {
+      preview_image = null;
+      return;
+    }
+    if (ch.id === 'preview') {
+      if (preview_timeout) clearTimeout(preview_timeout);
+      preview_image = ch.props.path;
+      is_distorting = true;
+      preview_timeout = setTimeout(() => {
+        is_distorting = false;
+        preview_timeout = null;
+      }, 80);
+      return;
+    }
+    preview_image = null;
+    if (channel_timeout) return;
+    if (active_channel) return;
+    is_distorting = true;
+    channel_timeout = setTimeout(() => {
+      active_channel = ch;
+      channel_timeout = null;
+      setTimeout(() => {
+        is_distorting = false;
+      }, 200);
+    }, 300);
+  }
+
+  export function handle_channel_close() {
+    preview_image = null;
+    if (is_distorting) return;
+    if (channel_timeout) clearTimeout(channel_timeout);
+    channel_timeout = null;
+    active_channel = null;
+    is_distorting = true;
+    channel_timeout = setTimeout(() => {
+      is_distorting = false;
+      channel_timeout = null;
+    }, 300);
+  }
+
+  function handle_preview_close() {
+    preview_image = null;
+    is_distorting = false;
+    if (preview_timeout) clearTimeout(preview_timeout);
+    preview_timeout = null;
+  }
 
   const sections = [
     { id: "explorer", icon: "solar:code-2-bold", label: "コード" },
@@ -20,7 +70,6 @@
     { id: "term", icon: "devicon-plain:bash", label: "ターミナル" },
     { id: "settings", icon: "hugeicons:settings-03", label: "設定" },
   ];
-  export let is_distorting = false;
 
   let canvas_ref = null;
   let animation_id = null;
@@ -112,7 +161,7 @@
           ctx.fillStyle = `rgba(255, 255, 255, ${Math.random() * 0.3 + 0.1})`;
           ctx.fillRect(0, 0, css_w, css_h);
         }
-      } else if (!channel) {
+      } else if (!active_channel && !preview_image) {
         ctx.strokeStyle = colors.detail;
         ctx.lineWidth = 2;
         ctx.beginPath();
@@ -172,7 +221,7 @@
           onerror={(e) => console.error('[preview] img error:', e.target.src)}
         />
         <div class="absolute bottom-0 left-0 right-0 z-20">
-          <ExplorerChannel mode="preview" name={preview_name} on_close={on_preview_close} />
+          <ExplorerChannel mode="preview" name={preview_name} on_close={handle_preview_close} />
         </div>
       {/if}
 
@@ -199,13 +248,13 @@
       {sections.find((s) => s.id === active_section)?.label}
     </div>
   </div>
-  {#if channel?.id === 'explorer'}
+  {#if active_channel?.id === 'explorer'}
     <ExplorerChannel
-      icon={channel.props.icon}
-      name={channel.props.name}
-      on_confirm={channel.props.on_confirm}
-      on_cancel={channel.props.on_cancel}
-      on_close={on_channel_close}
+      icon={active_channel.props.icon}
+      name={active_channel.props.name}
+      on_confirm={active_channel.props.on_confirm}
+      on_cancel={active_channel.props.on_cancel}
+      on_close={handle_channel_close}
     />
   {/if}
 </div>

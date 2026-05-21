@@ -10,49 +10,27 @@
   import { Footer, Monitor } from "$lib/components/ui";
 
   let active_section = "explorer";
-  let active_channel = null;
-  let is_distorting = false;
-  let preview_image = null;
-  let channel_timeout = null;
+  let monitor;
+  let channel_active = false;
 
-  function handle_channel(ch) {
-    preview_image = null;
-    if (channel_timeout) return;
-    if (active_channel) return;
-    is_distorting = true;
-    channel_timeout = setTimeout(() => {
-      active_channel = ch;
-      channel_timeout = null;
-      setTimeout(() => {
-        is_distorting = false;
-      }, 200);
-    }, 300);
+  function handle_channel_update(ch) {
+    monitor?.handle_channel(ch);
+    channel_active = ch !== null;
   }
 
   function handle_channel_close() {
-    if (is_distorting) return;
-    if (channel_timeout) clearTimeout(channel_timeout);
-    channel_timeout = null;
-    active_channel = null;
-    is_distorting = true;
-    channel_timeout = setTimeout(() => {
-      is_distorting = false;
-      channel_timeout = null;
-    }, 300);
-  }
-
-  function handle_preview(path) {
-    preview_image = path;
+    monitor?.handle_channel_close();
+    channel_active = false;
   }
 </script>
 
 <div class="h-[100vh] flex flex-col bg-back-deep rounded-l-3xl overflow-hidden">
   <div class="px-7 pt-5">
-    <Monitor {active_section} channel={active_channel} {is_distorting} {preview_image} on_channel_close={handle_channel_close} on_section_change={(id) => (active_section = id)} on_preview_close={() => handle_preview(null)} />
+    <Monitor bind:this={monitor} {active_section} on_section_change={(id) => (active_section = id)} />
   </div>
   <div class="flex-1 overflow-y-auto px-5">
     {#if active_section === "explorer"}
-      <ExplorerSection {active_section} channel={active_channel} on_channel={handle_channel} on_channel_close={handle_channel_close} on_image_preview={handle_preview} />
+      <ExplorerSection {active_section} on_channel_update={handle_channel_update} {channel_active} />
     {:else if active_section === "chat"}
       <ChatSection />
     {:else if active_section === "git"}
