@@ -31,7 +31,7 @@
   let preview_data = null;
   let preview_timeout = null;
 
-  $: channel_active = !!(channel_obj || preview_data);
+  $: channel_active = !!channel_obj;
 
   $: if (channel_obj) {
     active_channel = { component: ExplorerChannel, props: channel_obj.props };
@@ -297,6 +297,7 @@
     }
     channel_obj = null;
     preview_data = null;
+    active_channel = null;
     is_distorting = false;
   });
 
