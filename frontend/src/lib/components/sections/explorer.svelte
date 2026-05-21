@@ -71,14 +71,12 @@
     }
     if (ch.id === 'preview') {
       if (preview_timeout) clearTimeout(preview_timeout);
+      preview_data = { image_path: ch.props.path, icon: ch.props.icon, name: ch.props.name };
       is_distorting = true;
       preview_timeout = setTimeout(() => {
-        preview_data = { image_path: ch.props.path, icon: ch.props.icon, name: ch.props.name };
+        is_distorting = false;
         preview_timeout = null;
-        setTimeout(() => {
-          is_distorting = false;
-        }, 200);
-      }, 300);
+      }, 80);
       return;
     }
     preview_data = null;

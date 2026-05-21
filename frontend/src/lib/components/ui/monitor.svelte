@@ -173,7 +173,7 @@
         style="background: radial-gradient(ellipse at center, transparent 70%, rgba(0, 0, 0, 0.2) 100%)"
       ></div>
 
-      {#if active_channel}
+      {#if active_channel && !is_distorting}
         <div class="absolute inset-0 z-10">
           <svelte:component
             this={active_channel.component}
