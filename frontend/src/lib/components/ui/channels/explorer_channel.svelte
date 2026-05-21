@@ -19,7 +19,7 @@
     on_close();
   }
 
-  $: if (active_section !== "explorer" && on_active_channel) {
+  $: if (active_section !== "explorer") {
     on_close();
   }
 
