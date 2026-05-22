@@ -365,23 +365,16 @@ fn handle_terminal_list() -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
     let term = WeztermProtocol::new();
     match term.list_panes() {
         Ok(raw) => {
-            let target_wid = std::env::var("WEZTCODE_WINDOW_ID")
-                .ok().and_then(|s| s.parse::<u32>().ok());
-
             let mut panes = Vec::new();
             for line in raw.lines() {
                 if line.trim().is_empty() { continue; }
                 let cols: Vec<&str> = line.split('\t').collect();
                 if cols.len() < 5 { continue; }
-                let window_id = cols.get(2).and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
-
-                // Only include panes from WezCode's window
-                if target_wid.map_or(false, |tw| window_id != tw) { continue; }
 
                 panes.push(serde_json::json!({
                     "pane_id": cols[0].parse::<u32>().unwrap_or(0),
                     "tab_id": cols.get(1).and_then(|s| s.parse::<u32>().ok()).unwrap_or(0),
-                    "window_id": window_id,
+                    "window_id": cols.get(2).and_then(|s| s.parse::<u32>().ok()).unwrap_or(0),
                     "size": cols.get(3).unwrap_or(&""),
                     "is_active": cols.get(4).unwrap_or(&"false") == &"true",
                     "title": cols.get(5).unwrap_or(&""),
@@ -454,16 +447,10 @@ fn main() {
     let class = config::WINDOW_CLASS;
 
 //     println!("Iniciando WezTerm...");
-    let target_pid = match term.spawn(class) {
-        Ok((_child, pid)) => {
-//             println!("[Main] WezTerm iniciado con PID: {}", pid);
-            pid
-        }
-        Err(e) => {
-//             eprintln!("Error al iniciar terminal: {}", e);
-            std::process::exit(1);
-        }
-    };
+    if let Err(e) = term.spawn(class).map(|_| ()) {
+//         eprintln!("Error al iniciar terminal: {}", e);
+        std::process::exit(1);
+    }
 
     // Start HTTP server first
     let http_port = 8765;
@@ -512,7 +499,7 @@ fn main() {
 //         println!("No se detectó Window Manager - ejecutando en modo standalone");
     }
 
-    // Identify the main WezCode pane by CWD as fallback
+    // Identify the main WezCode pane
 //     println!("[Main] Identifying main WezCode pane...");
     if let Ok(raw) = WeztermProtocol::new().list_panes() {
         let current_dir = crate::config::props::UserProps::load()
@@ -522,9 +509,6 @@ fn main() {
             if cols.len() >= 7 && cols[6] == current_dir && !cols[5].starts_with("Yazi") {
                 if let Ok(pid) = cols[0].parse::<u32>() {
                     std::env::set_var("WEZTERM_PANE", pid.to_string());
-                    if let Ok(wid) = cols[2].parse::<u32>() {
-                        std::env::set_var("WEZTCODE_WINDOW_ID", wid.to_string());
-                    }
                     break;
                 }
             }

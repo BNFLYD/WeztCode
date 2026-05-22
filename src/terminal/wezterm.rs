@@ -27,7 +27,7 @@ impl TerminalProtocol for WeztermProtocol {
             .map(|s| s.to_string());
 
         let mut cmd = Command::new("wezterm");
-        cmd.arg("start").arg("--class").arg(class);
+        cmd.arg("start").arg("--prefer-mux").arg("--class").arg(class);
 
         if let Some(ref dir) = current_dir {
             cmd.arg("--cwd").arg(dir);
@@ -50,7 +50,7 @@ impl TerminalProtocol for WeztermProtocol {
 
     fn list_panes(&self) -> Result<String, String> {
         let output = Command::new("wezterm")
-            .args(["cli", "list"])
+            .args(["cli", "list", "--class", crate::config::WINDOW_CLASS])
             .output()
             .map_err(|e| format!("Failed to list panes: {}", e))?;
 
@@ -89,12 +89,7 @@ impl TerminalProtocol for WeztermProtocol {
 
     fn spawn_tab(&self, cwd: Option<&str>) -> Result<u32, String> {
         let mut cmd = Command::new("wezterm");
-        cmd.args(["cli", "spawn"]);
-
-        // Force tab creation in weztcode-terminal window
-        if let Ok(wid) = std::env::var("WEZTCODE_WINDOW_ID") {
-            cmd.arg("--window-id").arg(&wid);
-        }
+        cmd.args(["cli", "spawn", "--class", crate::config::WINDOW_CLASS]);
 
         if let Some(dir) = cwd {
             cmd.arg("--cwd").arg(dir);
@@ -116,7 +111,7 @@ impl TerminalProtocol for WeztermProtocol {
 
     fn kill_pane(&self, pane_id: u32) -> Result<(), String> {
         let output = Command::new("wezterm")
-            .args(["cli", "kill-pane", "--pane-id", &pane_id.to_string()])
+            .args(["cli", "kill-pane", "--class", crate::config::WINDOW_CLASS, "--pane-id", &pane_id.to_string()])
             .output()
             .map_err(|e| format!("Failed to kill pane: {}", e))?;
 
@@ -129,7 +124,7 @@ impl TerminalProtocol for WeztermProtocol {
 
     fn activate_pane(&self, pane_id: u32) -> Result<(), String> {
         let output = Command::new("wezterm")
-            .args(["cli", "activate-pane", "--pane-id", &pane_id.to_string()])
+            .args(["cli", "activate-pane", "--class", crate::config::WINDOW_CLASS, "--pane-id", &pane_id.to_string()])
             .output()
             .map_err(|e| format!("Failed to activate pane: {}", e))?;
 
