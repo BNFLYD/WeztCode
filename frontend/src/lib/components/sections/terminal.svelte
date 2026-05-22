@@ -141,8 +141,7 @@
     {:else}
       {#each panes as pane (pane.pane_id)}
         <div
-          class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-accent/5 transition-colors text-sm group cursor-pointer"
-          class:bg-accent/10={pane.is_active}
+          class={"flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-accent/5 transition-colors text-sm group cursor-pointer" + (pane.is_active ? " bg-accent/10" : "")}
           on:click={() => activate_pane(pane.pane_id)}
           on:keydown={(e) => { if (e.key === "Enter") activate_pane(pane.pane_id); }}
           role="button"
@@ -150,9 +149,7 @@
         >
           <Icon
             icon={pane.is_active ? "devicon-plain:bash" : "mdi:console-line"}
-            class="w-4 h-4 shrink-0"
-            class:text-accent-detail={pane.is_active}
-            class:text-print/40={!pane.is_active}
+            class={"w-4 h-4 shrink-0" + (pane.is_active ? " text-accent-detail" : " text-print/40")}
           />
 
           <div class="flex-1 min-w-0">
