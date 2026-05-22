@@ -50,7 +50,7 @@ impl TerminalProtocol for WeztermProtocol {
 
     fn list_panes(&self) -> Result<String, String> {
         let output = Command::new("wezterm")
-            .args(["cli", "list"])
+            .args(["cli", "list", "--domain", "weztcode"])
             .output()
             .map_err(|e| format!("Failed to list panes: {}", e))?;
 
@@ -89,10 +89,7 @@ impl TerminalProtocol for WeztermProtocol {
 
     fn spawn_tab(&self, cwd: Option<&str>) -> Result<u32, String> {
         let mut cmd = Command::new("wezterm");
-        cmd.args(["cli", "spawn"]);
-        if let Ok(window_id) = std::env::var("WEZTCODE_WINDOW_ID") {
-            cmd.arg("--window-id").arg(window_id);
-        }
+        cmd.args(["cli", "spawn", "--domain", "weztcode"]);
         if let Some(dir) = cwd {
             cmd.arg("--cwd").arg(dir);
         }
@@ -113,7 +110,7 @@ impl TerminalProtocol for WeztermProtocol {
 
     fn kill_pane(&self, pane_id: u32) -> Result<(), String> {
         let output = Command::new("wezterm")
-            .args(["cli", "kill-pane", "--pane-id", &pane_id.to_string()])
+            .args(["cli", "kill-pane", "--domain", "weztcode", "--pane-id", &pane_id.to_string()])
             .output()
             .map_err(|e| format!("Failed to kill pane: {}", e))?;
 
@@ -126,7 +123,7 @@ impl TerminalProtocol for WeztermProtocol {
 
     fn activate_pane(&self, pane_id: u32) -> Result<(), String> {
         let output = Command::new("wezterm")
-            .args(["cli", "activate-pane", "--pane-id", &pane_id.to_string()])
+            .args(["cli", "activate-pane", "--domain", "weztcode", "--pane-id", &pane_id.to_string()])
             .output()
             .map_err(|e| format!("Failed to activate pane: {}", e))?;
 
