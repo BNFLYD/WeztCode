@@ -27,7 +27,7 @@ impl TerminalProtocol for WeztermProtocol {
             .map(|s| s.to_string());
 
         let mut cmd = Command::new("wezterm");
-        cmd.arg("start").arg("--prefer-mux").arg("--class").arg(class);
+        cmd.arg("start").arg("--class").arg(class);
 
         if let Some(ref dir) = current_dir {
             cmd.arg("--cwd").arg(dir);
