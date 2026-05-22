@@ -51,7 +51,6 @@ impl TerminalProtocol for WeztermProtocol {
     fn list_panes(&self) -> Result<String, String> {
         let output = Command::new("wezterm")
             .args(["cli", "list"])
-            .env("WEZTERM_UNIX_SOCKET", crate::config::SOCKET_PATH)
             .output()
             .map_err(|e| format!("Failed to list panes: {}", e))?;
 
@@ -88,10 +87,12 @@ impl TerminalProtocol for WeztermProtocol {
             .unwrap_or(false)
     }
 
-    fn spawn_tab(&self, cwd: Option<&str>) -> Result<u32, String> {
+    fn spawn_tab(&self, cwd: Option<&str>, main_pane_id: Option<u32>) -> Result<u32, String> {
         let mut cmd = Command::new("wezterm");
         cmd.args(["cli", "spawn"]);
-        cmd.env("WEZTERM_UNIX_SOCKET", crate::config::SOCKET_PATH);
+        if let Some(pid) = main_pane_id {
+            cmd.arg("--pane-id").arg(pid.to_string());
+        }
         if let Some(dir) = cwd {
             cmd.arg("--cwd").arg(dir);
         }
@@ -113,7 +114,6 @@ impl TerminalProtocol for WeztermProtocol {
     fn kill_pane(&self, pane_id: u32) -> Result<(), String> {
         let output = Command::new("wezterm")
             .args(["cli", "kill-pane", "--pane-id", &pane_id.to_string()])
-            .env("WEZTERM_UNIX_SOCKET", crate::config::SOCKET_PATH)
             .output()
             .map_err(|e| format!("Failed to kill pane: {}", e))?;
 
@@ -127,7 +127,6 @@ impl TerminalProtocol for WeztermProtocol {
     fn activate_pane(&self, pane_id: u32) -> Result<(), String> {
         let output = Command::new("wezterm")
             .args(["cli", "activate-pane", "--pane-id", &pane_id.to_string()])
-            .env("WEZTERM_UNIX_SOCKET", crate::config::SOCKET_PATH)
             .output()
             .map_err(|e| format!("Failed to activate pane: {}", e))?;
 
