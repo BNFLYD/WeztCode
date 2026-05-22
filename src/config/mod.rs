@@ -13,23 +13,6 @@ pub const DEFAULT_UI_HEIGHT: i32 = 600;
 pub const FRONTEND_URL: &str = "file:///usr/share/weztcode/index.html";
 pub const LUA_FILE_NAME: &str = "weztcode.lua";
 pub const PAD_FILE_NAME: &str = "side_pad";
-pub const SOCKET_FILE_NAME: &str = "wezterm.sock";
-
-pub fn get_socket_path() -> String {
-    let temp_dir = if cfg!(target_os = "windows") {
-        std::env::var("TEMP").unwrap_or_else(|_| "C:\\Temp".to_string())
-    } else {
-        std::env::var("XDG_RUNTIME_DIR")
-            .or_else(|_| std::env::var("TMPDIR"))
-            .unwrap_or_else(|_| "/tmp".to_string())
-    };
-    std::path::PathBuf::from(temp_dir)
-        .join("weztcode")
-        .join(SOCKET_FILE_NAME)
-        .to_string_lossy()
-        .to_string()
-}
-
 pub fn get_frontend_path() -> String {
     let current_dir = env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     let frontend_path = current_dir.join("frontend/dist/index.html");
