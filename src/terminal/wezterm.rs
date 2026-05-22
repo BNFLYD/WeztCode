@@ -50,7 +50,7 @@ impl TerminalProtocol for WeztermProtocol {
 
     fn list_panes(&self) -> Result<String, String> {
         let output = Command::new("wezterm")
-            .args(["cli", "list", "--class", crate::config::WINDOW_CLASS])
+            .args(["cli", "--class", crate::config::WINDOW_CLASS, "list"])
             .output()
             .map_err(|e| format!("Failed to list panes: {}", e))?;
 
@@ -89,7 +89,7 @@ impl TerminalProtocol for WeztermProtocol {
 
     fn spawn_tab(&self, cwd: Option<&str>) -> Result<u32, String> {
         let mut cmd = Command::new("wezterm");
-        cmd.args(["cli", "spawn", "--class", crate::config::WINDOW_CLASS]);
+        cmd.args(["cli", "--class", crate::config::WINDOW_CLASS, "spawn"]);
 
         if let Some(dir) = cwd {
             cmd.arg("--cwd").arg(dir);
@@ -111,7 +111,7 @@ impl TerminalProtocol for WeztermProtocol {
 
     fn kill_pane(&self, pane_id: u32) -> Result<(), String> {
         let output = Command::new("wezterm")
-            .args(["cli", "kill-pane", "--class", crate::config::WINDOW_CLASS, "--pane-id", &pane_id.to_string()])
+            .args(["cli", "--class", crate::config::WINDOW_CLASS, "kill-pane", "--pane-id", &pane_id.to_string()])
             .output()
             .map_err(|e| format!("Failed to kill pane: {}", e))?;
 
@@ -124,7 +124,7 @@ impl TerminalProtocol for WeztermProtocol {
 
     fn activate_pane(&self, pane_id: u32) -> Result<(), String> {
         let output = Command::new("wezterm")
-            .args(["cli", "activate-pane", "--class", crate::config::WINDOW_CLASS, "--pane-id", &pane_id.to_string()])
+            .args(["cli", "--class", crate::config::WINDOW_CLASS, "activate-pane", "--pane-id", &pane_id.to_string()])
             .output()
             .map_err(|e| format!("Failed to activate pane: {}", e))?;
 
