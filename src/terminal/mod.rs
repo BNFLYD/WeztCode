@@ -10,7 +10,6 @@ pub trait TerminalProtocol {
 
     /// Spawns a new tab, returns pane_id
     fn spawn_tab(&self, cwd: Option<&str>) -> Result<u32, String>;
-    fn list_panes_json(&self) -> Result<String, String>;
     /// Kills a pane by ID
     fn kill_pane(&self, pane_id: u32) -> Result<(), String>;
     /// Activates a pane by ID
