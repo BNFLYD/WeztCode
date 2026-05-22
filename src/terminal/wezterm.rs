@@ -87,12 +87,9 @@ impl TerminalProtocol for WeztermProtocol {
             .unwrap_or(false)
     }
 
-    fn spawn_tab(&self, cwd: Option<&str>, main_pane_id: Option<u32>) -> Result<u32, String> {
+    fn spawn_tab(&self, cwd: Option<&str>) -> Result<u32, String> {
         let mut cmd = Command::new("wezterm");
         cmd.args(["cli", "spawn"]);
-        if let Some(pid) = main_pane_id {
-            cmd.arg("--pane-id").arg(pid.to_string());
-        }
         if let Some(dir) = cwd {
             cmd.arg("--cwd").arg(dir);
         }

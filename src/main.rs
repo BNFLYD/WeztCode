@@ -365,48 +365,31 @@ fn handle_terminal_list() -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
     let term = WeztermProtocol::new();
     match term.list_panes() {
         Ok(raw) => {
-            // Find the main pane's window_id to filter WezCode panes
-            let main_pane_id = std::env::var("WEZTCODE_MAIN_PANE_ID")
+            let target_wid = std::env::var("WEZTCODE_WINDOW_ID")
                 .ok().and_then(|s| s.parse::<u32>().ok());
-            let mut target_window = None;
 
             let mut panes = Vec::new();
             for line in raw.lines() {
                 if line.trim().is_empty() { continue; }
                 let cols: Vec<&str> = line.split('\t').collect();
                 if cols.len() < 5 { continue; }
-                let pane_id = cols[0].parse::<u32>().unwrap_or(0);
                 let window_id = cols.get(2).and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
 
-                // On first pass, capture the window_id of the main pane
-                if main_pane_id.is_some() && main_pane_id.unwrap() == pane_id {
-                    target_window = Some(window_id);
-                }
-                // Only include panes whose window_id matches (or all if no main pane identified)
-                let pane = serde_json::json!({
-                    "pane_id": pane_id,
+                // Only include panes from WezCode's window
+                if target_wid.map_or(false, |tw| window_id != tw) { continue; }
+
+                panes.push(serde_json::json!({
+                    "pane_id": cols[0].parse::<u32>().unwrap_or(0),
                     "tab_id": cols.get(1).and_then(|s| s.parse::<u32>().ok()).unwrap_or(0),
                     "window_id": window_id,
                     "size": cols.get(3).unwrap_or(&""),
                     "is_active": cols.get(4).unwrap_or(&"false") == &"true",
                     "title": cols.get(5).unwrap_or(&""),
                     "cwd": cols.get(6).unwrap_or(&""),
-                });
-                panes.push((window_id, pane));
+                }));
             }
 
-            // First try to find the target window from the main pane
-            let main_window = if let Some(pid) = main_pane_id {
-                panes.iter().find(|(_, p)| p["pane_id"].as_u64() == Some(pid as u64))
-                    .and_then(|(wid, _)| Some(*wid))
-            } else { None };
-
-            let filtered: Vec<_> = panes.into_iter()
-                .filter(|(wid, _)| main_window.map_or(true, |mw| *wid == mw))
-                .map(|(_, p)| p)
-                .collect();
-
-            let data = serde_json::json!({ "ok": true, "data": filtered });
+            let data = serde_json::json!({ "ok": true, "data": panes });
             json_response(&data)
         }
         Err(e) => json_error(&e),
@@ -418,10 +401,8 @@ fn handle_terminal_spawn() -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
         .get("current_dir")
         .filter(|s| !s.is_empty())
         .map(|s| s.to_string());
-    let main_pane_id = std::env::var("WEZTCODE_MAIN_PANE_ID")
-        .ok().and_then(|s| s.parse::<u32>().ok());
     let term = WeztermProtocol::new();
-    match term.spawn_tab(cwd.as_deref(), main_pane_id) {
+    match term.spawn_tab(cwd.as_deref()) {
         Ok(pane_id) => {
             let data = serde_json::json!({ "ok": true, "data": { "pane_id": pane_id } });
             json_response(&data)
@@ -531,16 +512,20 @@ fn main() {
 //         println!("No se detectó Window Manager - ejecutando en modo standalone");
     }
 
-    // Identify the main WezCode pane by its CWD matching current_dir
+    // Identify the main WezCode pane to set WEZTERM_PANE context
 //     println!("[Main] Identifying main WezCode pane...");
     if let Ok(raw) = WeztermProtocol::new().list_panes() {
         let current_dir = crate::config::props::UserProps::load()
             .get("current_dir").unwrap_or_default().to_string();
         for line in raw.lines() {
             let cols: Vec<&str> = line.split('\t').collect();
-            if cols.len() >= 7 && cols[6] == current_dir {
+            // cols: pane_id, tab_id, window_id, size, is_active, title, cwd
+            if cols.len() >= 7 && cols[6] == current_dir && !cols[5].starts_with("Yazi") {
                 if let Ok(pid) = cols[0].parse::<u32>() {
-                    std::env::set_var("WEZTCODE_MAIN_PANE_ID", pid.to_string());
+                    std::env::set_var("WEZTERM_PANE", pid.to_string());
+                    if let Ok(wid) = cols[2].parse::<u32>() {
+                        std::env::set_var("WEZTCODE_WINDOW_ID", wid.to_string());
+                    }
                     break;
                 }
             }
