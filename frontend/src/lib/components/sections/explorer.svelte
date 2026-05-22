@@ -76,7 +76,7 @@
       preview_timeout = setTimeout(() => {
         is_distorting = false;
         preview_timeout = null;
-      }, 80);
+      }, 300);
       return;
     }
     preview_data = null;

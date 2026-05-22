@@ -117,7 +117,17 @@ fn handle_api(request: tiny_http::Request, url: &str) {
         .map(PathBuf::from)
         .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
 
-    let response: tiny_http::Response<std::io::Cursor<Vec<u8>>> = if url.starts_with("/api/fs/ls") {
+    let response: tiny_http::Response<std::io::Cursor<Vec<u8>>> = if url.starts_with("/api/terminal/list") {
+        handle_terminal_list()
+    } else if url.starts_with("/api/terminal/spawn") {
+        handle_terminal_spawn()
+    } else if url.starts_with("/api/terminal/kill") {
+        let pane_id = parse_query_param(url, "pane_id").and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
+        handle_terminal_kill(pane_id)
+    } else if url.starts_with("/api/terminal/activate") {
+        let pane_id = parse_query_param(url, "pane_id").and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
+        handle_terminal_activate(pane_id)
+    } else if url.starts_with("/api/fs/ls") {
         let rel_path = parse_query_param(url, "path").unwrap_or_else(|| "/".to_string());
         handle_ls(&rel_path, &root)
     } else if url.starts_with("/api/fs/read") {
@@ -349,6 +359,70 @@ fn json_response(data: &serde_json::Value) -> tiny_http::Response<std::io::Curso
 fn json_error(msg: &str) -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
     let data = serde_json::json!({ "ok": false, "error": msg });
     json_response(&data)
+}
+
+fn handle_terminal_list() -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
+    let term = WeztermProtocol::new();
+    match term.list_panes() {
+        Ok(raw) => {
+            let mut panes = Vec::new();
+            for line in raw.lines() {
+                if line.trim().is_empty() { continue; }
+                let cols: Vec<&str> = line.split('\t').collect();
+                if cols.len() < 5 { continue; }
+                let pane = serde_json::json!({
+                    "pane_id": cols[0].parse::<u32>().unwrap_or(0),
+                    "tab_id": cols.get(1).and_then(|s| s.parse::<u32>().ok()).unwrap_or(0),
+                    "window_id": cols.get(2).and_then(|s| s.parse::<u32>().ok()).unwrap_or(0),
+                    "size": cols.get(3).unwrap_or(&""),
+                    "is_active": cols.get(4).unwrap_or(&"false") == &"true",
+                    "title": cols.get(5).unwrap_or(&""),
+                    "cwd": cols.get(6).unwrap_or(&""),
+                });
+                panes.push(pane);
+            }
+            let data = serde_json::json!({ "ok": true, "data": panes });
+            json_response(&data)
+        }
+        Err(e) => json_error(&e),
+    }
+}
+
+fn handle_terminal_spawn() -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
+    let cwd = crate::config::props::UserProps::load()
+        .get("current_dir")
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string());
+    let term = WeztermProtocol::new();
+    match term.spawn_tab(cwd.as_deref()) {
+        Ok(pane_id) => {
+            let data = serde_json::json!({ "ok": true, "data": { "pane_id": pane_id } });
+            json_response(&data)
+        }
+        Err(e) => json_error(&e),
+    }
+}
+
+fn handle_terminal_kill(pane_id: u32) -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
+    if pane_id == 0 {
+        return json_error("Invalid pane_id");
+    }
+    let term = WeztermProtocol::new();
+    match term.kill_pane(pane_id) {
+        Ok(_) => json_response(&serde_json::json!({ "ok": true })),
+        Err(e) => json_error(&e),
+    }
+}
+
+fn handle_terminal_activate(pane_id: u32) -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
+    if pane_id == 0 {
+        return json_error("Invalid pane_id");
+    }
+    let term = WeztermProtocol::new();
+    match term.activate_pane(pane_id) {
+        Ok(_) => json_response(&serde_json::json!({ "ok": true })),
+        Err(e) => json_error(&e),
+    }
 }
 
 fn main() {

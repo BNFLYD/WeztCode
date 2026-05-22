@@ -86,4 +86,51 @@ impl TerminalProtocol for WeztermProtocol {
             .map(|o| o.status.success())
             .unwrap_or(false)
     }
+
+    fn spawn_tab(&self, cwd: Option<&str>) -> Result<u32, String> {
+        let mut cmd = Command::new("wezterm");
+        cmd.args(["cli", "spawn"]);
+        if let Some(dir) = cwd {
+            cmd.arg("--cwd").arg(dir);
+        }
+        let output = cmd
+            .output()
+            .map_err(|e| format!("Failed to spawn tab: {}", e))?;
+
+        if output.status.success() {
+            let pane_id = String::from_utf8_lossy(&output.stdout)
+                .trim()
+                .parse::<u32>()
+                .map_err(|e| format!("Failed to parse pane_id: {}", e))?;
+            Ok(pane_id)
+        } else {
+            Err(String::from_utf8_lossy(&output.stderr).to_string())
+        }
+    }
+
+    fn kill_pane(&self, pane_id: u32) -> Result<(), String> {
+        let output = Command::new("wezterm")
+            .args(["cli", "kill-pane", "--pane-id", &pane_id.to_string()])
+            .output()
+            .map_err(|e| format!("Failed to kill pane: {}", e))?;
+
+        if output.status.success() {
+            Ok(())
+        } else {
+            Err(String::from_utf8_lossy(&output.stderr).to_string())
+        }
+    }
+
+    fn activate_pane(&self, pane_id: u32) -> Result<(), String> {
+        let output = Command::new("wezterm")
+            .args(["cli", "activate-pane", "--pane-id", &pane_id.to_string()])
+            .output()
+            .map_err(|e| format!("Failed to activate pane: {}", e))?;
+
+        if output.status.success() {
+            Ok(())
+        } else {
+            Err(String::from_utf8_lossy(&output.stderr).to_string())
+        }
+    }
 }
