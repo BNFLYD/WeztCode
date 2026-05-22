@@ -489,6 +489,18 @@ fn main() {
 //         println!("[Main] Sending capture signal to WM thread...");
         let _ = capture_signal_tx.send(());
 
+        // Capture window_id for spawning tabs in the right WezTerm window
+        if let Ok(raw) = term.list_panes() {
+            if let Some(line) = raw.lines().next().filter(|l| !l.trim().is_empty()) {
+                let cols: Vec<&str> = line.split('\t').collect();
+                if cols.len() >= 3 {
+                    if let Ok(wid) = cols[2].parse::<u32>() {
+                        std::env::set_var("WEZTCODE_WINDOW_ID", wid.to_string());
+                    }
+                }
+            }
+        }
+
         // Start monitoring target window - this BLOCKS until initial geometry is captured
         // target_toplevel_id is None initially - it will be captured from the query
 //         println!("[Main] Starting window monitoring and waiting for initial geometry...");

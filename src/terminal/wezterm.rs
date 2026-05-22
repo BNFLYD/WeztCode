@@ -90,6 +90,9 @@ impl TerminalProtocol for WeztermProtocol {
     fn spawn_tab(&self, cwd: Option<&str>) -> Result<u32, String> {
         let mut cmd = Command::new("wezterm");
         cmd.args(["cli", "spawn"]);
+        if let Ok(window_id) = std::env::var("WEZTCODE_WINDOW_ID") {
+            cmd.arg("--window-id").arg(window_id);
+        }
         if let Some(dir) = cwd {
             cmd.arg("--cwd").arg(dir);
         }
