@@ -57,6 +57,7 @@ fn setup_padding_hook() -> Result<(), String> {
     std::env::set_var("WEZTCODE_SESSION", "true");
     std::env::set_var("WEZTERM_CONFIG_FILE", lua_str);
     std::env::set_var("WEZTCODE_PAD_FILE", pad_str);
+    std::env::set_var("WEZTERM_UNIX_SOCKET", config::get_socket_path());
 
 //     println!("[Main] Padding hook: WEZTERM_CONFIG_FILE={}", lua_str);
 //     println!("[Main] Padding hook: WEZTCODE_PAD_FILE={}", pad_str);

@@ -16,15 +16,7 @@ if user_config_path then
   end
 end
 
--- 2. Agregar domain weztcode para CLI (siempre, incluso si el usuario tiene domains)
-local weztcode_domain = { name = "weztcode", socket_path = "/tmp/weztcode-wezterm.sock" }
-if user_config.unix_domains == nil then
-  user_config.unix_domains = { weztcode_domain }
-else
-  table.insert(user_config.unix_domains, weztcode_domain)
-end
-
--- 3. Leer side_pad para padding dinámico
+-- 2. Leer side_pad para padding dinámico
 local pad_file = os.getenv("WEZTCODE_PAD_FILE")
 local gui_padding = 0
 
@@ -38,7 +30,7 @@ end
 
 wezterm.log_info("GUI_PADDING from side_pad = " .. gui_padding)
 
--- 4. Aplicar padding si hay valor válido (se ejecuta en reload-config)
+-- 3. Aplicar padding si hay valor válido (se ejecuta en reload-config)
 local pad_applied = gui_padding > 0
 
 if pad_applied then
@@ -52,7 +44,7 @@ if pad_applied then
   wezterm.log_info("Padding applied via config reload")
 end
 
--- 5. update-status: reintentar si aún no se pudo aplicar
+-- 4. update-status: reintentar si aún no se pudo aplicar
 wezterm.on("update-status", function(window, pane)
   if pad_applied then return end
 
