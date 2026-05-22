@@ -58,6 +58,16 @@ fn setup_padding_hook() -> Result<(), String> {
     std::env::set_var("WEZTERM_CONFIG_FILE", lua_str);
     std::env::set_var("WEZTCODE_PAD_FILE", pad_str);
 
+    // Generate unique session ID for workspace identification
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let session_id = format!("{:x}", nanos);
+    let session_id = &session_id[session_id.len().saturating_sub(8)..];
+    std::env::set_var("WEZTCODE_SESSION_ID", session_id);
+
 //     println!("[Main] Padding hook: WEZTERM_CONFIG_FILE={}", lua_str);
 //     println!("[Main] Padding hook: WEZTCODE_PAD_FILE={}", pad_str);
 //     println!("[Main] Padding hook: WEZTCODE_USER_CONFIG={}", user_config);
@@ -512,21 +522,23 @@ fn main() {
 //         println!("No se detectó Window Manager - ejecutando en modo standalone");
     }
 
-    // Identify the main WezCode pane to set WEZTERM_PANE context
-//     println!("[Main] Identifying main WezCode pane...");
-    if let Ok(raw) = WeztermProtocol::new().list_panes() {
-        let current_dir = crate::config::props::UserProps::load()
-            .get("current_dir").unwrap_or_default().to_string();
-        for line in raw.lines() {
-            let cols: Vec<&str> = line.split('\t').collect();
-            // cols: pane_id, tab_id, window_id, size, is_active, title, cwd
-            if cols.len() >= 7 && cols[6] == current_dir && !cols[5].starts_with("Yazi") {
-                if let Ok(pid) = cols[0].parse::<u32>() {
-                    std::env::set_var("WEZTERM_PANE", pid.to_string());
-                    if let Ok(wid) = cols[2].parse::<u32>() {
-                        std::env::set_var("WEZTCODE_WINDOW_ID", wid.to_string());
+    // Identify the main WezCode pane by its unique workspace name
+//     println!("[Main] Identifying main WezCode pane by workspace...");
+    if let Ok(raw) = WeztermProtocol::new().list_panes_json() {
+        let session_id = std::env::var("WEZTCODE_SESSION_ID").unwrap_or_default();
+        let target_workspace = format!("weztcode-{}", session_id);
+        if let Ok(panes) = serde_json::from_str::<serde_json::Value>(&raw) {
+            if let Some(arr) = panes.as_array() {
+                for pane in arr {
+                    if pane["workspace"].as_str() == Some(&target_workspace) {
+                        if let Some(pid) = pane["pane_id"].as_u64() {
+                            std::env::set_var("WEZTERM_PANE", pid.to_string());
+                        }
+                        if let Some(wid) = pane["window_id"].as_u64() {
+                            std::env::set_var("WEZTCODE_WINDOW_ID", wid.to_string());
+                        }
+                        break;
                     }
-                    break;
                 }
             }
         }

@@ -61,6 +61,18 @@ impl TerminalProtocol for WeztermProtocol {
         }
     }
 
+    fn list_panes_json(&self) -> Result<String, String> {
+        let output = Command::new("wezterm")
+            .args(["cli", "list", "--format", "json"])
+            .output()
+            .map_err(|e| format!("Failed to list panes json: {}", e))?;
+        if output.status.success() {
+            Ok(String::from_utf8_lossy(&output.stdout).to_string())
+        } else {
+            Err(String::from_utf8_lossy(&output.stderr).to_string())
+        }
+    }
+
     fn send_text(&self, text: &str, pane_id: Option<u32>) -> Result<(), String> {
         let mut cmd = Command::new("wezterm");
         cmd.arg("cli").arg("send-text").arg(text);

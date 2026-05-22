@@ -16,14 +16,20 @@ if user_config_path then
   end
 end
 
--- 2. Asegurar socket unix_domains para wezterm cli
+-- 2. Forzar workspace único para identificar esta sesión de WezCode
+local session_id = os.getenv("WEZTCODE_SESSION_ID")
+if session_id then
+  user_config.default_workspace = "weztcode-" .. session_id
+end
+
+-- 3. Asegurar socket unix_domains para wezterm cli
 if user_config.unix_domains == nil then
   user_config.unix_domains = {
     { name = "weztcode", socket_path = "/tmp/weztcode-wezterm.sock" },
   }
 end
 
--- 3. Leer side_pad para padding dinámico
+-- 4. Leer side_pad para padding dinámico
 local pad_file = os.getenv("WEZTCODE_PAD_FILE")
 local gui_padding = 0
 
@@ -37,7 +43,7 @@ end
 
 wezterm.log_info("GUI_PADDING from side_pad = " .. gui_padding)
 
--- 4. Aplicar padding si hay valor válido (se ejecuta en reload-config)
+-- 5. Aplicar padding si hay valor válido (se ejecuta en reload-config)
 local pad_applied = gui_padding > 0
 
 if pad_applied then
@@ -51,7 +57,7 @@ if pad_applied then
   wezterm.log_info("Padding applied via config reload")
 end
 
--- 5. update-status: reintentar si aún no se pudo aplicar
+-- 6. update-status: reintentar si aún no se pudo aplicar
 wezterm.on("update-status", function(window, pane)
   if pad_applied then return end
 
