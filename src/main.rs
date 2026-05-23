@@ -499,22 +499,6 @@ fn main() {
 //         println!("No se detectó Window Manager - ejecutando en modo standalone");
     }
 
-    // Identify the main WezCode pane
-//     println!("[Main] Identifying main WezCode pane...");
-    if let Ok(raw) = WeztermProtocol::new().list_panes() {
-        let current_dir = crate::config::props::UserProps::load()
-            .get("current_dir").unwrap_or_default().to_string();
-        for line in raw.lines() {
-            let cols: Vec<&str> = line.split('\t').collect();
-            if cols.len() >= 7 && cols[6] == current_dir && !cols[5].starts_with("Yazi") {
-                if let Ok(pid) = cols[0].parse::<u32>() {
-                    std::env::set_var("WEZTERM_PANE", pid.to_string());
-                    break;
-                }
-            }
-        }
-    }
-
     // NOW create GUI platform with captured geometry available
     let platform = Gtk4Platform::new();
 
