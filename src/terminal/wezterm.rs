@@ -13,7 +13,7 @@ impl TerminalProtocol for WeztermProtocol {
     fn set_right_padding(&self, pixels: u32) -> Result<(), String> {
         let pad_path = std::env::var("WEZTCODE_PAD_FILE")
             .map_err(|_| "WEZTCODE_PAD_FILE not set".to_string())?;
-
+// Back up
         std::fs::write(&pad_path, pixels.to_string())
             .map_err(|e| format!("Failed to write padding file: {}", e))
     }
@@ -27,12 +27,7 @@ impl TerminalProtocol for WeztermProtocol {
             .map(|s| s.to_string());
 
         let mut cmd = Command::new("wezterm");
-
-        // --prefer-mux to create the window in a mux session
-        cmd.arg("start")
-            //.arg("--prefer-mux")
-            .arg("--class")
-            .arg(class);
+        cmd.arg("start").arg("--class").arg(class);
 
         if let Some(ref dir) = current_dir {
             cmd.arg("--cwd").arg(dir);
@@ -44,8 +39,8 @@ impl TerminalProtocol for WeztermProtocol {
         }
 
         let child = cmd
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
             .spawn()
             .map_err(|e| format!("Failed to spawn wezterm: {}", e))?;
 
@@ -55,7 +50,7 @@ impl TerminalProtocol for WeztermProtocol {
 
     fn list_panes(&self) -> Result<String, String> {
         let output = Command::new("wezterm")
-            .args(["cli", "--prefer-mux", "--class", crate::config::WINDOW_CLASS, "list"])
+            .args(["cli", "--class", crate::config::WINDOW_CLASS, "list"])
             .output()
             .map_err(|e| format!("Failed to list panes: {}", e))?;
 
@@ -68,7 +63,7 @@ impl TerminalProtocol for WeztermProtocol {
 
     fn send_text(&self, text: &str, pane_id: Option<u32>) -> Result<(), String> {
         let mut cmd = Command::new("wezterm");
-        cmd.args(["cli", "--prefer-mux", "--class", crate::config::WINDOW_CLASS, "send-text", text]);
+        cmd.arg("cli").arg("send-text").arg(text);
 
         if let Some(id) = pane_id {
             cmd.arg("--pane-id").arg(id.to_string());
@@ -94,15 +89,13 @@ impl TerminalProtocol for WeztermProtocol {
 
     fn spawn_tab(&self, cwd: Option<&str>) -> Result<u32, String> {
         let mut cmd = Command::new("wezterm");
-
-        // === CLAVE: Siempre usar --prefer-mux + --class ===
-        cmd.args(["cli", "--prefer-mux", "--class", crate::config::WINDOW_CLASS, "spawn"]);
+        cmd.args(["cli", "--class", crate::config::WINDOW_CLASS, "spawn"]);
 
         if let Some(dir) = cwd {
             cmd.arg("--cwd").arg(dir);
         }
-
-        let output = cmd.output()
+        let output = cmd
+            .output()
             .map_err(|e| format!("Failed to spawn tab: {}", e))?;
 
         if output.status.success() {
@@ -118,7 +111,7 @@ impl TerminalProtocol for WeztermProtocol {
 
     fn kill_pane(&self, pane_id: u32) -> Result<(), String> {
         let output = Command::new("wezterm")
-            .args(["cli", "--prefer-mux", "--class", crate::config::WINDOW_CLASS, "kill-pane", "--pane-id", &pane_id.to_string()])
+            .args(["cli", "--class", crate::config::WINDOW_CLASS, "kill-pane", "--pane-id", &pane_id.to_string()])
             .output()
             .map_err(|e| format!("Failed to kill pane: {}", e))?;
 
@@ -131,7 +124,7 @@ impl TerminalProtocol for WeztermProtocol {
 
     fn activate_pane(&self, pane_id: u32) -> Result<(), String> {
         let output = Command::new("wezterm")
-            .args(["cli", "--prefer-mux", "--class", crate::config::WINDOW_CLASS, "activate-pane", "--pane-id", &pane_id.to_string()])
+            .args(["cli", "--class", crate::config::WINDOW_CLASS, "activate-pane", "--pane-id", &pane_id.to_string()])
             .output()
             .map_err(|e| format!("Failed to activate pane: {}", e))?;
 
