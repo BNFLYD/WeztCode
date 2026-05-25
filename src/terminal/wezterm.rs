@@ -49,15 +49,30 @@ impl TerminalProtocol for WeztermProtocol {
     }
 
     fn list_panes(&self) -> Result<String, String> {
-        let output = Command::new("wezterm")
-            .args(["cli", "--class", crate::config::WINDOW_CLASS, "list"])
-            .output()
-            .map_err(|e| format!("Failed to list panes: {}", e))?;
+        let class = crate::config::WINDOW_CLASS;
 
-        if output.status.success() {
-            Ok(String::from_utf8_lossy(&output.stdout).to_string())
+        let try_list = |use_class: bool| -> Result<String, String> {
+            let mut cmd = Command::new("wezterm");
+            cmd.arg("cli");
+            if use_class {
+                cmd.args(["--class", class]);
+            }
+            cmd.arg("list");
+            let output = cmd.output()
+                .map_err(|e| format!("Failed to list panes: {}", e))?;
+            if output.status.success() {
+                Ok(String::from_utf8_lossy(&output.stdout).to_string())
+            } else {
+                Err(String::from_utf8_lossy(&output.stderr).to_string())
+            }
+        };
+
+        let result = try_list(true)?;
+        if result.trim().is_empty() {
+            eprintln!("[list_panes] empty with --class, retrying without");
+            try_list(false)
         } else {
-            Err(String::from_utf8_lossy(&output.stderr).to_string())
+            Ok(result)
         }
     }
 

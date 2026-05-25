@@ -370,15 +370,20 @@ fn handle_terminal_list() -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
     let term = WeztermProtocol::new();
     match term.list_panes() {
         Ok(raw) => {
+            eprintln!("[terminal_list] raw output: {:?}", raw);
             let mut panes = Vec::new();
             for line in raw.lines() {
                 if line.trim().is_empty() { continue; }
                 let cols: Vec<&str> = line.split('\t').collect();
                 if cols.len() < 5 { continue; }
 
+                let tab_id = cols.get(1).and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
+
+                if tab_id == 0 { continue; }
+
                 panes.push(serde_json::json!({
                     "pane_id": cols[0].parse::<u32>().unwrap_or(0),
-                    "tab_id": cols.get(1).and_then(|s| s.parse::<u32>().ok()).unwrap_or(0),
+                    "tab_id": tab_id,
                     "window_id": cols.get(2).and_then(|s| s.parse::<u32>().ok()).unwrap_or(0),
                     "size": cols.get(3).unwrap_or(&""),
                     "is_active": cols.get(4).unwrap_or(&"false") == &"true",
