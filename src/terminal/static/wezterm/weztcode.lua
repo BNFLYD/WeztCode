@@ -81,4 +81,59 @@ end)
 --- Ocultar completamente la barra de tabs (WeztCode maneja su propia UI)
 user_config.enable_tab_bar = false
 
+-- 5. Keybindings de navegación entre tabs
+local function load_keybindings()
+    local bindings = {
+        tab_next = "CTRL+J",
+        tab_prev = "CTRL+K",
+    }
+    local props_path = os.getenv("WEZTCODE_PROPS_FILE")
+    if props_path then
+        local f = io.open(props_path, "r")
+        if f then
+            local content = f:read("*a")
+            f:close()
+            for line in content:gmatch("[^\r\n]+") do
+                local trimmed = line:match("^%s*(.-)%s*$")
+                if trimmed and not trimmed:match("^%-%-") and trimmed:match("=") then
+                    local k, v = trimmed:match("^(%w+)%s*=%s*\"([^\"]+)\"")
+                    if k and v then
+                        bindings[k] = v
+                    end
+                end
+            end
+        end
+    end
+    return bindings
+end
+
+local function parse_key(key_combo)
+    local mods_str, key = key_combo:match("^(.+)%+(%w)$")
+    if not mods_str then
+        mods_str, key = "", key_combo:match("^(%w)$")
+    end
+    return key, mods_str:upper()
+end
+
+local keys = load_keybindings()
+user_config.keys = user_config.keys or {}
+
+local k, m = parse_key(keys.tab_next)
+if k then
+    table.insert(user_config.keys, {
+        key = k,
+        mods = m,
+        action = wezterm.action { ActivateTabRelative = 1 },
+    })
+end
+
+local k, m = parse_key(keys.tab_prev)
+if k then
+    table.insert(user_config.keys, {
+        key = k,
+        mods = m,
+        action = wezterm.action { ActivateTabRelative = -1 },
+    })
+end
+
 return user_config

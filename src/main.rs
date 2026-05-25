@@ -28,6 +28,11 @@ fn setup_padding_hook() -> Result<(), String> {
 
     std::env::set_var("WEZTCODE_USER_CONFIG", &user_config);
 
+    let props_path = std::env::current_dir()
+        .unwrap_or_default()
+        .join("user_props.lua");
+    std::env::set_var("WEZTCODE_PROPS_FILE", props_path.to_str().unwrap_or(""));
+
     let temp_dir = if cfg!(target_os = "windows") {
         std::env::var("TEMP").unwrap_or_else(|_| "C:\\Temp".to_string())
     } else {
