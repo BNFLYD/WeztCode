@@ -112,10 +112,12 @@ local function parse_key(key_combo)
     if not mods_str then
         mods_str, key = "", key_combo:match("^(%w)$")
     end
-    return key, mods_str:upper()
+    return key and key:lower(), mods_str:upper()
 end
 
 local keys = load_keybindings()
+wezterm.log_info("Keybindings: tab_next=" .. keys.tab_next .. ", tab_prev=" .. keys.tab_prev)
+
 user_config.keys = user_config.keys or {}
 
 local k, m = parse_key(keys.tab_next)
@@ -123,7 +125,7 @@ if k then
     table.insert(user_config.keys, {
         key = k,
         mods = m,
-        action = wezterm.action { ActivateTabRelative = 1 },
+        action = wezterm.action.ActivateTabRelative(1),
     })
 end
 
@@ -132,7 +134,7 @@ if k then
     table.insert(user_config.keys, {
         key = k,
         mods = m,
-        action = wezterm.action { ActivateTabRelative = -1 },
+        action = wezterm.action.ActivateTabRelative(-1),
     })
 end
 
