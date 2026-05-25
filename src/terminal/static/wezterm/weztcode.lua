@@ -30,6 +30,15 @@ end
 
 wezterm.log_info("GUI_PADDING from side_pad = " .. gui_padding)
 
+-- Ocultar la barra de tabs pero mantener las tabs funcionales
+overrides.enable_tab_bar = true
+overrides.hide_tab_bar_if_only_one_tab = true
+overrides.show_tabs_in_tab_bar = false
+overrides.show_new_tab_button_in_tab_bar = false
+overrides.use_fancy_tab_bar = false
+overrides.show_tab_index_in_tab_bar = false
+overrides.tab_bar_at_bottom = false
+
 -- 3. Aplicar padding si hay valor válido (se ejecuta en reload-config)
 local pad_applied = gui_padding > 0
 
