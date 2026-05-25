@@ -19,39 +19,37 @@ impl TerminalProtocol for WeztermProtocol {
     }
 
     fn spawn(&self, class: &str) -> Result<(Child, u32), String> {
-        let props = crate::config::props::UserProps::load();
+    let props = crate::config::props::UserProps::load();
 
-        let editor = props.get("user_editor").map(|s| s.to_string());
-        let current_dir = props.get("current_dir")
-            .filter(|s| !s.is_empty())
-            .map(|s| s.to_string());
+    let editor = props.get("user_editor").map(|s| s.to_string());
+    let current_dir = props.get("current_dir")
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string());
 
-        let mut cmd = Command::new("wezterm");
+    let mut cmd = Command::new("wezterm");
+    cmd.arg("start")
+        .arg("--class")
+        .arg(class)
+        // .arg("--prefer-mux")   ← Comentado por ahora
 
-        // --prefer-mux to create the window in a mux session
-        cmd.arg("start")
-            .arg("--prefer-mux")
-            .arg("--class")
-            .arg(class);
-
-        if let Some(ref dir) = current_dir {
-            cmd.arg("--cwd").arg(dir);
-        }
-
-        if let Some(ref prog) = editor {
-            cmd.arg(prog);
-            cmd.arg("--listen").arg("/tmp/weztcode-nvim.sock");
-        }
-
-        let child = cmd
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-            .map_err(|e| format!("Failed to spawn wezterm: {}", e))?;
-
-        let pid = child.id();
-        Ok((child, pid))
+    if let Some(ref dir) = current_dir {
+        cmd.arg("--cwd").arg(dir);
     }
+
+    if let Some(ref prog) = editor {
+        cmd.arg(prog);
+        cmd.arg("--listen").arg("/tmp/weztcode-nvim.sock");
+    }
+
+    let child = cmd
+        .stdout(Stdio::piped())   // ← Cambiado para ver errores
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("Failed to spawn wezterm: {}", e))?;
+
+    let pid = child.id();
+    Ok((child, pid))
+}
 
     fn list_panes(&self) -> Result<String, String> {
         let output = Command::new("wezterm")
