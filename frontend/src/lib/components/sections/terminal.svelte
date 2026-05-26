@@ -17,10 +17,16 @@
       const res = await fetch("/api/terminal/list");
       const json = await res.json();
       if (json.ok) {
-        panes = (json.data || []).map(line => ({
-          winid: parseInt(line.split(/\s+/)[0]) || 0,
-          raw: line
-        }));
+        panes = (json.data || [])
+          .map(line => {
+            const cols = line.split(/\s+/);
+            return {
+              tab_id: parseInt(cols[1]) || 0,
+              pane_id: parseInt(cols[2]) || 0,
+              raw: line
+            };
+          })
+          .filter(p => p.tab_id !== 0);
       } else {
         error = json.error;
       }
@@ -38,6 +44,34 @@
       if (json.ok) {
         await load_panes();
       } else {
+        error = json.error;
+      }
+    } catch (e) {
+      error = e.message;
+    }
+  }
+
+  async function kill_pane(pane_id) {
+    error = null;
+    try {
+      const res = await fetch(`/api/terminal/kill?pane_id=${pane_id}`, { method: "POST" });
+      const json = await res.json();
+      if (json.ok) {
+        await load_panes();
+      } else {
+        error = json.error;
+      }
+    } catch (e) {
+      error = e.message;
+    }
+  }
+
+  async function activate_pane(pane_id) {
+    error = null;
+    try {
+      const res = await fetch(`/api/terminal/activate?pane_id=${pane_id}`, { method: "POST" });
+      const json = await res.json();
+      if (!json.ok) {
         error = json.error;
       }
     } catch (e) {
@@ -74,11 +108,27 @@
     {:else}
       {#each panes as pane}
         <div
-          class="font-mono text-[11px] text-print/80 px-3 py-1.5 truncate hover:bg-accent/5 rounded-lg flex items-center gap-3"
+          class="font-mono text-[11px] text-print/80 px-3 py-1.5 hover:bg-accent/5 rounded-lg flex items-center gap-3 group"
           title={pane.raw}
         >
-          <span class="font-bold text-accent-detail shrink-0">WINID: {pane.winid}</span>
-          <span class="text-print/40 truncate">{pane.raw}</span>
+          <span class="font-bold text-accent-detail shrink-0">T{pane.tab_id}:P{pane.pane_id}</span>
+          <span class="text-print/40 truncate flex-1">{pane.raw}</span>
+
+          <button
+            on:click={() => activate_pane(pane.pane_id)}
+            class="opacity-0 group-hover:opacity-100 text-accent-detail/60 hover:text-accent-detail transition-all shrink-0"
+            aria-label="Activate"
+          >
+            <Icon icon="lucide:play" class="w-3.5 h-3.5" />
+          </button>
+
+          <button
+            on:click={() => kill_pane(pane.pane_id)}
+            class="opacity-0 group-hover:opacity-100 text-accent-err/60 hover:text-accent-err transition-all shrink-0"
+            aria-label="Kill"
+          >
+            <Icon icon="lucide:x" class="w-3.5 h-3.5" />
+          </button>
         </div>
       {/each}
     {/if}
