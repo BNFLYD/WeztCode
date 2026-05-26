@@ -4,7 +4,6 @@
 user_editor = "nvim"
 current_dir = "/home/mori/Projects/Rust/GTK4/WeztCode"
 
--- Keybindings de navegación entre tabs (opcional)
--- Descomentar para overridear los defaults
+-- Ctrl+J: toggle entre nvim (pane 0) y la última terminal usada (opcional)
+-- Descomentar para overridear el default
 tab_next = "CTRL+J"
-tab_prev = "CTRL+K"

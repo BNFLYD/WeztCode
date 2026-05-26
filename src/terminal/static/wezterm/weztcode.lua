@@ -78,6 +78,18 @@ wezterm.on("update-status", function(window, pane)
   end
 end)
 
+-- Track the last non-zero pane for toggling to nvim
+local last_non_zero_pane = nil
+
+wezterm.on("update-status", function(window, pane)
+    if pane then
+        local id = pane:pane_id()
+        if id ~= 0 then
+            last_non_zero_pane = id
+        end
+    end
+end)
+
 --- Ocultar completamente la barra de tabs (WeztCode maneja su propia UI)
 user_config.enable_tab_bar = false
 
@@ -116,7 +128,7 @@ local function parse_key(key_combo)
 end
 
 local keys = load_keybindings()
-wezterm.log_info("Keybindings: tab_next=" .. keys.tab_next .. ", tab_prev=" .. keys.tab_prev)
+wezterm.log_info("Keybindings: tab_next=" .. keys.tab_next)
 
 user_config.keys = user_config.keys or {}
 
@@ -125,16 +137,41 @@ if k then
     table.insert(user_config.keys, {
         key = k,
         mods = m,
-        action = wezterm.action.ActivateTabRelative(1),
-    })
-end
+        action = wezterm.action_callback(function(window, pane)
+            local active = window:active_pane()
+            if not active then return end
 
-local k, m = parse_key(keys.tab_prev)
-if k then
-    table.insert(user_config.keys, {
-        key = k,
-        mods = m,
-        action = wezterm.action.ActivateTabRelative(-1),
+            local active_id = active:pane_id()
+
+            if active_id == 0 then
+                local target_id = last_non_zero_pane
+                if not target_id then
+                    local windows = wezterm.mux.all_windows()
+                    for _, win in ipairs(windows) do
+                        local tabs = win:tabs()
+                        for _, tab in ipairs(tabs) do
+                            local panes = tab:panes()
+                            for _, p in ipairs(panes) do
+                                if p:pane_id() ~= 0 then
+                                    target_id = p:pane_id()
+                                    break
+                                end
+                            end
+                            if target_id then break end
+                        end
+                        if target_id then break end
+                    end
+                end
+                if target_id then
+                    local target, _, _ = wezterm.mux.get_pane(target_id)
+                    if target then target:activate() end
+                end
+            else
+                last_non_zero_pane = active_id
+                local target, _, _ = wezterm.mux.get_pane(0)
+                if target then target:activate() end
+            end
+        end),
     })
 end
 

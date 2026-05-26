@@ -507,6 +507,9 @@ fn main() {
         std::process::exit(1);
     }
 
+    // TODO: technical debt — this creates a visible flicker because spawn_tab()
+    // steals focus and activate_pane(0) returns it. Future: use Lua API from a
+    // background thread to spawn without auto-focus.
     // Spawn an additional default terminal, then return focus to nvim
     let cwd = crate::config::props::UserProps::load()
         .get("current_dir")
