@@ -141,6 +141,7 @@
     {:else}
       {#each panes as pane (pane.pane_id)}
         <div
+          title={"pane_id: " + pane.pane_id}
           class={"flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-accent/5 transition-colors text-sm group cursor-pointer" + (pane.is_active ? " bg-accent/10" : "")}
           on:click={() => activate_pane(pane.pane_id)}
           on:keydown={(e) => { if (e.key === "Enter") activate_pane(pane.pane_id); }}
@@ -151,6 +152,10 @@
             icon={pane.is_active ? "devicon-plain:bash" : "mdi:console-line"}
             class={"w-4 h-4 shrink-0" + (pane.is_active ? " text-accent-detail" : " text-print/40")}
           />
+
+          {#if pane.is_active}
+            <span class="text-[10px] font-bold text-accent-detail tracking-wide shrink-0">ACTIVE</span>
+          {/if}
 
           <div class="flex-1 min-w-0">
             {#if renaming_id === pane.pane_id}
@@ -169,7 +174,9 @@
               <div class="text-print font-medium truncate leading-tight">
                 {labels[pane.pane_id] || pane.title || `Pane ${pane.pane_id}`}
               </div>
-              <div class="text-print/40 text-xs truncate leading-tight">{pane.cwd}</div>
+              <div class="text-print/40 text-xs truncate leading-tight">
+                {pane.workspace || pane.cwd || ""}
+              </div>
             {/if}
           </div>
 

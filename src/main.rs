@@ -382,13 +382,14 @@ fn handle_terminal_list() -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
                 if tab_id == 0 { continue; }
 
                 panes.push(serde_json::json!({
-                    "pane_id": cols[0].parse::<u32>().unwrap_or(0),
+                    "pane_id": cols.get(2).and_then(|s| s.parse::<u32>().ok()).unwrap_or(0),
                     "tab_id": tab_id,
-                    "window_id": cols.get(2).and_then(|s| s.parse::<u32>().ok()).unwrap_or(0),
-                    "size": cols.get(3).unwrap_or(&""),
-                    "is_active": cols.get(4).unwrap_or(&"false") == &"true",
-                    "title": cols.get(5).unwrap_or(&""),
-                    "cwd": cols.get(6).unwrap_or(&""),
+                    "window_id": cols[0].parse::<u32>().unwrap_or(0),
+                    "workspace": cols.get(3).unwrap_or(&""),
+                    "size": cols.get(4).unwrap_or(&""),
+                    "is_active": cols.get(5).unwrap_or(&"false") == &"true",
+                    "title": cols.get(6).unwrap_or(&""),
+                    "cwd": cols.get(7).unwrap_or(&""),
                 }));
             }
 
