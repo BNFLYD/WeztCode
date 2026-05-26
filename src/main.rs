@@ -507,15 +507,14 @@ fn main() {
         std::process::exit(1);
     }
 
-    // Spawn an additional default terminal (non-critical, after wezterm is ready)
+    // Spawn an additional default terminal, then return focus to nvim
     let cwd = crate::config::props::UserProps::load()
         .get("current_dir")
         .filter(|s| !s.is_empty())
         .map(|s| s.to_string());
     let _term2 = WeztermProtocol::new();
-    if let Err(e) = _term2.spawn_tab(cwd.as_deref()) {
-        eprintln!("[Main] Warning: failed to spawn default terminal: {}", e);
-    }
+    let _ = _term2.spawn_tab(cwd.as_deref());
+    let _ = term.activate_pane(0);
 
 //     println!("WeztCode corriendo...");
     platform.run();
