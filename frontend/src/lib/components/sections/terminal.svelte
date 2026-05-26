@@ -221,10 +221,7 @@
   }
 
   afterUpdate(() => {
-    if (creating && create_input) {
-      create_input.focus();
-      create_input.select();
-    }
+    if (creating && create_input) create_input.focus();
     if (!loading && list_ref && panes.length > 0) {
       scroll_to_cursor();
     }
