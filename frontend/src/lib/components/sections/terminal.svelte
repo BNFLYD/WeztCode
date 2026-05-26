@@ -152,7 +152,7 @@
     {:else}
       {#each panes as pane}
         <div
-          class="font-mono font-lg text-print/80 px-3 py-1.5 hover:bg-accent/5 rounded-lg flex items-center gap-3 group"
+          class="font-lg text-print/80 px-3 py-1.5 hover:bg-accent/5 rounded-lg flex items-center gap-3 group"
           title={pane.raw}
         >
           <div class="flex-1 min-w-0">
@@ -184,6 +184,22 @@
               <Icon icon="lucide:pencil" class="w-3.5 h-3.5" />
             </button>
           {/if}
+
+          <button
+            on:click={() => activate_pane(pane.pane_id)}
+            class="opacity-0 group-hover:opacity-100 text-accent-detail/60 hover:text-accent-detail transition-all shrink-0"
+            aria-label="Activate"
+          >
+            <Icon icon="lucide:play" class="w-3.5 h-3.5" />
+          </button>
+
+          <button
+            on:click={() => kill_pane(pane.pane_id)}
+            class="opacity-0 group-hover:opacity-100 text-accent-err/60 hover:text-accent-err transition-all shrink-0"
+            aria-label="Kill"
+          >
+            <Icon icon="lucide:x" class="w-3.5 h-3.5" />
+          </button>
           <span class="font-bold text-accent-detail shrink-0">T{pane.tab_id}</span>
         </div>
       {/each}
