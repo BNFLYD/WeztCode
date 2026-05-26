@@ -258,7 +258,7 @@
     {/if}
   </div>
 
-  <div class="flex-1 overflow-y-auto min-h-0 px-1" bind:this={list_ref}>
+  <div class="flex-1 overflow-y-auto min-h-0" bind:this={list_ref}>
     {#if loading}
       <div class="flex items-center justify-center py-8">
         <span class="text-print/50 text-lg">Loading...</span>
@@ -275,7 +275,7 @@
       {#each panes as pane, index}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <div
-          class={"py-8 rounded-lg hover:bg-accent/5 transition-colors cursor-pointer flex items-center gap-2" +
+          class={"py-3 rounded-lg hover:bg-accent/5 transition-colors cursor-pointer flex items-center gap-2" +
             (cursor_index === index ? " bg-accent/10" : "")}
           title={pane.raw}
           data-index={index}
@@ -284,7 +284,7 @@
             activate_current();
           }}
         >
-          <div class="flex-1 min-w-0">
+          <div class="flex-1 min-w-0 px-2">
             <div class="text-print font-lg truncate leading-tight">
               {labels[pane.pane_id] || pane.title || `Pane ${pane.pane_id}`}
             </div>
