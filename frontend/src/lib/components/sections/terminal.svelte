@@ -2,7 +2,7 @@
   import { onMount } from "svelte";
   import Icon from "@iconify/svelte";
 
-  let lines = [];
+  let panes = [];
   let loading = true;
   let error = null;
 
@@ -17,7 +17,10 @@
       const res = await fetch("/api/terminal/list");
       const json = await res.json();
       if (json.ok) {
-        lines = json.data;
+        panes = (json.data || []).map(line => ({
+          winid: parseInt(line.split(/\s+/)[0]) || 0,
+          raw: line
+        }));
       } else {
         error = json.error;
       }
@@ -64,18 +67,18 @@
       <div class="flex items-center justify-center py-8">
         <span class="text-accent-err text-lg">{error}</span>
       </div>
-    {:else if lines.length === 0}
+    {:else if panes.length === 0}
       <div class="flex items-center justify-center py-8">
         <span class="text-print/50 text-lg">No terminals</span>
       </div>
     {:else}
-      {#each lines as line, i}
+      {#each panes as pane}
         <div
-          class="font-mono text-[11px] text-print/80 px-3 py-1.5 truncate hover:bg-accent/5 rounded-lg"
-          title={line}
+          class="font-mono text-[11px] text-print/80 px-3 py-1.5 truncate hover:bg-accent/5 rounded-lg flex items-center gap-3"
+          title={pane.raw}
         >
-          <span class="text-accent-detail/60 mr-2">#{i}</span>
-          {line}
+          <span class="font-bold text-accent-detail shrink-0">WINID: {pane.winid}</span>
+          <span class="text-print/40 truncate">{pane.raw}</span>
         </div>
       {/each}
     {/if}
