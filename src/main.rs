@@ -374,22 +374,21 @@ fn handle_terminal_list() -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
             let mut panes = Vec::new();
             for line in raw.lines() {
                 if line.trim().is_empty() { continue; }
-                let cols: Vec<&str> = line.split('\t').collect();
-                if cols.len() < 5 { continue; }
+                let cols: Vec<&str> = line.split_whitespace().collect();
+                if cols.len() < 7 { continue; }
 
                 let tab_id = cols.get(1).and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
 
                 if tab_id == 0 { continue; }
 
                 panes.push(serde_json::json!({
-                    "pane_id": cols.get(2).and_then(|s| s.parse::<u32>().ok()).unwrap_or(0),
-                    "tab_id": tab_id,
                     "window_id": cols[0].parse::<u32>().unwrap_or(0),
+                    "tab_id": tab_id,
+                    "pane_id": cols.get(2).and_then(|s| s.parse::<u32>().ok()).unwrap_or(0),
                     "workspace": cols.get(3).unwrap_or(&""),
                     "size": cols.get(4).unwrap_or(&""),
-                    "is_active": cols.get(5).unwrap_or(&"false") == &"true",
-                    "title": cols.get(6).unwrap_or(&""),
-                    "cwd": cols.get(7).unwrap_or(&""),
+                    "title": cols.get(5).unwrap_or(&""),
+                    "cwd": cols.get(6).unwrap_or(&""),
                 }));
             }
 
