@@ -244,7 +244,7 @@
     </button>
     {#if creating}
       <span class="font-mono truncate flex items-center gap-1 text-print flex-1">
-        <span class="text-print text-sm">{_>}</span>
+        <span class="text-print text-sm">_></span>
         <input
           bind:value={create_name}
           bind:this={create_input}
