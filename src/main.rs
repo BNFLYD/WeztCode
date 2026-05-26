@@ -371,28 +371,12 @@ fn handle_terminal_list() -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
     match term.list_panes() {
         Ok(raw) => {
             eprintln!("[terminal_list] raw output: {:?}", raw);
-            let mut panes = Vec::new();
-            for line in raw.lines() {
-                if line.trim().is_empty() { continue; }
-                let cols: Vec<&str> = line.split_whitespace().collect();
-                if cols.len() < 7 { continue; }
-
-                let tab_id = cols.get(1).and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
-
-                if tab_id == 0 { continue; }
-
-                panes.push(serde_json::json!({
-                    "window_id": cols[0].parse::<u32>().unwrap_or(0),
-                    "tab_id": tab_id,
-                    "pane_id": cols.get(2).and_then(|s| s.parse::<u32>().ok()).unwrap_or(0),
-                    "workspace": cols.get(3).unwrap_or(&""),
-                    "size": cols.get(4).unwrap_or(&""),
-                    "title": cols.get(5).unwrap_or(&""),
-                    "cwd": cols.get(6).unwrap_or(&""),
-                }));
-            }
-
-            let data = serde_json::json!({ "ok": true, "data": panes });
+            let lines: Vec<String> = raw.lines()
+                .skip(1)
+                .filter(|l| !l.trim().is_empty())
+                .map(|l| l.trim().to_string())
+                .collect();
+            let data = serde_json::json!({ "ok": true, "data": lines });
             json_response(&data)
         }
         Err(e) => json_error(&e),
