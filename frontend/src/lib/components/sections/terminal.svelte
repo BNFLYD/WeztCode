@@ -236,9 +236,15 @@
 
 <div class="flex flex-col gap-1 py-2 h-full">
   <div class="flex items-center gap-2 px-3 py-2 border-b border-accent-detail/20 mb-2 flex-shrink-0">
+  <button
+      on:click={() => { creating = true; create_name = ""; }}
+      class="flex items-center gap-1 text-xs text-accent-detail hover:text-print transition-colors"
+    >
+      <Icon icon="lucide:plus" class="w-4 h-4" />
+    </button>
     {#if creating}
       <span class="font-mono truncate flex items-center gap-1 text-print flex-1">
-        <span class="text-print text-xs">new:</span>
+        <span class="text-print text-sm">{_>}</span>
         <input
           bind:value={create_name}
           bind:this={create_input}
@@ -250,13 +256,6 @@
     {:else}
       <span class="text-sm text-print-contrast font-bold tracking-wide flex-1">TERMINALS</span>
     {/if}
-    <button
-      on:click={() => { creating = true; create_name = ""; }}
-      class="flex items-center gap-1 text-xs text-accent-detail hover:text-print transition-colors"
-    >
-      <Icon icon="lucide:plus" class="w-4 h-4" />
-      <span>New</span>
-    </button>
   </div>
 
   <div class="flex-1 overflow-y-auto min-h-0 px-1" bind:this={list_ref}>
