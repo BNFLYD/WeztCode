@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from "svelte";
+  import { afterUpdate, onDestroy, onMount } from "svelte";
   import Icon from "@iconify/svelte";
 
   let panes = [];
@@ -8,6 +8,9 @@
   let labels = {};
   let renaming_id = null;
   let rename_value = "";
+  let cursor_index = 0;
+  let list_ref;
+  let controller = null;
 
   onMount(() => {
     try {
@@ -51,10 +54,14 @@
   }
 
   async function load_panes() {
+    if (controller) controller.abort();
+    controller = new AbortController();
+    const signal = controller.signal;
     loading = true;
     error = null;
+    cursor_index = 0;
     try {
-      const res = await fetch("/api/terminal/list");
+      const res = await fetch("/api/terminal/list", { signal });
       const json = await res.json();
       if (json.ok) {
         panes = (json.data || [])
@@ -72,9 +79,9 @@
         error = json.error;
       }
     } catch (e) {
-      error = e.message;
+      if (e.name !== "AbortError") error = e.message;
     }
-    loading = false;
+    if (!signal.aborted) loading = false;
   }
 
   async function spawn_tab() {
@@ -123,11 +130,82 @@
       error = e.message;
     }
   }
+
+  function move_cursor(delta) {
+    const new_index = cursor_index + delta;
+    if (new_index < 0 || new_index >= panes.length) return;
+    cursor_index = new_index;
+    scroll_to_cursor();
+  }
+
+  function scroll_to_cursor() {
+    if (!list_ref) return;
+    const child = list_ref.querySelector(`[data-index="${cursor_index}"]`);
+    if (child) child.scrollIntoView({ block: "nearest" });
+  }
+
+  function activate_current() {
+    const pane = panes[cursor_index];
+    if (pane) activate_pane(pane.pane_id);
+  }
+
+  function handle_keydown(e) {
+    if (renaming_id !== null) {
+      if (e.key === "Enter") commit_rename();
+      else if (e.key === "Escape") cancel_rename();
+      return;
+    }
+
+    switch (e.key) {
+      case "j":
+      case "ArrowDown":
+        e.preventDefault();
+        move_cursor(1);
+        break;
+      case "k":
+      case "ArrowUp":
+        e.preventDefault();
+        move_cursor(-1);
+        break;
+      case "l":
+      case "Enter":
+        e.preventDefault();
+        activate_current();
+        break;
+      case "r":
+      case "R":
+        e.preventDefault();
+        start_rename(panes[cursor_index]?.pane_id);
+        break;
+      case "d":
+      case "D":
+        e.preventDefault();
+        kill_pane(panes[cursor_index]?.pane_id);
+        break;
+      case "a":
+      case "A":
+        e.preventDefault();
+        spawn_tab();
+        break;
+    }
+  }
+
+  afterUpdate(() => {
+    if (!loading && list_ref && panes.length > 0) {
+      scroll_to_cursor();
+    }
+  });
+
+  onDestroy(() => {
+    if (controller) controller.abort();
+  });
 </script>
 
-<div class="flex flex-col gap-2 py-4 h-full">
-  <div class="flex items-center justify-between px-3 pb-2 border-b border-accent-detail/20 mb-2 flex-shrink-0">
-    <span class="text-sm text-print-contrast font-bold tracking-wide">TERMINAL TABS</span>
+<svelte:window on:keydown={handle_keydown} />
+
+<div class="flex flex-col gap-1 py-2 h-full">
+  <div class="flex items-center justify-between px-3 py-2 border-b border-accent-detail/20 mb-2 flex-shrink-0">
+    <span class="text-sm text-print-contrast font-bold tracking-wide">TERMINALS</span>
     <button
       on:click={spawn_tab}
       class="flex items-center gap-1 text-xs text-accent-detail hover:text-print transition-colors"
@@ -137,7 +215,7 @@
     </button>
   </div>
 
-  <div class="flex-1 overflow-y-auto min-h-0 space-y-1 px-1">
+  <div class="flex-1 overflow-y-auto min-h-0 px-1" bind:this={list_ref}>
     {#if loading}
       <div class="flex items-center justify-center py-8">
         <span class="text-print/50 text-lg">Loading...</span>
@@ -151,12 +229,16 @@
         <span class="text-print/50 text-lg">No terminals</span>
       </div>
     {:else}
-      {#each panes as pane}
+      {#each panes as pane, index}
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
         <div
-          class="font-mono text-[11px] text-print/80 px-3 py-1.5 hover:bg-accent/5 rounded-lg flex items-center gap-3 group"
+          class={"px-3 py-1.5 rounded-lg hover:bg-accent/5 transition-colors cursor-pointer flex items-center gap-2 group"
+            + (cursor_index === index ? " bg-accent/10" : "")}
           title={pane.raw}
+          data-index={index}
+          on:click={() => { cursor_index = index; activate_current(); }}
         >
-          <span class="font-bold text-accent-detail shrink-0">T{pane.tab_id}:P{pane.pane_id}</span>
+          <span class="font-bold text-accent-detail shrink-0 text-xs">T{pane.tab_id}:P{pane.pane_id}</span>
 
           <div class="flex-1 min-w-0">
             {#if renaming_id === pane.pane_id}
@@ -184,7 +266,7 @@
               class="opacity-0 group-hover:opacity-100 text-print/40 hover:text-print transition-all shrink-0"
               aria-label="Rename"
             >
-              <Icon icon="lucide:pencil" class="w-3.5 h-3.5" />
+              <Icon icon="lucide:pencil" class="w-4 h-4" />
             </button>
           {/if}
 
@@ -193,7 +275,7 @@
             class="opacity-0 group-hover:opacity-100 text-accent-detail/60 hover:text-accent-detail transition-all shrink-0"
             aria-label="Activate"
           >
-            <Icon icon="lucide:play" class="w-3.5 h-3.5" />
+            <Icon icon="lucide:play" class="w-4 h-4" />
           </button>
 
           <button
@@ -201,7 +283,7 @@
             class="opacity-0 group-hover:opacity-100 text-accent-err/60 hover:text-accent-err transition-all shrink-0"
             aria-label="Kill"
           >
-            <Icon icon="lucide:x" class="w-3.5 h-3.5" />
+            <Icon icon="lucide:x" class="w-4 h-4" />
           </button>
         </div>
       {/each}
