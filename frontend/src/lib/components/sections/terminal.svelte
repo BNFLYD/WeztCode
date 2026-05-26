@@ -9,6 +9,9 @@
   let renaming_id = null;
   let rename_value = "";
   let cursor_index = 0;
+  let creating = false;
+  let create_name = "";
+  let create_input;
   let list_ref;
   let controller = null;
 
@@ -84,12 +87,16 @@
     if (!signal.aborted) loading = false;
   }
 
-  async function spawn_tab() {
+  async function spawn_tab(name) {
     error = null;
     try {
       const res = await fetch("/api/terminal/spawn", { method: "POST" });
       const json = await res.json();
       if (json.ok) {
+        if (name) {
+          labels[json.data.pane_id] = name;
+          save_labels();
+        }
         await load_panes();
       } else {
         error = json.error;
@@ -97,6 +104,18 @@
     } catch (e) {
       error = e.message;
     }
+  }
+
+  function create_terminal() {
+    const name = create_name.trim();
+    spawn_tab(name || undefined);
+    creating = false;
+    create_name = "";
+  }
+
+  function cancel_create() {
+    creating = false;
+    create_name = "";
   }
 
   async function kill_pane(pane_id) {
@@ -160,6 +179,12 @@
       return;
     }
 
+    if (creating) {
+      if (e.key === "Enter") { e.preventDefault(); create_terminal(); }
+      else if (e.key === "Escape") { e.preventDefault(); cancel_create(); }
+      return;
+    }
+
     switch (e.key) {
       case "j":
       case "ArrowDown":
@@ -189,12 +214,17 @@
       case "a":
       case "A":
         e.preventDefault();
-        spawn_tab();
+        creating = true;
+        create_name = "";
         break;
     }
   }
 
   afterUpdate(() => {
+    if (creating && create_input) {
+      create_input.focus();
+      create_input.select();
+    }
     if (!loading && list_ref && panes.length > 0) {
       scroll_to_cursor();
     }
@@ -208,17 +238,27 @@
 <svelte:window on:keydown={handle_keydown} />
 
 <div class="flex flex-col gap-1 py-2 h-full">
-  <div
-    class="flex items-center justify-between px-3 py-2 border-b border-accent-detail/20 mb-2 flex-shrink-0"
-  >
-    <span class="text-sm text-print-contrast font-bold tracking-wide"
-      >TERMINALS</span
-    >
+  <div class="flex items-center gap-2 px-3 py-2 border-b border-accent-detail/20 mb-2 flex-shrink-0">
+    {#if creating}
+      <span class="font-mono truncate flex items-center gap-1 text-print flex-1">
+        <span class="text-print text-xs">new:</span>
+        <input
+          bind:value={create_name}
+          bind:this={create_input}
+          placeholder="terminal name"
+          class="bg-transparent outline-none text-print font-mono text-xs flex-1 min-w-0"
+          on:blur={() => { if (!create_name.trim()) creating = false; }}
+        />
+      </span>
+    {:else}
+      <span class="text-sm text-print-contrast font-bold tracking-wide flex-1">TERMINALS</span>
+    {/if}
     <button
-      on:click={spawn_tab}
+      on:click={() => { creating = true; create_name = ""; }}
       class="flex items-center gap-1 text-xs text-accent-detail hover:text-print transition-colors"
     >
       <Icon icon="lucide:plus" class="w-4 h-4" />
+      <span>New</span>
     </button>
   </div>
 
@@ -233,7 +273,7 @@
       </div>
     {:else if panes.length === 0}
       <div class="flex items-center justify-center py-8">
-        <span class="text-print/50 text-lg">No terminals</span>
+        <span class="text-print/50 text-lg">0 tabs</span>
       </div>
     {:else}
       {#each panes as pane, index}
@@ -246,8 +286,8 @@
           on:click={() => {
             cursor_index = index;
             activate_current();
-          }}>
-
+          }}
+        >
           <div class="flex-1 min-w-0">
             {#if renaming_id === pane.pane_id}
               <input
@@ -259,14 +299,17 @@
                 on:keydown={(e) => {
                   if (e.key === "Enter") commit_rename();
                   if (e.key === "Escape") cancel_rename();
-                }}/>
+                }}
+              />
             {:else}
               <div class="text-print font-lg truncate leading-tight">
                 {labels[pane.pane_id] || pane.title || `Pane ${pane.pane_id}`}
               </div>
             {/if}
           </div>
-          <span class="font-bold font-sm text-accent-detail shrink-0 text-xs">T{pane.tab_id}</span>
+          <span class="font-bold font-sm text-accent-detail shrink-0 text-xs"
+            >T{pane.tab_id}</span
+          >
         </div>
       {/each}
     {/if}
