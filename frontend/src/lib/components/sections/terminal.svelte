@@ -5,10 +5,50 @@
   let panes = [];
   let loading = true;
   let error = null;
+  let labels = {};
+  let renaming_id = null;
+  let rename_value = "";
 
   onMount(() => {
+    try {
+      const saved = localStorage.getItem("terminal_labels");
+      if (saved) labels = JSON.parse(saved);
+    } catch {}
     load_panes();
   });
+
+  function save_labels() {
+    try {
+      localStorage.setItem("terminal_labels", JSON.stringify(labels));
+    } catch {}
+  }
+
+  function focus_on_mount(node) {
+    node.focus();
+    node.select();
+  }
+
+  function start_rename(pane_id) {
+    renaming_id = pane_id;
+    rename_value = labels[pane_id] || "";
+  }
+
+  function commit_rename() {
+    if (renaming_id !== null) {
+      const v = rename_value.trim();
+      if (v) {
+        labels[renaming_id] = v;
+      } else {
+        delete labels[renaming_id];
+      }
+      save_labels();
+      renaming_id = null;
+    }
+  }
+
+  function cancel_rename() {
+    renaming_id = null;
+  }
 
   async function load_panes() {
     loading = true;
@@ -23,6 +63,7 @@
             return {
               tab_id: parseInt(cols[1]) || 0,
               pane_id: parseInt(cols[2]) || 0,
+              title: cols.slice(5).join(" "),
               raw: line
             };
           })
@@ -52,11 +93,14 @@
   }
 
   async function kill_pane(pane_id) {
+    if (pane_id === 0) return;
     error = null;
     try {
       const res = await fetch(`/api/terminal/kill?pane_id=${pane_id}`, { method: "POST" });
       const json = await res.json();
       if (json.ok) {
+        delete labels[pane_id];
+        save_labels();
         await load_panes();
       } else {
         error = json.error;
@@ -67,6 +111,7 @@
   }
 
   async function activate_pane(pane_id) {
+    if (pane_id === 0) return;
     error = null;
     try {
       const res = await fetch(`/api/terminal/activate?pane_id=${pane_id}`, { method: "POST" });
@@ -112,7 +157,36 @@
           title={pane.raw}
         >
           <span class="font-bold text-accent-detail shrink-0">T{pane.tab_id}:P{pane.pane_id}</span>
-          <span class="text-print/40 truncate flex-1">{pane.raw}</span>
+
+          <div class="flex-1 min-w-0">
+            {#if renaming_id === pane.pane_id}
+              <input
+                type="text"
+                bind:value={rename_value}
+                use:focus_on_mount
+                class="bg-back rounded px-1 py-0.5 text-print text-xs w-full outline-none border border-accent-detail/40"
+                on:blur={commit_rename}
+                on:keydown={(e) => {
+                  if (e.key === "Enter") commit_rename();
+                  if (e.key === "Escape") cancel_rename();
+                }}
+              />
+            {:else}
+              <div class="text-print font-medium truncate leading-tight">
+                {labels[pane.pane_id] || pane.title || `Pane ${pane.pane_id}`}
+              </div>
+            {/if}
+          </div>
+
+          {#if renaming_id !== pane.pane_id}
+            <button
+              on:click|stopPropagation={() => start_rename(pane.pane_id)}
+              class="opacity-0 group-hover:opacity-100 text-print/40 hover:text-print transition-all shrink-0"
+              aria-label="Rename"
+            >
+              <Icon icon="lucide:pencil" class="w-3.5 h-3.5" />
+            </button>
+          {/if}
 
           <button
             on:click={() => activate_pane(pane.pane_id)}
