@@ -446,6 +446,15 @@ fn main() {
         std::process::exit(1);
     }
 
+    // Spawn an additional default terminal on startup
+    let cwd = crate::config::props::UserProps::load()
+        .get("current_dir")
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string());
+    if let Err(e) = term.spawn_tab(cwd.as_deref()) {
+        eprintln!("[Main] Warning: failed to spawn default terminal: {}", e);
+    }
+
     // Start HTTP server first
     let http_port = 8765;
     let _http_thread = start_http_server(http_port);
