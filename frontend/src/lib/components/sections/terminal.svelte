@@ -65,16 +65,16 @@
       const json = await res.json();
       if (json.ok) {
         panes = (json.data || [])
-          .map(line => {
+          .map((line) => {
             const cols = line.split(/\s+/);
             return {
               tab_id: parseInt(cols[1]) || 0,
               pane_id: parseInt(cols[2]) || 0,
               title: cols.slice(5).join(" "),
-              raw: line
+              raw: line,
             };
           })
-          .filter(p => p.tab_id !== 0);
+          .filter((p) => p.tab_id !== 0);
       } else {
         error = json.error;
       }
@@ -103,7 +103,9 @@
     if (pane_id === 0) return;
     error = null;
     try {
-      const res = await fetch(`/api/terminal/kill?pane_id=${pane_id}`, { method: "POST" });
+      const res = await fetch(`/api/terminal/kill?pane_id=${pane_id}`, {
+        method: "POST",
+      });
       const json = await res.json();
       if (json.ok) {
         delete labels[pane_id];
@@ -121,7 +123,9 @@
     if (pane_id === 0) return;
     error = null;
     try {
-      const res = await fetch(`/api/terminal/activate?pane_id=${pane_id}`, { method: "POST" });
+      const res = await fetch(`/api/terminal/activate?pane_id=${pane_id}`, {
+        method: "POST",
+      });
       const json = await res.json();
       if (!json.ok) {
         error = json.error;
@@ -204,14 +208,17 @@
 <svelte:window on:keydown={handle_keydown} />
 
 <div class="flex flex-col gap-1 py-2 h-full">
-  <div class="flex items-center justify-between px-3 py-2 border-b border-accent-detail/20 mb-2 flex-shrink-0">
-    <span class="text-sm text-print-contrast font-bold tracking-wide">TERMINALS</span>
+  <div
+    class="flex items-center justify-between px-3 py-2 border-b border-accent-detail/20 mb-2 flex-shrink-0"
+  >
+    <span class="text-sm text-print-contrast font-bold tracking-wide"
+      >TERMINALS</span
+    >
     <button
       on:click={spawn_tab}
       class="flex items-center gap-1 text-xs text-accent-detail hover:text-print transition-colors"
     >
       <Icon icon="lucide:plus" class="w-4 h-4" />
-      <span>New</span>
     </button>
   </div>
 
@@ -232,13 +239,14 @@
       {#each panes as pane, index}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <div
-          class={"px-3 py-1.5 rounded-lg hover:bg-accent/5 transition-colors cursor-pointer flex items-center gap-2"
-            + (cursor_index === index ? " bg-accent/10" : "")}
+          class={"px-3 py-2 rounded-lg hover:bg-accent/5 transition-colors cursor-pointer flex items-center gap-2" +
+            (cursor_index === index ? " bg-accent/10" : "")}
           title={pane.raw}
           data-index={index}
-          on:click={() => { cursor_index = index; activate_current(); }}
-        >
-          <span class="font-bold text-accent-detail shrink-0 text-xs">T{pane.tab_id}:P{pane.pane_id}</span>
+          on:click={() => {
+            cursor_index = index;
+            activate_current();
+          }}>
 
           <div class="flex-1 min-w-0">
             {#if renaming_id === pane.pane_id}
@@ -246,19 +254,19 @@
                 type="text"
                 bind:value={rename_value}
                 use:focus_on_mount
-                class="bg-back rounded px-1 py-0.5 text-print text-xs w-full outline-none border border-accent-detail/40"
+                class="bg-back rounded px-1 py-2 text-print text-sm w-full outline-none border border-accent-detail/40"
                 on:blur={commit_rename}
                 on:keydown={(e) => {
                   if (e.key === "Enter") commit_rename();
                   if (e.key === "Escape") cancel_rename();
-                }}
-              />
+                }}/>
             {:else}
-              <div class="text-print font-medium truncate leading-tight">
+              <div class="text-print font-lg truncate leading-tight">
                 {labels[pane.pane_id] || pane.title || `Pane ${pane.pane_id}`}
               </div>
             {/if}
           </div>
+          <span class="font-bold font-sm text-accent-detail shrink-0 text-xs">T{pane.tab_id}</span>
         </div>
       {/each}
     {/if}
