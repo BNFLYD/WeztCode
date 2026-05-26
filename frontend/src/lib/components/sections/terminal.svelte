@@ -6,8 +6,9 @@
   let loading = true;
   let error = null;
   let labels = {};
-  let renaming_id = null;
-  let rename_value = "";
+  let renaming = false;
+  let rename_name = "";
+  let rename_input;
   let cursor_index = 0;
   let creating = false;
   let create_name = "";
@@ -29,31 +30,17 @@
     } catch {}
   }
 
-  function focus_on_mount(node) {
-    node.focus();
-    node.select();
-  }
-
-  function start_rename(pane_id) {
-    renaming_id = pane_id;
-    rename_value = labels[pane_id] || "";
-  }
-
-  function commit_rename() {
-    if (renaming_id !== null) {
-      const v = rename_value.trim();
-      if (v) {
-        labels[renaming_id] = v;
-      } else {
-        delete labels[renaming_id];
+  function rename_entry() {
+    const name = rename_name.trim();
+    if (name) {
+      const pane = panes[cursor_index];
+      if (pane) {
+        labels[pane.pane_id] = name;
+        save_labels();
       }
-      save_labels();
-      renaming_id = null;
     }
-  }
-
-  function cancel_rename() {
-    renaming_id = null;
+    renaming = false;
+    rename_name = "";
   }
 
   async function load_panes() {
@@ -173,9 +160,9 @@
   }
 
   function handle_keydown(e) {
-    if (renaming_id !== null) {
-      if (e.key === "Enter") commit_rename();
-      else if (e.key === "Escape") cancel_rename();
+    if (renaming) {
+      if (e.key === "Enter") { e.preventDefault(); rename_entry(); }
+      else if (e.key === "Escape") { e.preventDefault(); renaming = false; rename_name = ""; }
       return;
     }
 
@@ -204,7 +191,8 @@
       case "r":
       case "R":
         e.preventDefault();
-        start_rename(panes[cursor_index]?.pane_id);
+        renaming = true;
+        rename_name = labels[panes[cursor_index]?.pane_id] || "";
         break;
       case "d":
       case "D":
@@ -222,6 +210,7 @@
 
   afterUpdate(() => {
     if (creating && create_input) create_input.focus();
+    else if (renaming && rename_input) rename_input.focus();
     if (!loading && list_ref && panes.length > 0) {
       scroll_to_cursor();
     }
@@ -244,7 +233,7 @@
     </button>
     {#if creating}
       <span class="font-mono truncate flex items-center gap-1 text-print flex-1">
-        <span class="text-print text-sm">_></span>
+        <span class="text-print text-sm">>_</span>
         <input
           bind:value={create_name}
           bind:this={create_input}
@@ -253,8 +242,19 @@
           on:blur={() => { if (!create_name.trim()) creating = false; }}
         />
       </span>
+    {:else if renaming}
+      <span class="font-mono truncate flex items-center gap-1 text-print flex-1">
+        <span class="text-print text-sm">>_</span>
+        <input
+          bind:value={rename_name}
+          bind:this={rename_input}
+          placeholder="rename"
+          class="bg-transparent outline-none text-print font-mono text-xs flex-1 min-w-0"
+          on:blur={rename_entry}
+        />
+      </span>
     {:else}
-      <span class="text-sm text-print-contrast font-bold tracking-wide flex-1">TERMINALS</span>
+      <span class="text-sm text-print font-bold tracking-wide flex-1">>_</span>
     {/if}
   </div>
 
@@ -285,23 +285,9 @@
           }}
         >
           <div class="flex-1 min-w-0">
-            {#if renaming_id === pane.pane_id}
-              <input
-                type="text"
-                bind:value={rename_value}
-                use:focus_on_mount
-                class="bg-back rounded px-1 py-2 text-print text-sm w-full outline-none border border-accent-detail/40"
-                on:blur={commit_rename}
-                on:keydown={(e) => {
-                  if (e.key === "Enter") commit_rename();
-                  if (e.key === "Escape") cancel_rename();
-                }}
-              />
-            {:else}
-              <div class="text-print font-lg truncate leading-tight">
-                {labels[pane.pane_id] || pane.title || `Pane ${pane.pane_id}`}
-              </div>
-            {/if}
+            <div class="text-print font-lg truncate leading-tight">
+              {labels[pane.pane_id] || pane.title || `Pane ${pane.pane_id}`}
+            </div>
           </div>
           <span class="font-bold font-sm text-accent-detail shrink-0 text-xs"
             >T{pane.tab_id}</span
