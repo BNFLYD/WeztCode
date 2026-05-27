@@ -6,6 +6,7 @@
   let loading = true;
   let error = null;
   let labels = {};
+  let icons = {};
   let renaming = false;
   let rename_name = "";
   let rename_input;
@@ -21,6 +22,10 @@
       const saved = localStorage.getItem("terminal_labels");
       if (saved) labels = JSON.parse(saved);
     } catch {}
+    try {
+      const saved = localStorage.getItem("terminal_icons");
+      if (saved) icons = JSON.parse(saved);
+    } catch {}
     load_panes();
   });
 
@@ -30,14 +35,33 @@
     } catch {}
   }
 
+  function save_icons() {
+    try {
+      localStorage.setItem("terminal_icons", JSON.stringify(icons));
+    } catch {}
+  }
+
   function rename_entry() {
-    const name = rename_name.trim();
-    if (name) {
-      const pane = panes[cursor_index];
-      if (pane) {
+    const input = rename_name.trim();
+    let name = input;
+    let icon = null;
+    const slash_idx = input.indexOf("/");
+    if (slash_idx !== -1) {
+      name = input.slice(0, slash_idx).trim();
+      icon = input.slice(slash_idx + 1).trim();
+    }
+    const pane = panes[cursor_index];
+    if (pane) {
+      if (name) {
         labels[pane.pane_id] = name;
-        save_labels();
+      } else {
+        delete labels[pane.pane_id];
       }
+      if (icon) {
+        icons[pane.pane_id] = icon;
+        save_icons();
+      }
+      save_labels();
     }
     renaming = false;
     rename_name = "";
@@ -74,7 +98,7 @@
     if (!signal.aborted) loading = false;
   }
 
-  async function spawn_tab(name) {
+  async function spawn_tab(name, icon) {
     error = null;
     try {
       const res = await fetch("/api/terminal/spawn", { method: "POST" });
@@ -83,6 +107,10 @@
         if (name) {
           labels[json.data.pane_id] = name;
           save_labels();
+        }
+        if (icon) {
+          icons[json.data.pane_id] = icon;
+          save_icons();
         }
         await load_panes();
       } else {
@@ -94,8 +122,15 @@
   }
 
   function create_terminal() {
-    const name = create_name.trim();
-    spawn_tab(name || undefined);
+    const input = create_name.trim();
+    let name = input;
+    let icon = null;
+    const slash_idx = input.indexOf("/");
+    if (slash_idx !== -1) {
+      name = input.slice(0, slash_idx).trim();
+      icon = input.slice(slash_idx + 1).trim();
+    }
+    spawn_tab(name || undefined, icon || undefined);
     creating = false;
     create_name = "";
   }
@@ -106,6 +141,8 @@
   }
 
   function terminal_icon(pane) {
+    const custom = icons[pane.pane_id];
+    if (custom) return custom;
     const name = labels[pane.pane_id] || pane.title || "";
     const lower = name.toLowerCase();
     if (lower.includes("zsh")) return "devicon-plain:terminal";
@@ -129,7 +166,9 @@
       const json = await res.json();
       if (json.ok) {
         delete labels[pane_id];
+        delete icons[pane_id];
         save_labels();
+        save_icons();
         await load_panes();
       } else {
         error = json.error;
@@ -300,7 +339,7 @@
         >
           <div class="flex-1 min-w-0 flex items-center gap-2">
             <span class="text-accent-detail shrink-0">
-              <Icon icon={terminal_icon(pane)} class="w-4 h-4" />
+              <Icon icon={terminal_icon(pane)} class="w-5 h-5" />
             </span>
             <div class="text-print font-lg truncate leading-tight">
               {labels[pane.pane_id] || pane.title || `Pane ${pane.pane_id}`}
