@@ -1,14 +1,24 @@
 mod config;
 mod gui;
 mod terminal;
+mod chat;
 
 use gui::{GuiPlatform, Gtk4Platform};
 use terminal::{TerminalProtocol, WeztermProtocol};
-use std::sync::mpsc;
+use std::io::Read;
+use std::sync::{mpsc, Mutex};
 use std::thread;
 use std::time::Duration;
 use std::fs::read_to_string;
 use std::path::{Path, PathBuf};
+
+use once_cell::sync::Lazy;
+
+static CHAT_SERVICE: Lazy<Mutex<chat::ChatService>> = Lazy::new(|| {
+    let config = chat::ChatConfig::from_props();
+    let backend: Box<dyn chat::AgentBackend> = Box::new(chat::PiAgentBackend::new(config));
+    Mutex::new(chat::ChatService::new(backend))
+});
 
 fn setup_padding_hook() -> Result<(), String> {
     let user_config = std::env::var("WEZTERM_CONFIG_FILE").ok()
@@ -124,6 +134,10 @@ fn start_http_server(port: u16) -> thread::JoinHandle<()> {
 }
 
 fn handle_api(request: tiny_http::Request, url: &str) {
+    if url == "/api/chat/send" {
+        return handle_chat_send(request);
+    }
+
     let root = crate::config::props::UserProps::load()
         .get("current_dir")
         .map(PathBuf::from)
@@ -429,6 +443,74 @@ fn handle_terminal_activate(pane_id: u32) -> tiny_http::Response<std::io::Cursor
         Ok(_) => json_response(&serde_json::json!({ "ok": true })),
         Err(e) => json_error(&e),
     }
+}
+
+fn read_request_body(request: &mut tiny_http::Request) -> String {
+    let mut body = String::new();
+    let _ = request.as_reader().read_to_string(&mut body);
+    body
+}
+
+fn handle_chat_send(mut request: tiny_http::Request) {
+    let body = read_request_body(&mut request);
+
+    let message = match serde_json::from_str::<serde_json::Value>(&body) {
+        Ok(val) => val.get("message").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+        Err(_) => {
+            let err = json_error("Invalid JSON body");
+            let _ = request.respond(err);
+            return;
+        }
+    };
+
+    if message.is_empty() {
+        let err = json_error("Message is empty");
+        let _ = request.respond(err);
+        return;
+    }
+
+    let reader = {
+        let mut service = match CHAT_SERVICE.lock() {
+            Ok(s) => s,
+            Err(_) => {
+                let err = json_error("Chat service lock failed");
+                let _ = request.respond(err);
+                return;
+            }
+        };
+
+        match service.send_message_stream(&message) {
+            Ok(r) => r,
+            Err(e) => {
+                let err = json_error(&format!("Chat error: {}", e));
+                let _ = request.respond(err);
+                return;
+            }
+        }
+    };
+
+    let response = tiny_http::Response::new(
+        tiny_http::StatusCode(200),
+        vec![
+            tiny_http::Header {
+                field: "Content-Type".parse().unwrap(),
+                value: "text/event-stream".parse().unwrap(),
+            },
+            tiny_http::Header {
+                field: "Cache-Control".parse().unwrap(),
+                value: "no-cache".parse().unwrap(),
+            },
+            tiny_http::Header {
+                field: "Access-Control-Allow-Origin".parse().unwrap(),
+                value: "*".parse().unwrap(),
+            },
+        ],
+        reader,
+        None,
+        None,
+    );
+
+    let _ = request.respond(response);
 }
 
 fn handle_active_pane() -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
