@@ -339,7 +339,7 @@
         >
           <div class="flex-1 min-w-0 flex items-center gap-2">
             <span class="text-accent-detail shrink-0">
-              <Icon icon={terminal_icon(pane)} class="w-5 h-5" />
+              <Icon icon={terminal_icon(pane)} class="w-4 h-4" />
             </span>
             <div class="text-print font-lg truncate leading-tight">
               {labels[pane.pane_id] || pane.title || `Pane ${pane.pane_id}`}
