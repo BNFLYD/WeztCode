@@ -276,18 +276,18 @@
     </button>
     {#if creating}
       <span class="font-mono truncate flex items-center gap-1 text-print flex-1">
-        <span class="text-print text-sm">$_</span>
+        <span class="text-print/50 text-sm font-semibold">$_</span>
         <input
           bind:value={create_name}
           bind:this={create_input}
-          placeholder="terminal name"
+          placeholder="sh"
           class="bg-transparent outline-none text-print font-mono text-xs flex-1 min-w-0"
           on:blur={() => { if (!create_name.trim()) creating = false; }}
         />
       </span>
     {:else if renaming}
       <span class="font-mono truncate flex items-center gap-1 text-print flex-1">
-        <span class="text-print text-sm">>_</span>
+        <span class="text-print/50 text-sm font-semibold">>_</span>
         <input
           bind:value={rename_name}
           bind:this={rename_input}
@@ -297,7 +297,7 @@
         />
       </span>
     {:else}
-      <span class="text-sm text-print font-bold tracking-wide flex-1">[~]#</span>
+      <span class="text-sm text-print/50 font-semibold tracking-wide flex-1">[~]#</span>
     {/if}
   </div>
 
@@ -318,7 +318,7 @@
       {#each panes as pane, index}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <div
-          class={"py-3 px-2 rounded-lg hover:bg-accent/5 transition-colors cursor-pointer flex items-center gap-2" +
+          class={"py-2 px-2 rounded-lg hover:bg-accent/5 transition-colors cursor-pointer flex items-center gap-2" +
             (cursor_index === index ? " bg-accent/10" : "")}
           title={pane.raw}
           data-index={index}
