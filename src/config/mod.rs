@@ -13,6 +13,7 @@ pub const DEFAULT_UI_HEIGHT: i32 = 600;
 pub const FRONTEND_URL: &str = "file:///usr/share/weztcode/index.html";
 pub const LUA_FILE_NAME: &str = "weztcode.lua";
 pub const PAD_FILE_NAME: &str = "side_pad";
+pub const ACTIVE_PANE_FILE_NAME: &str = "active_pane";
 pub fn get_frontend_path() -> String {
     let current_dir = env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     let frontend_path = current_dir.join("frontend/dist/index.html");

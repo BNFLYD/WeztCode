@@ -154,7 +154,12 @@
     return "mdi:folder";
   }
 
-  function open_file(path) {
+  async function open_file(path) {
+    const res = await fetch('/api/terminal/active-pane');
+    const json = await res.json();
+    if (json.ok && json.data.pane_id !== 0) {
+      await fetch('/api/terminal/ensure-main', { method: 'POST' });
+    }
     fetch(`/api/editor/open?path=${encodeURIComponent(path)}`);
   }
 

@@ -80,12 +80,20 @@ end)
 
 -- Track the last non-zero pane for toggling to nvim
 local last_non_zero_pane = nil
+local active_pane_file = os.getenv("WEZTCODE_ACTIVE_PANE_FILE")
 
 wezterm.on("update-status", function(window, pane)
     if pane then
         local id = pane:pane_id()
         if id ~= 0 then
             last_non_zero_pane = id
+        end
+        if active_pane_file then
+            local f = io.open(active_pane_file, "w")
+            if f then
+                f:write(tostring(id))
+                f:close()
+            end
         end
     end
 end)

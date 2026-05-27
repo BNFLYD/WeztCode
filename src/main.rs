@@ -59,9 +59,16 @@ fn setup_padding_hook() -> Result<(), String> {
     let pad_str = pad_path.to_str()
         .ok_or_else(|| "Invalid pad path".to_string())?;
 
+    let active_path = weztcode_dir.join(config::ACTIVE_PANE_FILE_NAME);
+    std::fs::write(&active_path, "0")
+        .map_err(|e| format!("Failed to write active_pane file: {}", e))?;
+    let active_str = active_path.to_str()
+        .ok_or_else(|| "Invalid active_pane path".to_string())?;
+
     std::env::set_var("WEZTCODE_SESSION", "true");
     std::env::set_var("WEZTERM_CONFIG_FILE", lua_str);
     std::env::set_var("WEZTCODE_PAD_FILE", pad_str);
+    std::env::set_var("WEZTCODE_ACTIVE_PANE_FILE", active_str);
 
 //     println!("[Main] Padding hook: WEZTERM_CONFIG_FILE={}", lua_str);
 //     println!("[Main] Padding hook: WEZTCODE_PAD_FILE={}", pad_str);
@@ -129,6 +136,10 @@ fn handle_api(request: tiny_http::Request, url: &str) {
     } else if url.starts_with("/api/terminal/kill") {
         let pane_id = parse_query_param(url, "pane_id").and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
         handle_terminal_kill(pane_id)
+    } else if url.starts_with("/api/terminal/active-pane") {
+        handle_active_pane()
+    } else if url.starts_with("/api/terminal/ensure-main") {
+        handle_terminal_ensure_main()
     } else if url.starts_with("/api/terminal/activate") {
         let pane_id = parse_query_param(url, "pane_id").and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
         handle_terminal_activate(pane_id)
@@ -415,6 +426,32 @@ fn handle_terminal_activate(pane_id: u32) -> tiny_http::Response<std::io::Cursor
     }
     let term = WeztermProtocol::new();
     match term.activate_pane(pane_id) {
+        Ok(_) => json_response(&serde_json::json!({ "ok": true })),
+        Err(e) => json_error(&e),
+    }
+}
+
+fn handle_active_pane() -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
+    let path = match std::env::var("WEZTCODE_ACTIVE_PANE_FILE") {
+        Ok(p) => p,
+        Err(_) => return json_error("ACTIVE_PANE_FILE not set"),
+    };
+    match std::fs::read_to_string(&path) {
+        Ok(content) => {
+            let pane_id = content.trim().parse::<u32>().unwrap_or(0);
+            let data = serde_json::json!({
+                "ok": true,
+                "data": { "pane_id": pane_id }
+            });
+            json_response(&data)
+        }
+        Err(e) => json_error(&format!("Failed to read active_pane: {}", e)),
+    }
+}
+
+fn handle_terminal_ensure_main() -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
+    let term = WeztermProtocol::new();
+    match term.activate_pane(0) {
         Ok(_) => json_response(&serde_json::json!({ "ok": true })),
         Err(e) => json_error(&e),
     }

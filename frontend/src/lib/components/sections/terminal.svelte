@@ -143,7 +143,7 @@
   function terminal_icon(pane) {
     const custom = icons[pane.pane_id];
     if (custom) return custom;
-    return "devicon-plain:bash";
+    return "file-icons:terminal";
   }
 
   async function kill_pane(pane_id) {
