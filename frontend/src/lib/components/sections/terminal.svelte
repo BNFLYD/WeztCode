@@ -331,7 +331,7 @@
             <span class="text-print shrink-0">
               <Icon icon={terminal_icon(pane)} class="w-4 h-4" />
             </span>
-            <div class="text-print font-md font-bold truncate leading-tight">
+            <div class="text-print font-medium truncate leading-tight">
               {labels[pane.pane_id] || pane.title || `Pane ${pane.pane_id}`}
             </div>
           </div>
