@@ -143,16 +143,6 @@
   function terminal_icon(pane) {
     const custom = icons[pane.pane_id];
     if (custom) return custom;
-    const name = labels[pane.pane_id] || pane.title || "";
-    const lower = name.toLowerCase();
-    if (lower.includes("zsh")) return "devicon-plain:terminal";
-    if (lower.includes("powershell") || lower.includes("pwsh")) return "devicon-plain:windows8";
-    if (lower.includes("cmd")) return "devicon-plain:windows8";
-    if (lower.includes("node")) return "devicon-plain:nodejs";
-    if (lower.includes("python") || lower.includes("py")) return "devicon-plain:python";
-    if (lower.includes("git")) return "devicon-plain:git";
-    if (lower.includes("docker")) return "devicon-plain:docker";
-    if (lower.includes("rust") || lower.includes("cargo")) return "devicon-plain:rust";
     return "devicon-plain:bash";
   }
 
