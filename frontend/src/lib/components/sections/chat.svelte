@@ -92,8 +92,8 @@
   <div
     class="flex items-center gap-2 px-3 py-2 text-sm text-accent-detail/50 border-b border-accent-detail/20 mb-2 flex-shrink-0"
   >
-    <Icon icon="mdi:chat" class="w-4 h-4" />
-    <span class="font-mono truncate flex items-center gap-1 text-print">
+    <Icon icon="ri:search-line" class="w-4 h-4 hover:text-accent-detail" />
+    <span class="font-mono truncate flex items-center gap-1 text-print/50">
       Chat
     </span>
   </div>
