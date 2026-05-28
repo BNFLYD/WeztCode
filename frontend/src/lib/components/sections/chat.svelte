@@ -107,9 +107,9 @@
         >
           <div
             class={
-              "max-w-[85%] px-3 py-2 rounded-lg text-lg whitespace-pre-wrap" +
+              "max-w-[85%] px-3 py-2 rounded-xl text-lg whitespace-pre-wrap " +
               (msg.role === "user"
-                ? "bg-accent text-print"
+                ? "bg-accent-detail/20 text-print"
                 : "bg-back text-print-contrast")
             }
           >
