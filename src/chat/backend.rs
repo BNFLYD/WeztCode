@@ -29,8 +29,22 @@ fn find_pi_path() -> String {
         return path.to_string();
     }
 
+    let home = std::env::var("HOME").unwrap_or_default();
+    let candidates = [
+        format!("{}/.local/share/pnpm/pi", home),
+        format!("{}/.npm-global/bin/pi", home),
+        "/usr/local/bin/pi".to_string(),
+        "/usr/bin/pi".to_string(),
+    ];
+
+    for candidate in &candidates {
+        if std::path::Path::new(candidate).exists() {
+            return candidate.to_string();
+        }
+    }
+
     let cwd = std::env::current_dir().unwrap_or_default();
-    let local_pi = cwd.join("frontend/node_modules/.bin/pi");
+    let local_pi = cwd.join("node_modules/.bin/pi");
     if local_pi.exists() {
         return local_pi.to_string_lossy().to_string();
     }
