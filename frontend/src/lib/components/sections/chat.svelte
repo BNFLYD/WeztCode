@@ -88,7 +88,7 @@
   }
 </script>
 
-<div class="flex flex-col h-full">
+<div class="flex flex-col gap-1 py-2 h-full relative">
   <div
     class="flex items-center gap-2 px-3 py-2 text-sm text-accent-detail/50 border-b border-accent-detail/20 mb-2 flex-shrink-0"
   >
