@@ -100,7 +100,7 @@ impl PiAgentBackend {
 impl AgentBackend for PiAgentBackend {
     fn spawn(&mut self) -> Result<(), String> {
         let mut cmd = Command::new(&self.config.pi_path);
-        cmd.args(["--mode", "rpc"])
+        cmd.args(["--mode", "rpc", "--no-session"])
             .arg("--provider").arg(&self.config.provider)
             .arg("--model").arg(&self.config.model)
             .stdin(Stdio::piped())
@@ -143,6 +143,8 @@ impl AgentBackend for PiAgentBackend {
             let mut stdin_lock = stdin.lock().map_err(|e| format!("stdin lock: {}", e))?;
             writeln!(stdin_lock, "{}", request_str)
                 .map_err(|e| format!("Failed to write to pi stdin: {}", e))?;
+            stdin_lock.flush()
+                .map_err(|e| format!("Failed to flush pi stdin: {}", e))?;
         }
 
         thread::spawn(move || {
@@ -251,7 +253,7 @@ impl AgentBackend for PiAgentBackend {
                                             status: if is_err { "error" } else { "ok" }.to_string(),
                                         });
                                     }
-                                    "agent_end" | "turn_end" => {
+                                    "agent_end" => {
                                         let _ = tx.send(SseEvent::Done);
                                         break;
                                     }
