@@ -9,7 +9,8 @@ current_dir = "/home/mori/Projects/Rust/GTK4/WeztCode"
 tab_next = "CTRL+J"
 
 -- Chat IA
-llm_provider = "openrouter"
-llm_model = "openrouter/anthropic/claude-sonnet-4"
-llm_api_key = "sk-or-v1-..."
+llm_provider = "opencode"
+llm_model = "deepseek/deepseek-v4-flash-free"
+-- Las API keys se referencian como KEYS.<NOMBRE> desde ~/.config/weztcode/KEYS.env
+llm_api_key = "KEYS.OPENCODE"
 pi_path = "pi"

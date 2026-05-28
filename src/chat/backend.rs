@@ -17,8 +17,8 @@ impl ChatConfig {
         Self {
             provider: props.get("llm_provider").unwrap_or("openrouter").to_string(),
             model: props.get("llm_model").unwrap_or("openrouter/anthropic/claude-sonnet-4").to_string(),
-            api_key: props.get("llm_api_key").unwrap_or("").to_string(),
-            pi_path: props.get("pi_path").unwrap_or("./frontend/node_modules/.bin/pi").to_string(),
+            api_key: props.get_resolved("llm_api_key").unwrap_or_default(),
+            pi_path: props.get("pi_path").unwrap_or("pi").to_string(),
         }
     }
 }

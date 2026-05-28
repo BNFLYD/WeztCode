@@ -38,6 +38,11 @@ impl UserProps {
         self.props.get(key).map(|s| s.as_str())
     }
 
+    pub fn get_resolved(&self, key: &str) -> Option<String> {
+        self.get(key)
+            .map(|raw| crate::config::keys::KeysStore::resolve(raw))
+    }
+
     fn path() -> PathBuf {
         std::env::current_dir()
             .unwrap_or_default()

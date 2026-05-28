@@ -3,3 +3,6 @@ z_dump/
 pnpm-lock.yaml
 .svelte-kit/
 .opencode/
+
+# API keys (user-level, en ~/.config/weztcode/KEYS.env)
+KEYS.env

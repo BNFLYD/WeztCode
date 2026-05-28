@@ -112,7 +112,7 @@
             (msg.role === "user" ? "justify-end" : "justify-start")}
         >
           <div
-            class={"max-w-[85%] px-2 py-2 font-semibold rounded-lg text-lg whitespace-pre-wrap " +
+            class={"max-w-[85%] px-2 py-1 font-semibold rounded-lg text-lg whitespace-pre-wrap " +
               (msg.role === "user"
                 ? "bg-accent-detail/95 text-back-deep"
                 : "bg-back text-print")}

@@ -14,6 +14,8 @@ use std::path::{Path, PathBuf};
 
 use once_cell::sync::Lazy;
 
+use config::keys::KeysStore;
+
 static CHAT_SERVICE: Lazy<Mutex<chat::ChatService>> = Lazy::new(|| {
     let config = chat::ChatConfig::from_props();
     let backend: Box<dyn chat::AgentBackend> = Box::new(chat::PiAgentBackend::new(config));
@@ -138,6 +140,10 @@ fn handle_api(request: tiny_http::Request, url: &str) {
         return handle_chat_send(request);
     }
 
+    if url.starts_with("/api/keys/set") {
+        return handle_keys_set(request);
+    }
+
     let root = crate::config::props::UserProps::load()
         .get("current_dir")
         .map(PathBuf::from)
@@ -157,6 +163,11 @@ fn handle_api(request: tiny_http::Request, url: &str) {
     } else if url.starts_with("/api/terminal/activate") {
         let pane_id = parse_query_param(url, "pane_id").and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
         handle_terminal_activate(pane_id)
+    } else if url.starts_with("/api/keys/delete") {
+        let name = parse_query_param(url, "name").unwrap_or_default();
+        handle_keys_delete(&name)
+    } else if url.starts_with("/api/keys/list") {
+        handle_keys_list()
     } else if url.starts_with("/api/fs/ls") {
         let rel_path = parse_query_param(url, "path").unwrap_or_else(|| "/".to_string());
         handle_ls(&rel_path, &root)
@@ -212,6 +223,10 @@ fn handle_ls(rel_path: &str, root: &Path) -> tiny_http::Response<std::io::Cursor
 }
 
 fn handle_read(rel_path: &str, root: &Path) -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
+    if rel_path.trim_start_matches('/').eq_ignore_ascii_case("KEYS.env") {
+        return json_error("Access denied");
+    }
+
     match crate::config::fs::read_file(rel_path, root) {
         Ok(content) => {
             let data = serde_json::json!({
@@ -341,6 +356,45 @@ fn handle_image(rel_path: String, root: &Path) -> tiny_http::Response<std::io::C
             json_response(&serde_json::json!({ "ok": false, "error": e }))
         },
     }
+}
+
+fn is_keys_path(path: &Path) -> bool {
+    let canonical = path.canonicalize().unwrap_or_default();
+    let keys_path = KeysStore::load_path();
+    canonical == keys_path.canonicalize().unwrap_or_default()
+}
+
+fn handle_keys_set(mut request: tiny_http::Request) -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
+    let body = read_request_body(&mut request);
+    let parsed: serde_json::Value = match serde_json::from_str(&body) {
+        Ok(v) => v,
+        Err(_) => return json_error("Invalid JSON body"),
+    };
+    let name = parsed.get("name").and_then(|v| v.as_str()).unwrap_or("");
+    let value = parsed.get("value").and_then(|v| v.as_str()).unwrap_or("");
+    if name.is_empty() {
+        return json_error("Missing 'name' field");
+    }
+    match KeysStore::set(name, value) {
+        Ok(_) => json_response(&serde_json::json!({ "ok": true })),
+        Err(e) => json_error(&e),
+    }
+}
+
+fn handle_keys_delete(name: &str) -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
+    if name.is_empty() {
+        return json_error("Missing 'name' query param");
+    }
+    match KeysStore::delete(name) {
+        Ok(_) => json_response(&serde_json::json!({ "ok": true })),
+        Err(e) => json_error(&e),
+    }
+}
+
+fn handle_keys_list() -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
+    let store = KeysStore::load();
+    let names = store.list_names();
+    json_response(&serde_json::json!({ "ok": true, "keys": names }))
 }
 
 fn parse_query_param(url: &str, key: &str) -> Option<String> {
@@ -482,7 +536,8 @@ fn handle_chat_send(mut request: tiny_http::Request) {
         match service.send_message_stream(&message) {
             Ok(r) => r,
             Err(e) => {
-                let err = json_error(&format!("Chat error: {}", e));
+                let safe = config::keys::redact_keys(&format!("Chat error: {}", e));
+                let err = json_error(&safe);
                 let _ = request.respond(err);
                 return;
             }
