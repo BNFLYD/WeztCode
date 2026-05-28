@@ -18,9 +18,24 @@ impl ChatConfig {
             provider: props.get("llm_provider").unwrap_or("openrouter").to_string(),
             model: props.get("llm_model").unwrap_or("openrouter/anthropic/claude-sonnet-4").to_string(),
             api_key: props.get_resolved("llm_api_key").unwrap_or_default(),
-            pi_path: props.get("pi_path").unwrap_or("pi").to_string(),
+            pi_path: find_pi_path(),
         }
     }
+}
+
+fn find_pi_path() -> String {
+    let props = crate::config::props::UserProps::load();
+    if let Some(path) = props.get("pi_path").filter(|s| !s.is_empty()) {
+        return path.to_string();
+    }
+
+    let cwd = std::env::current_dir().unwrap_or_default();
+    let local_pi = cwd.join("frontend/node_modules/.bin/pi");
+    if local_pi.exists() {
+        return local_pi.to_string_lossy().to_string();
+    }
+
+    "pi".to_string()
 }
 
 #[derive(Debug, Clone)]

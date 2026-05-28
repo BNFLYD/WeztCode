@@ -31,6 +31,14 @@
         body: JSON.stringify({ message: text }),
       });
 
+      if (!res.ok || !res.headers.get("Content-Type")?.includes("text/event-stream")) {
+        const err_text = await res.text();
+        assistant_msg.content = `Error del servidor:\n${err_text}`;
+        messages = messages;
+        streaming = false;
+        return;
+      }
+
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
