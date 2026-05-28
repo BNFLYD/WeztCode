@@ -96,8 +96,8 @@
     {#if messages.length === 0}
       <div class="flex items-center justify-center h-full">
         <div class="text-center text-print/50">
-          <Icon icon="mdi:thinking" class="w-12 h-12 mx-auto mb-3 opacity-40" />
-          <p class="text-xl">Decime lo que pensás...</p>
+          <Icon icon="mdi:thinking" class="w-20 h-20 mx-auto mb-3 opacity-50" />
+          <p class="text-xl">Animate a crear...</p>
         </div>
       </div>
     {:else}
@@ -107,9 +107,9 @@
         >
           <div
             class={
-              "max-w-[85%] px-3 py-2 rounded-xl text-sm whitespace-pre-wrap " +
+              "max-w-[85%] px-3 py-2 rounded-lg text-lg whitespace-pre-wrap" +
               (msg.role === "user"
-                ? "bg-accent-detail/20 text-print"
+                ? "bg-accent/20 text-print"
                 : "bg-back text-print-contrast")
             }
           >
