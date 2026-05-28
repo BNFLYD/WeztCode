@@ -64,6 +64,21 @@ pub trait AgentBackend: Send {
     fn shutdown(&mut self);
 }
 
+fn env_var_for_provider(provider: &str) -> &'static str {
+    match provider {
+        "opencode" | "opencode-go" => "OPENCODE_API_KEY",
+        "deepseek" => "DEEPSEEK_API_KEY",
+        "openrouter" => "OPENROUTER_API_KEY",
+        "anthropic" => "ANTHROPIC_API_KEY",
+        "openai" => "OPENAI_API_KEY",
+        "google" => "GEMINI_API_KEY",
+        "mistral" => "MISTRAL_API_KEY",
+        "groq" => "GROQ_API_KEY",
+        "xai" => "XAI_API_KEY",
+        _ => "OPENROUTER_API_KEY",
+    }
+}
+
 pub struct PiAgentBackend {
     config: ChatConfig,
     child: Option<Child>,
@@ -85,11 +100,15 @@ impl PiAgentBackend {
 impl AgentBackend for PiAgentBackend {
     fn spawn(&mut self) -> Result<(), String> {
         let mut cmd = Command::new(&self.config.pi_path);
-        cmd.arg("rpc")
+        cmd.args(["--mode", "rpc"])
+            .arg("--provider").arg(&self.config.provider)
+            .arg("--model").arg(&self.config.model)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::inherit())
-            .env("OPENROUTER_API_KEY", &self.config.api_key);
+            .stderr(Stdio::inherit());
+
+        let env_key = env_var_for_provider(&self.config.provider);
+        cmd.env(env_key, &self.config.api_key);
 
         let mut child = cmd.spawn().map_err(|e| format!("Failed to spawn pi: {}", e))?;
 
@@ -114,10 +133,8 @@ impl AgentBackend for PiAgentBackend {
             .clone();
 
         let request = serde_json::json!({
-            "type": "message",
-            "content": message,
-            "model": self.config.model,
-            "provider": self.config.provider,
+            "type": "prompt",
+            "message": message,
         });
 
         let request_str = serde_json::to_string(&request).unwrap_or_default();
@@ -167,64 +184,93 @@ impl AgentBackend for PiAgentBackend {
                                     .unwrap_or("");
 
                                 match event_type {
-                                    "token" | "text" => {
-                                        if let Some(content) = json.get("content")
-                                            .or_else(|| json.get("text"))
-                                            .and_then(|v| v.as_str())
-                                        {
-                                            if !content.is_empty() {
-                                                let _ = tx.send(SseEvent::Token {
-                                                    content: content.to_string(),
-                                                });
+                                    "response" => {
+                                        let success = json.get("success")
+                                            .and_then(|v| v.as_bool())
+                                            .unwrap_or(false);
+                                        if !success {
+                                            let err = json.get("error")
+                                                .and_then(|v| v.as_str())
+                                                .unwrap_or("Unknown error");
+                                            let _ = tx.send(SseEvent::Error {
+                                                message: err.to_string(),
+                                            });
+                                            let _ = tx.send(SseEvent::Done);
+                                            break;
+                                        }
+                                    }
+                                    "message_update" => {
+                                        if let Some(ae) = json.get("assistantMessageEvent") {
+                                            match ae.get("type").and_then(|v| v.as_str()) {
+                                                Some("text_delta") => {
+                                                    if let Some(delta) = ae.get("delta").and_then(|v| v.as_str()) {
+                                                        let _ = tx.send(SseEvent::Token {
+                                                            content: delta.to_string(),
+                                                        });
+                                                    }
+                                                }
+                                                Some("toolcall_end") => {
+                                                    if let Some(tc) = ae.get("toolCall") {
+                                                        let name = tc.get("name")
+                                                            .and_then(|v| v.as_str())
+                                                            .unwrap_or("tool");
+                                                        let _ = tx.send(SseEvent::ToolCall {
+                                                            name: name.to_string(),
+                                                        });
+                                                    }
+                                                }
+                                                Some("error") => {
+                                                    let reason = ae.get("reason")
+                                                                .and_then(|v| v.as_str())
+                                                                .unwrap_or("unknown");
+                                                    let _ = tx.send(SseEvent::Error {
+                                                        message: format!("Stream error: {}", reason),
+                                                    });
+                                                }
+                                                _ => {}
                                             }
                                         }
                                     }
-                                    "tool_call" | "tool" => {
-                                        let name = json.get("name")
+                                    "tool_execution_start" => {
+                                        let name = json.get("toolName")
                                             .and_then(|v| v.as_str())
-                                            .unwrap_or("unknown");
+                                            .unwrap_or("tool");
                                         let _ = tx.send(SseEvent::ToolCall {
                                             name: name.to_string(),
                                         });
                                     }
-                                    "tool_result" => {
-                                        let name = json.get("name")
+                                    "tool_execution_end" => {
+                                        let name = json.get("toolName")
                                             .and_then(|v| v.as_str())
-                                            .unwrap_or("unknown");
-                                        let status = json.get("status")
-                                            .and_then(|v| v.as_str())
-                                            .unwrap_or("ok");
+                                            .unwrap_or("tool");
+                                        let is_err = json.get("isError")
+                                            .and_then(|v| v.as_bool())
+                                            .unwrap_or(false);
                                         let _ = tx.send(SseEvent::ToolResult {
                                             name: name.to_string(),
-                                            status: status.to_string(),
+                                            status: if is_err { "error" } else { "ok" }.to_string(),
                                         });
                                     }
+                                    "agent_end" | "turn_end" => {
+                                        let _ = tx.send(SseEvent::Done);
+                                        break;
+                                    }
                                     "error" => {
-                                        let msg = json.get("message")
-                                            .and_then(|v| v.as_str())
-                                            .unwrap_or("Unknown error");
+                                        let msg = json.get("error")
+                                                            .and_then(|v| v.as_str())
+                                                            .or_else(|| json.get("message").and_then(|v| v.as_str()))
+                                                            .unwrap_or("Unknown error");
                                         let _ = tx.send(SseEvent::Error {
                                             message: msg.to_string(),
                                         });
                                         let _ = tx.send(SseEvent::Done);
                                         break;
                                     }
-                                    "done" | "complete" | "finish" => {
-                                        let _ = tx.send(SseEvent::Done);
-                                        break;
-                                    }
-                                    _ => {
-                                        if let Some(content) = json.get("content").and_then(|v| v.as_str()) {
-                                            if !content.is_empty() {
-                                                let _ = tx.send(SseEvent::Token {
-                                                    content: content.to_string(),
-                                                });
-                                            }
-                                        }
-                                    }
+                                    _ => {}
                                 }
                             }
                             Err(_) => {
+                                // Non-JSON line (shouldn't happen in RPC mode)
                                 let _ = tx.send(SseEvent::Token {
                                     content: trimmed.to_string(),
                                 });
