@@ -107,10 +107,10 @@
         >
           <div
             class={
-              "max-w-[85%] px-3 py-2 rounded-xl text-lg whitespace-pre-wrap " +
+              "max-w-[85%] px-2 py-2 rounded-lg text-lg whitespace-pre-wrap " +
               (msg.role === "user"
-                ? "bg-back text-print"
-                : "bg-accent-detail text-back")
+                ? "bg-accent-detail/40 text-back"
+                : "bg-back text-print")
             }
           >
             {#if msg.role === "assistant" && i === messages.length - 1 && streaming}
