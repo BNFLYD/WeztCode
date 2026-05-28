@@ -89,6 +89,10 @@
 </script>
 
 <div class="flex flex-col h-full">
+<div class="flex items-center gap-2 px-3 py-2 text-sm text-accent-detail/50 border-b border-accent-detail/20 mb-2 flex-shrink-0">
+  <Icon icon="mdi:chat" class="w-5 h-5" />
+  <span>Chat</span>
+</div>
   <div
     class="flex-1 overflow-y-auto px-3 py-2 space-y-3"
     bind:this={list_ref}
