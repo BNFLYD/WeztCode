@@ -89,14 +89,15 @@
 </script>
 
 <div class="flex flex-col h-full">
-<div class="flex items-center gap-2 px-3 py-2 text-sm text-accent-detail/50 border-b border-accent-detail/20 mb-2 flex-shrink-0">
-  <Icon icon="mdi:chat" class="w-5 h-5" />
-  <span>Chat</span>
-</div>
   <div
-    class="flex-1 overflow-y-auto px-3 py-2 space-y-3"
-    bind:this={list_ref}
+    class="flex items-center gap-2 px-3 py-2 text-sm text-accent-detail/50 border-b border-accent-detail/20 mb-2 flex-shrink-0"
   >
+    <Icon icon="mdi:chat" class="w-4 h-4" />
+    <span class="font-mono truncate flex items-center gap-1 text-print">
+      Chat
+    </span>
+  </div>
+  <div class="flex-1 overflow-y-auto px-3 py-2 space-y-3" bind:this={list_ref}>
     {#if messages.length === 0}
       <div class="flex items-center justify-center h-full">
         <div class="text-center text-print/50">
@@ -107,15 +108,14 @@
     {:else}
       {#each messages as msg, i (i)}
         <div
-          class={"flex " + (msg.role === "user" ? "justify-end" : "justify-start")}
+          class={"flex " +
+            (msg.role === "user" ? "justify-end" : "justify-start")}
         >
           <div
-            class={
-              "max-w-[85%] px-2 py-2 font-semibold rounded-lg text-lg whitespace-pre-wrap " +
+            class={"max-w-[85%] px-2 py-2 font-semibold rounded-lg text-lg whitespace-pre-wrap " +
               (msg.role === "user"
                 ? "bg-accent-detail/95 text-back-deep"
-                : "bg-back text-print")
-            }
+                : "bg-back text-print")}
           >
             {#if msg.role === "assistant" && i === messages.length - 1 && streaming}
               {msg.content}<span class="animate-pulse">▌</span>
