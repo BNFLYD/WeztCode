@@ -109,7 +109,7 @@
             class={
               "max-w-[85%] px-2 py-2 rounded-lg text-lg whitespace-pre-wrap " +
               (msg.role === "user"
-                ? "bg-accent-detail/80 text-back"
+                ? "bg-accent-detail/90 text-back-deep"
                 : "bg-back text-print")
             }
           >
