@@ -364,20 +364,24 @@ fn is_keys_path(path: &Path) -> bool {
     canonical == keys_path.canonicalize().unwrap_or_default()
 }
 
-fn handle_keys_set(mut request: tiny_http::Request) -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
+fn handle_keys_set(mut request: tiny_http::Request) {
     let body = read_request_body(&mut request);
     let parsed: serde_json::Value = match serde_json::from_str(&body) {
         Ok(v) => v,
-        Err(_) => return json_error("Invalid JSON body"),
+        Err(_) => {
+            let _ = request.respond(json_error("Invalid JSON body"));
+            return;
+        }
     };
     let name = parsed.get("name").and_then(|v| v.as_str()).unwrap_or("");
     let value = parsed.get("value").and_then(|v| v.as_str()).unwrap_or("");
     if name.is_empty() {
-        return json_error("Missing 'name' field");
+        let _ = request.respond(json_error("Missing 'name' field"));
+        return;
     }
     match KeysStore::set(name, value) {
-        Ok(_) => json_response(&serde_json::json!({ "ok": true })),
-        Err(e) => json_error(&e),
+        Ok(_) => { let _ = request.respond(json_response(&serde_json::json!({ "ok": true }))); }
+        Err(e) => { let _ = request.respond(json_error(&e)); }
     }
 }
 
