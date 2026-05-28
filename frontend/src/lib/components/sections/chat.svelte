@@ -95,9 +95,9 @@
   >
     {#if messages.length === 0}
       <div class="flex items-center justify-center h-full">
-        <div class="text-center text-print/30">
-          <Icon icon="mingcute:ai-fill" class="w-12 h-12 mx-auto mb-3 opacity-40" />
-          <p class="text-sm">Decime lo que pensás...</p>
+        <div class="text-center text-print/50">
+          <Icon icon="mdi:thinking" class="w-12 h-12 mx-auto mb-3 opacity-40" />
+          <p class="text-xl">Decime lo que pensás...</p>
         </div>
       </div>
     {:else}
