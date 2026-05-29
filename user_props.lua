@@ -11,6 +11,5 @@ tab_next = "CTRL+J"
 -- Chat IA
 llm_provider = "opencode"
 llm_model = "deepseek-v4-flash-free"
--- Las API keys se referencian como KEYS.<NOMBRE> desde ~/.config/weztcode/KEYS.env
 llm_api_key = "KEYS.OPENCODE"
 pi_path = "pi"
