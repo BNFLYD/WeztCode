@@ -499,7 +499,7 @@
       {#each entries as entry, index (entry.path)}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <div class={"flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-lg group cursor-pointer hover:bg-accent/5"
-            + (cursor_index === index && window_has_focus ? " bg-accent/10 hover:bg-accent/10" : "")
+            + (cursor_index === index ? " bg-accent/10 hover:bg-accent/10" : "")
             + (clipboard?.entry.path === entry.path ? " opacity-40" : "")}
           data-index={index}
         on:click={() => {
