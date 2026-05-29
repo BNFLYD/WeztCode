@@ -267,7 +267,7 @@
 <svelte:window on:keydown={handle_keydown} />
 
 <div class="flex flex-col gap-1 py-2 h-full relative">
-  <div class="flex items-center gap-2 px-3 py-2 border-b border-accent-detail/20 mb-2 flex-shrink-0">
+  <div class="flex items-center gap-2 px-3 py-2 text-sm text-accent-detail/50 border-b border-accent-detail/20 mb-2 flex-shrink-0">
   <button
       on:click={() => { creating = true; create_name = ""; }}
       class="flex items-center gap-1 text-xs text-print/50 hover:text-print transition-colors"
@@ -276,23 +276,23 @@
     </button>
     {#if creating}
       <span class="font-mono truncate flex items-center gap-1 text-print flex-1">
-        <span class="text-print/50 text-sm font-semibold">$_</span>
+        <span class="text-print-contrast text-sm font-semibold">$_</span>
         <input
           bind:value={create_name}
           bind:this={create_input}
           placeholder="new.sh"
-          class="bg-transparent outline-none text-print font-mono text-xs flex-1 min-w-0"
+          class="bg-transparent outline-none text-print font-mono text-sm flex-1 min-w-0"
           on:blur={() => { if (!create_name.trim()) creating = false; }}
         />
       </span>
     {:else if renaming}
       <span class="font-mono truncate flex items-center gap-1 text-print flex-1">
-        <span class="text-print/50 text-sm font-semibold">>_</span>
+        <span class="text-print-contrast text-sm font-semibold">>_</span>
         <input
           bind:value={rename_name}
           bind:this={rename_input}
           placeholder="rename.sh"
-          class="bg-transparent outline-none text-print font-mono text-xs flex-1 min-w-0"
+          class="bg-transparent outline-none text-print font-mono text-sm flex-1 min-w-0"
           on:blur={rename_entry}
         />
       </span>
