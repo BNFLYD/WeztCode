@@ -266,8 +266,8 @@
 
 <svelte:window on:keydown={handle_keydown} />
 
-<div class="flex flex-col gap-1 py-2 h-full">
-  <div class="flex items-center gap-2 px-3 py-2.5 border-b border-accent-detail/20 mb-2 flex-shrink-0">
+<div class="flex flex-col gap-1 py-2 h-full relative">
+  <div class="flex items-center gap-2 px-3 py-2 border-b border-accent-detail/20 mb-2 flex-shrink-0">
   <button
       on:click={() => { creating = true; create_name = ""; }}
       class="flex items-center gap-1 text-xs text-print/50 hover:text-print transition-colors"
@@ -318,7 +318,7 @@
       {#each panes as pane, index}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <div
-          class={"flex items-center gap-2 px-3 py-2 rounded-lg transition-colors cursor-pointer hover:bg-accent/5" +
+          class={"flex items-center gap-2 px-3 py-2.5 rounded-lg transition-colors cursor-pointer hover:bg-accent/5" +
             (cursor_index === index ? " bg-accent/10 hover:bg-accent/10" : "")}
           title={pane.raw}
           data-index={index}
