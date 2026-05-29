@@ -59,12 +59,13 @@
     const pane = panes[cursor_index];
     if (pane) {
       if (name) {
-        labels[pane.pane_id] = name;
+        labels = { ...labels, [pane.pane_id]: name };
       } else {
-        delete labels[pane.pane_id];
+        const { [pane.pane_id]: _, ...rest } = labels;
+        labels = rest;
       }
       if (icon) {
-        icons[pane.pane_id] = icon;
+        icons = { ...icons, [pane.pane_id]: icon };
         save_icons();
       }
       save_labels();
@@ -116,11 +117,11 @@
       const json = await res.json();
       if (json.ok) {
         if (name) {
-          labels[json.data.pane_id] = name;
+          labels = { ...labels, [json.data.pane_id]: name };
           save_labels();
         }
         if (icon) {
-          icons[json.data.pane_id] = icon;
+          icons = { ...icons, [json.data.pane_id]: icon };
           save_icons();
         }
         await load_panes();
@@ -166,8 +167,10 @@
       });
       const json = await res.json();
       if (json.ok) {
-        delete labels[pane_id];
-        delete icons[pane_id];
+        const { [pane_id]: _, ...rest_labels } = labels;
+        labels = rest_labels;
+        const { [pane_id]: __, ...rest_icons } = icons;
+        icons = rest_icons;
         save_labels();
         save_icons();
         await load_panes();
