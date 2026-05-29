@@ -2,10 +2,29 @@
   import { afterUpdate } from "svelte";
   import Icon from "@iconify/svelte";
 
-  let messages = [];
+  const STORAGE_KEY = "weztcode_chat_messages";
+
+  let messages = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
   let input_value = "";
   let streaming = false;
   let list_ref;
+
+  function save() {
+    const raw = JSON.stringify(messages);
+    // localStorage tiene ~5MB, pero prevenimos truncamiento
+    try {
+      localStorage.setItem(STORAGE_KEY, raw);
+    } catch {
+      // Si excede cuota, guardamos solo los últimos 50 mensajes
+      const trimmed = messages.slice(-50);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
+    }
+  }
+
+  function newConversation() {
+    messages = [];
+    localStorage.removeItem(STORAGE_KEY);
+  }
 
   afterUpdate(() => {
     if (list_ref) {
@@ -18,11 +37,13 @@
     if (!text || streaming) return;
 
     messages = [...messages, { role: "user", content: text }];
+    save();
     input_value = "";
     streaming = true;
 
     const assistant_msg = { role: "assistant", content: "" };
     messages = [...messages, assistant_msg];
+    save();
 
     try {
       const res = await fetch("/api/chat/send", {
@@ -35,6 +56,7 @@
         const err_text = await res.text();
         assistant_msg.content = `Error del servidor:\n${err_text}`;
         messages = messages;
+        save();
         streaming = false;
         return;
       }
@@ -60,14 +82,17 @@
               case "token":
                 assistant_msg.content += data.content;
                 messages = messages;
+                save();
                 break;
               case "tool_call":
                 assistant_msg.content += `\n\n[${data.name}]`;
                 messages = messages;
+                save();
                 break;
               case "error":
                 assistant_msg.content += `\n\nError: ${data.message}`;
                 messages = messages;
+                save();
                 break;
               case "done":
                 break;
@@ -78,6 +103,7 @@
     } catch (e) {
       assistant_msg.content += `\n\nConnection error: ${e.message}`;
       messages = messages;
+      save();
     }
 
     if (!assistant_msg.content.trim()) {
@@ -86,6 +112,7 @@
 
     streaming = false;
     messages = messages;
+    save();
   }
 
   function handle_keydown(e) {
@@ -104,6 +131,12 @@
     <span class="font-mono truncate flex items-center gap-1 text-print/50">
       Chat
     </span>
+    <button
+      class="ml-auto text-xs px-2 py-0.5 rounded border border-accent-detail/30 hover:bg-accent-detail/10 text-accent-detail/60 hover:text-accent-detail transition-colors"
+      on:click={newConversation}
+    >
+      Nueva
+    </button>
   </div>
   <div class="flex-1 overflow-y-auto px-3 py-2 space-y-3" bind:this={list_ref}>
     {#if messages.length === 0}
