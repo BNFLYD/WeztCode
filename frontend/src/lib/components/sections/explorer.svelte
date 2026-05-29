@@ -13,7 +13,6 @@
   let error = null;
   let cursor_index = 0;
   let list_ref;
-  let window_has_focus = true;
   let creating = false;
   let create_name = "";
   let create_input;
@@ -430,14 +429,7 @@
   load_dir("/");
 </script>
 
-<svelte:window
-  on:keydown={handle_keydown}
-  on:focus={() => {
-    window_has_focus = true;
-    if (!loading) load_dir(current_path);
-  }}
-  on:blur={() => window_has_focus = false}
-/>
+<svelte:window on:keydown={handle_keydown} />
 
 <div class="flex flex-col gap-1 py-2 h-full relative">
   <div class="flex items-center gap-2 px-3 py-2 text-sm text-accent-detail/50 border-b border-accent-detail/20 mb-2 flex-shrink-0">
