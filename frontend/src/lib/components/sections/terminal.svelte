@@ -272,7 +272,7 @@
       on:click={() => { creating = true; create_name = ""; }}
       class="flex items-center gap-1 text-xs text-print/50 hover:text-print transition-colors"
     >
-      <Icon icon="lucide:plus" class="w-4 h-4" />
+      <Icon icon="tabler:square-plus" class="w-4 h-4" />
     </button>
     {#if creating}
       <span class="font-mono truncate flex items-center gap-1 text-print flex-1">
@@ -280,7 +280,7 @@
         <input
           bind:value={create_name}
           bind:this={create_input}
-          placeholder="sh"
+          placeholder="new.sh"
           class="bg-transparent outline-none text-print font-mono text-xs flex-1 min-w-0"
           on:blur={() => { if (!create_name.trim()) creating = false; }}
         />
@@ -291,7 +291,7 @@
         <input
           bind:value={rename_name}
           bind:this={rename_input}
-          placeholder="rename"
+          placeholder="rename.sh"
           class="bg-transparent outline-none text-print font-mono text-xs flex-1 min-w-0"
           on:blur={rename_entry}
         />
