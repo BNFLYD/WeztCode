@@ -270,9 +270,9 @@
   <div class="flex items-center gap-2 px-3 py-2 border-b border-accent-detail/20 mb-2 flex-shrink-0">
   <button
       on:click={() => { creating = true; create_name = ""; }}
-      class="flex items-center gap-1 border border-accent-detail/20 rounded-xs text-xs text-print/50 hover:text-print transition-colors"
+      class="flex items-center gap-1 text-xs text-print/50 hover:text-print transition-colors"
     >
-      <Icon icon="tabler:plus-filled" class="w-4 h-4" />
+      <Icon icon="tabler:plus-filled border border-accent-detail/40 hover:border-accent-detail rounded-md" class="w-4 h-4" />
     </button>
     {#if creating}
       <span class="font-mono truncate flex items-center gap-1 text-print flex-1">
