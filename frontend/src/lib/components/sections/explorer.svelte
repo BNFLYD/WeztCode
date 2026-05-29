@@ -1,3 +1,7 @@
+<script context="module">
+  let saved_state = { path: "/", entry_name: null };
+</script>
+
 <script>
   import { afterUpdate, onDestroy } from "svelte";
   import Icon from "@iconify/svelte";
@@ -295,6 +299,10 @@
   });
 
   onDestroy(() => {
+    saved_state = {
+      path: current_path,
+      entry_name: entries[cursor_index]?.name ?? null
+    };
     if (controller) controller.abort();
     if (channel_timeout) {
       clearTimeout(channel_timeout);
@@ -431,7 +439,7 @@
     }
   }
 
-  load_dir("/");
+  load_dir(saved_state.path, saved_state.entry_name);
 </script>
 
 <svelte:window on:keydown={handle_keydown} />
