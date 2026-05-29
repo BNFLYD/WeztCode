@@ -441,12 +441,12 @@
 
 <div class="flex flex-col gap-1 py-2 h-full relative">
   <div class="flex items-center gap-2 px-3 py-2 text-sm text-accent-detail/50 border-b border-accent-detail/20 mb-2 flex-shrink-0">
-    <button on:click={go_up} class="hover:text-print transition-colors" disabled={current_path === "/"}>
+    <button on:click={go_up} class="hover:text-print transition-colors">
       <Icon icon="tabler:folder" class="w-4 h-4" />
     </button>
     {#if creating}
       <span class="font-mono truncate flex items-center gap-1 text-print">
-        <span class="text-print">add:</span>
+        <span class="text-print-contrast">add:</span>
         <input
           bind:value={create_name}
           bind:this={create_input}
@@ -457,7 +457,7 @@
       </span>
     {:else if renaming}
       <span class="font-mono truncate flex items-center gap-1 text-print">
-        <span class="text-print">upd:</span>
+        <span class="text-print-contrast">upd:</span>
         <input
           bind:value={rename_name}
           bind:this={rename_input}
@@ -468,7 +468,7 @@
       </span>
     {:else if moving}
       <span class="font-mono truncate flex items-center gap-1 text-print">
-        <span class="text-print">mv:</span>
+        <span class="text-print-contrast">mv:</span>
         <input
           bind:value={move_name}
           bind:this={move_input}
@@ -478,7 +478,7 @@
         />
       </span>
     {:else}
-      <span class="font-mono truncate">{current_path}</span>
+      <span class="font-mono truncate-start">{current_path}</span>
     {/if}
   </div>
 
@@ -499,8 +499,8 @@
       {#each entries as entry, index (entry.path)}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <div
-          class={"flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent/5 transition-colors text-lg group cursor-pointer"
-            + (cursor_index === index && window_has_focus ? " bg-accent/10" : "")
+          class={"flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-lg group cursor-pointer"
+            + (cursor_index === index && window_has_focus ? " bg-accent/10" : "hover:bg-accent/5")
             + (clipboard?.entry.path === entry.path ? " opacity-40" : "")}
           data-index={index}
         on:click={() => {

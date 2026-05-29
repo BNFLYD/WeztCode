@@ -272,7 +272,7 @@
       on:click={() => { creating = true; create_name = ""; }}
       class="flex items-center gap-1 text-xs text-print/50 hover:text-print transition-colors"
     >
-      <Icon icon="tabler:square-plus" class="w-4 h-4" />
+      <Icon icon="tabler:plus-filled" class="w-4 h-4" />
     </button>
     {#if creating}
       <span class="font-mono truncate flex items-center gap-1 text-print flex-1">
@@ -318,8 +318,8 @@
       {#each panes as pane, index}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <div
-          class={"py-2 px-2 rounded-lg hover:bg-accent/5 transition-colors cursor-pointer flex items-center gap-2" +
-            (cursor_index === index ? " bg-accent/10" : "")}
+          class={"flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors cursor-pointer" +
+            (cursor_index === index ? " bg-accent/10" : "hover:bg-accent/5")}
           title={pane.raw}
           data-index={index}
           on:click={() => {
@@ -331,11 +331,11 @@
             <span class="text-print shrink-0">
               <Icon icon={terminal_icon(pane)} class="w-4 h-4" />
             </span>
-            <div class="text-print font-medium truncate leading-tight">
+            <div class="text-print text-lg truncate leading-tight">
               {labels[pane.pane_id] || pane.title || `Pane ${pane.pane_id}`}
             </div>
           </div>
-          <span class="font-bold font-sm text-accent-detail shrink-0 text-xs"
+          <span class="font-bold text-xs text-accent-detail shrink-0"
             >T{pane.tab_id}</span
           >
         </div>
