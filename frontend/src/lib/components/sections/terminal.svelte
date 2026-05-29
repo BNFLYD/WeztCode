@@ -1,6 +1,12 @@
+<script context="module">
+  let saved_state = { pane_id: null };
+</script>
+
 <script>
   import { afterUpdate, onDestroy, onMount } from "svelte";
   import Icon from "@iconify/svelte";
+
+  export let active_section = "term";
 
   let panes = [];
   let loading = true;
@@ -89,6 +95,11 @@
             };
           })
           .filter((p) => p.tab_id !== 0);
+        if (saved_state.pane_id !== null) {
+          const idx = panes.findIndex(p => p.pane_id === saved_state.pane_id);
+          if (idx !== -1) cursor_index = idx;
+          saved_state.pane_id = null;
+        }
       } else {
         error = json.error;
       }
@@ -203,6 +214,8 @@
   }
 
   function handle_keydown(e) {
+    if (!document.hasFocus()) return;
+    if (active_section !== "term") return;
     if (renaming) {
       if (e.key === "Enter") { e.preventDefault(); rename_entry(); }
       else if (e.key === "Escape") { e.preventDefault(); renaming = false; rename_name = ""; }
@@ -260,6 +273,8 @@
   });
 
   onDestroy(() => {
+    const pane = panes[cursor_index];
+    if (pane) saved_state.pane_id = pane.pane_id;
     if (controller) controller.abort();
   });
 </script>
