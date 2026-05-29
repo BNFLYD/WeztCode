@@ -1,5 +1,5 @@
 use std::io::{BufRead, BufReader, Read, Write};
-use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
+use std::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command, Stdio};
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
 
@@ -119,6 +119,7 @@ pub struct PiAgentBackend {
     child: Option<Child>,
     stdin: Option<Mutex<ChildStdin>>,
     stdout: Option<Arc<Mutex<ChildStdout>>>,
+    stderr: Option<Arc<Mutex<ChildStderr>>>,
 }
 
 impl PiAgentBackend {
@@ -128,6 +129,7 @@ impl PiAgentBackend {
             child: None,
             stdin: None,
             stdout: None,
+            stderr: None,
         }
     }
 }
@@ -140,7 +142,7 @@ impl AgentBackend for PiAgentBackend {
             .arg("--model").arg(&self.config.model)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::inherit());
+            .stderr(Stdio::piped());
 
         let env_key = env_var_for_provider(&self.config.provider);
         cmd.env(env_key, &self.config.api_key);
@@ -167,6 +169,12 @@ impl AgentBackend for PiAgentBackend {
                 eprintln!("[pi] {}", msg);
                 msg
             })?;
+        let stderr = child.stderr.take()
+            .ok_or_else(|| {
+                let msg = "Failed to capture pi stderr".to_string();
+                eprintln!("[pi] {}", msg);
+                msg
+            })?;
 
         // Pequeña pausa para detectar si pi muere inmediatamente (como rpc-client.ts)
         std::thread::sleep(std::time::Duration::from_millis(200));
@@ -186,6 +194,7 @@ impl AgentBackend for PiAgentBackend {
 
         self.stdin = Some(Mutex::new(stdin));
         self.stdout = Some(Arc::new(Mutex::new(stdout)));
+        self.stderr = Some(Arc::new(Mutex::new(stderr)));
         self.child = Some(child);
         Ok(())
     }
@@ -206,6 +215,7 @@ impl AgentBackend for PiAgentBackend {
                 msg
             })?
             .clone();
+        let stderr_arc = self.stderr.as_ref().map(Arc::clone);
 
         let request = serde_json::json!({
             "type": "prompt",
@@ -222,8 +232,36 @@ impl AgentBackend for PiAgentBackend {
                 .map_err(|e| format!("Failed to flush pi stdin: {}", e))?;
         }
 
-        eprintln!("[pi] send_message: sending prompt, starting reader thread");
+        eprintln!("[pi] send_message: sending prompt, starting reader threads");
 
+        // Thread for stderr: capture pi warnings/errors and forward them as SseEvent::Error
+        if let Some(stderr_arc) = stderr_arc {
+            let tx_err = tx.clone();
+            thread::spawn(move || {
+                let mut stderr_lock = match stderr_arc.lock() {
+                    Ok(g) => g,
+                    Err(_) => return,
+                };
+                let mut reader = BufReader::new(&mut *stderr_lock);
+                let mut line = String::new();
+                loop {
+                    line.clear();
+                    match reader.read_line(&mut line) {
+                        Ok(0) | Err(_) => break,
+                        Ok(_) => {
+                            let trimmed = line.trim();
+                            if !trimmed.is_empty() {
+                                let _ = tx_err.send(SseEvent::Error {
+                                    message: format!("[pi stderr] {}", trimmed),
+                                });
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Thread for stdout: parse JSON event stream
         thread::spawn(move || {
             let mut stdout_lock = match stdout_arc.lock() {
                 Ok(g) => g,
@@ -370,6 +408,7 @@ impl AgentBackend for PiAgentBackend {
     fn shutdown(&mut self) {
         self.stdin = None;
         self.stdout = None;
+        self.stderr = None;
         if let Some(mut child) = self.child.take() {
             let _ = child.kill();
             let _ = child.wait();
