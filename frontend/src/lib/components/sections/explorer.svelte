@@ -110,7 +110,7 @@
     preview_timeout = null;
   }
 
-  async function load_dir(path) {
+  async function load_dir(path, focus_name = null) {
     if (controller) controller.abort();
     controller = new AbortController();
     const signal = controller.signal;
@@ -123,6 +123,10 @@
       if (json.ok) {
         entries = json.data.files;
         current_path = json.data.path;
+        if (focus_name) {
+          const idx = entries.findIndex(e => e.name === focus_name);
+          if (idx !== -1) cursor_index = idx;
+        }
       } else {
         error = json.error;
       }
@@ -263,8 +267,9 @@
   function go_up() {
     if (current_path === "/") return;
     const parts = current_path.split("/").filter(Boolean);
-    parts.pop();
-    load_dir(parts.length === 0 ? "/" : "/" + parts.join("/"));
+    const focus_name = parts.pop();
+    const parent = parts.length === 0 ? "/" : "/" + parts.join("/");
+    load_dir(parent, focus_name);
   }
 
   function move_cursor(delta) {
