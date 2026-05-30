@@ -1,7 +1,46 @@
 use crate::terminal::TerminalProtocol;
+use std::io::Read;
 use std::process::{Child, Command, Stdio};
+use std::time::Duration;
 
 pub struct WeztermProtocol;
+
+fn run_cmd_with_timeout(cmd: &mut Command, timeout: Duration) -> Result<std::process::Output, String> {
+    cmd.stdout(Stdio::piped());
+    cmd.stderr(Stdio::piped());
+
+    let mut child = cmd.spawn().map_err(|e| format!("Failed to spawn: {}", e))?;
+
+    let deadline = std::time::Instant::now() + timeout;
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) => {
+                if std::time::Instant::now() >= deadline {
+                    let _ = child.kill();
+                    child.wait().ok();
+                    return Err("Command timed out".to_string());
+                }
+                std::thread::sleep(Duration::from_millis(50));
+            }
+            Err(e) => {
+                let _ = child.kill();
+                return Err(format!("Failed to wait: {}", e));
+            }
+        }
+    };
+
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    if let Some(ref mut out) = child.stdout {
+        let _ = out.read_to_end(&mut stdout);
+    }
+    if let Some(ref mut err) = child.stderr {
+        let _ = err.read_to_end(&mut stderr);
+    }
+
+    Ok(std::process::Output { status, stdout, stderr })
+}
 
 impl WeztermProtocol {
     pub fn new() -> Self {
@@ -58,8 +97,7 @@ impl TerminalProtocol for WeztermProtocol {
                 cmd.args(["--class", class]);
             }
             cmd.arg("list");
-            let output = cmd.output()
-                .map_err(|e| format!("Failed to list panes: {}", e))?;
+            let output = run_cmd_with_timeout(&mut cmd, Duration::from_secs(5))?;
             if output.status.success() {
                 Ok(String::from_utf8_lossy(&output.stdout).to_string())
             } else {
@@ -84,8 +122,7 @@ impl TerminalProtocol for WeztermProtocol {
             cmd.arg("--pane-id").arg(id.to_string());
         }
 
-        let output = cmd.output()
-            .map_err(|e| format!("Failed to send text: {}", e))?;
+        let output = run_cmd_with_timeout(&mut cmd, Duration::from_secs(5))?;
 
         if output.status.success() {
             Ok(())
@@ -109,9 +146,7 @@ impl TerminalProtocol for WeztermProtocol {
         if let Some(dir) = cwd {
             cmd.arg("--cwd").arg(dir);
         }
-        let output = cmd
-            .output()
-            .map_err(|e| format!("Failed to spawn tab: {}", e))?;
+        let output = run_cmd_with_timeout(&mut cmd, Duration::from_secs(5))?;
 
         if output.status.success() {
             let pane_id = String::from_utf8_lossy(&output.stdout)
@@ -125,10 +160,9 @@ impl TerminalProtocol for WeztermProtocol {
     }
 
     fn kill_pane(&self, pane_id: u32) -> Result<(), String> {
-        let output = Command::new("wezterm")
-            .args(["cli", "--class", crate::config::WINDOW_CLASS, "kill-pane", "--pane-id", &pane_id.to_string()])
-            .output()
-            .map_err(|e| format!("Failed to kill pane: {}", e))?;
+        let mut cmd = Command::new("wezterm");
+        cmd.args(["cli", "--class", crate::config::WINDOW_CLASS, "kill-pane", "--pane-id", &pane_id.to_string()]);
+        let output = run_cmd_with_timeout(&mut cmd, Duration::from_secs(5))?;
 
         if output.status.success() {
             Ok(())
@@ -138,10 +172,9 @@ impl TerminalProtocol for WeztermProtocol {
     }
 
     fn activate_pane(&self, pane_id: u32) -> Result<(), String> {
-        let output = Command::new("wezterm")
-            .args(["cli", "--class", crate::config::WINDOW_CLASS, "activate-pane", "--pane-id", &pane_id.to_string()])
-            .output()
-            .map_err(|e| format!("Failed to activate pane: {}", e))?;
+        let mut cmd = Command::new("wezterm");
+        cmd.args(["cli", "--class", crate::config::WINDOW_CLASS, "activate-pane", "--pane-id", &pane_id.to_string()]);
+        let output = run_cmd_with_timeout(&mut cmd, Duration::from_secs(5))?;
 
         if output.status.success() {
             Ok(())

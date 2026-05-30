@@ -80,17 +80,7 @@
       const res = await fetch("/api/terminal/list", { signal });
       const json = await res.json();
       if (json.ok) {
-        panes = (json.data || [])
-          .map((line) => {
-            const cols = line.split(/\s+/);
-            return {
-              tab_id: parseInt(cols[1]) || 0,
-              pane_id: parseInt(cols[2]) || 0,
-              title: cols.slice(5).join(" "),
-              raw: line,
-            };
-          })
-          .filter((p) => p.tab_id !== 0);
+        panes = (json.data || []).filter((p) => p.tab_id !== 0);
         if (saved_state.pane_id !== null) {
           const idx = panes.findIndex(p => p.pane_id === saved_state.pane_id);
           if (idx !== -1) cursor_index = idx;
@@ -340,7 +330,7 @@
         <div
           class={"flex items-center gap-2 px-3 py-2.5 rounded-lg transition-colors cursor-pointer hover:bg-accent/5" +
             (cursor_index === index ? " bg-accent/10 hover:bg-accent/10" : "")}
-          title={pane.raw}
+          title={pane.title || `Pane ${pane.pane_id}`}
           data-index={index}
           on:click={() => {
             cursor_index = index;

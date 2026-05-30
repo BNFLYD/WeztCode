@@ -451,15 +451,9 @@ fn json_error(msg: &str) -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
 
 fn handle_terminal_list() -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
     let term = WeztermProtocol::new();
-    match term.list_panes() {
-        Ok(raw) => {
-            eprintln!("[terminal_list] raw output: {:?}", raw);
-            let lines: Vec<String> = raw.lines()
-                .skip(1)
-                .filter(|l| !l.trim().is_empty())
-                .map(|l| l.trim().to_string())
-                .collect();
-            let data = serde_json::json!({ "ok": true, "data": lines });
+    match term.list_panes_structured() {
+        Ok(panes) => {
+            let data = serde_json::json!({ "ok": true, "data": panes });
             json_response(&data)
         }
         Err(e) => json_error(&e),
