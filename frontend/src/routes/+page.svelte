@@ -28,7 +28,7 @@
     {:else if active_section === "view"}
       <ViewSection />
     {:else if active_section === "term"}
-      <TerminalSection />
+      <TerminalSection {active_section} />
     {:else if active_section === "settings"}
       <SettingsSection />
     {/if}

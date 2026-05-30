@@ -22,6 +22,7 @@
   let create_input;
   let list_ref;
   let controller = null;
+  let load_timeout = null;
 
   onMount(() => {
     try {
@@ -35,14 +36,9 @@
     load_panes();
   });
 
-  function save_labels() {
+  function save_metadata() {
     try {
       localStorage.setItem("terminal_labels", JSON.stringify(labels));
-    } catch {}
-  }
-
-  function save_icons() {
-    try {
       localStorage.setItem("terminal_icons", JSON.stringify(icons));
     } catch {}
   }
@@ -66,9 +62,8 @@
       }
       if (icon) {
         icons = { ...icons, [pane.pane_id]: icon };
-        save_icons();
       }
-      save_labels();
+      save_metadata();
     }
     renaming = false;
     rename_name = "";
@@ -118,13 +113,12 @@
       if (json.ok) {
         if (name) {
           labels = { ...labels, [json.data.pane_id]: name };
-          save_labels();
         }
         if (icon) {
           icons = { ...icons, [json.data.pane_id]: icon };
-          save_icons();
         }
-        await load_panes();
+        save_metadata();
+        schedule_load();
       } else {
         error = json.error;
       }
@@ -171,9 +165,8 @@
         labels = rest_labels;
         const { [pane_id]: __, ...rest_icons } = icons;
         icons = rest_icons;
-        save_labels();
-        save_icons();
-        await load_panes();
+        save_metadata();
+        schedule_load();
       } else {
         error = json.error;
       }
@@ -196,6 +189,14 @@
     } catch (e) {
       error = e.message;
     }
+  }
+
+  function schedule_load() {
+    if (load_timeout) clearTimeout(load_timeout);
+    load_timeout = setTimeout(() => {
+      load_panes();
+      load_timeout = null;
+    }, 300);
   }
 
   function move_cursor(delta) {
@@ -279,6 +280,7 @@
     const pane = panes[cursor_index];
     if (pane) saved_state.pane_id = pane.pane_id;
     if (controller) controller.abort();
+    if (load_timeout) clearTimeout(load_timeout);
   });
 </script>
 
@@ -311,7 +313,7 @@
           bind:this={rename_input}
           placeholder="rename.sh"
           class="bg-transparent outline-none text-print font-mono text-sm flex-1 min-w-0"
-          on:blur={rename_entry}
+          on:blur={() => { if (!rename_name.trim()) renaming = false; }}
         />
       </span>
     {:else}
@@ -333,7 +335,7 @@
         <span class="text-print/50 text-lg">0 tabs</span>
       </div>
     {:else}
-      {#each panes as pane, index}
+      {#each panes as pane, index (pane.pane_id)}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <div
           class={"flex items-center gap-2 px-3 py-2.5 rounded-lg transition-colors cursor-pointer hover:bg-accent/5" +
