@@ -835,21 +835,38 @@ fn main() {
         let _term2 = WeztermProtocol::new();
         let _ = _term2.spawn_tab(cwd.as_deref(), None);
     } else {
-        let term2 = WeztermProtocol::new();
-        for dt in &autostart_terms {
-            match term2.spawn_tab(cwd.as_deref(), Some(&dt.program)) {
-                Ok(pane_id) => {
+        // Try Lua mux spawn first (avoids focus flash)
+        let cwd_ref = cwd.as_deref();
+        match crate::terminal::lua_spawn::spawn_autostart_terms(&autostart_terms, cwd_ref) {
+            Ok(spawned) => {
+                for (pane_id, name, icon) in spawned {
                     let _ = crate::config::terms_metadata::set(
                         pane_id,
-                        Some(dt.name.clone()),
-                        Some(dt.icon.clone()),
+                        Some(name),
+                        Some(icon),
                     );
                 }
-                Err(e) => eprintln!("[main] Failed to spawn '{}': {}", dt.name, e),
+            }
+            Err(_) => {
+                eprintln!("[main] Lua spawn failed, falling back to CLI spawn");
+                let term2 = WeztermProtocol::new();
+                for dt in &autostart_terms {
+                    match term2.spawn_tab(cwd_ref, Some(&dt.program)) {
+                        Ok(pane_id) => {
+                            let _ = crate::config::terms_metadata::set(
+                                pane_id,
+                                Some(dt.name.clone()),
+                                Some(dt.icon.clone()),
+                            );
+                        }
+                        Err(e) => eprintln!("[main] Failed to spawn '{}': {}", dt.name, e),
+                    }
+                }
+                // Only needed for CLI spawn: switch focus back to pane 0
+                let _ = term.activate_pane(0);
             }
         }
     }
-    let _ = term.activate_pane(0);
 
 //     println!("WeztCode corriendo...");
     platform.run();

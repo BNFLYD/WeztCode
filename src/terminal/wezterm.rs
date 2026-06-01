@@ -5,7 +5,7 @@ use std::time::Duration;
 
 pub struct WeztermProtocol;
 
-fn run_cmd_with_timeout(cmd: &mut Command, timeout: Duration) -> Result<std::process::Output, String> {
+pub fn run_cmd_with_timeout(cmd: &mut Command, timeout: Duration) -> Result<std::process::Output, String> {
     cmd.stdout(Stdio::piped());
     cmd.stderr(Stdio::piped());
 
