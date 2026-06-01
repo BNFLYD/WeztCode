@@ -65,6 +65,7 @@ pub fn add(name: &str, icon: &str, program: &str) -> Result<Vec<DefaultTerm>, St
         name: name.to_string(),
         icon: icon.to_string(),
         program: program.to_string(),
+        autostart: false,
     });
     save(&terms)?;
     Ok(terms)
