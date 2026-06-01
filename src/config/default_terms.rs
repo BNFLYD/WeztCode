@@ -7,6 +7,8 @@ pub struct DefaultTerm {
     pub name: String,
     pub icon: String,
     pub program: String,
+    #[serde(default)]
+    pub autostart: bool,
 }
 
 fn home_dir() -> PathBuf {

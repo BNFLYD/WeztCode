@@ -820,12 +820,13 @@ fn main() {
         .map(|s| s.to_string());
 
     let default_terms = crate::config::default_terms::list();
-    if default_terms.is_empty() {
+    let autostart_terms: Vec<_> = default_terms.iter().filter(|t| t.autostart).collect();
+    if autostart_terms.is_empty() {
         let _term2 = WeztermProtocol::new();
         let _ = _term2.spawn_tab(cwd.as_deref(), None);
     } else {
         let term2 = WeztermProtocol::new();
-        for dt in &default_terms {
+        for dt in &autostart_terms {
             match term2.spawn_tab(cwd.as_deref(), Some(&dt.program)) {
                 Ok(pane_id) => {
                     let _ = crate::config::terms_metadata::set(
