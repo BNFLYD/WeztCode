@@ -117,13 +117,10 @@
       src="/api/fs/image?path={encodeURIComponent(image_path)}"
       class="absolute inset-0 w-full h-full object-contain z-10"
       alt={name}
-      onerror={(e) => console.error('[preview] img error:', e.target.src)}
+      onerror={(e) => console.error("[preview] img error:", e.target.src)}
     />
   {/if}
   <div
     class="absolute bottom-0 left-0 right-0 z-20 flex items-center gap-2 px-3 py-1.5 bg-back-deep/80 rounded-md text-sm"
-  >
-    <Icon {icon} class="w-4 h-4 text-accent-detail shrink-0" />
-    <span class="text-print font-medium truncate flex-1">{name}</span>
-  </div>
+  ></div>
 {/if}
