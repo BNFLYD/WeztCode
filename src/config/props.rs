@@ -43,6 +43,31 @@ impl UserProps {
             .map(|raw| crate::config::keys::KeysStore::resolve(raw))
     }
 
+    pub fn set(key: &str, value: &str) -> Result<(), String> {
+        let path = Self::path();
+        let content = fs::read_to_string(&path).unwrap_or_default();
+        let mut lines: Vec<String> = content.lines().map(String::from).collect();
+        let search_key = format!("{} =", key);
+        let search_key_alt = format!("{}=", key);
+        let mut found = false;
+
+        for line in lines.iter_mut() {
+            let trimmed = line.trim();
+            if trimmed.starts_with(&search_key) || trimmed.starts_with(&search_key_alt) {
+                *line = format!("{} = \"{}\"", key, value);
+                found = true;
+                break;
+            }
+        }
+
+        if !found {
+            lines.push(format!("{} = \"{}\"", key, value));
+        }
+
+        fs::write(&path, lines.join("\n") + "\n")
+            .map_err(|e| format!("Cannot write user_props.lua: {}", e))
+    }
+
     fn path() -> PathBuf {
         std::env::current_dir()
             .unwrap_or_default()

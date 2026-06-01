@@ -28,6 +28,9 @@
   let move_name = "";
   let move_input;
   let controller = null;
+  let show_projects = false;
+  let projects = [];
+  let project_loading = false;
 
   let channel_obj = null;
   let channel_timeout = null;
@@ -269,16 +272,84 @@
   }
 
   function go_up() {
-    if (current_path === "/") return;
+    if (current_path === "/") {
+      load_projects();
+      return;
+    }
     const parts = current_path.split("/").filter(Boolean);
     const focus_name = parts.pop();
     const parent = parts.length === 0 ? "/" : "/" + parts.join("/");
     load_dir(parent, focus_name);
   }
 
+  async function load_projects() {
+    show_projects = true;
+    project_loading = true;
+    error = null;
+    cursor_index = 0;
+    try {
+      const res = await fetch("/api/projects/list");
+      const json = await res.json();
+      if (json.ok) {
+        projects = json.data || [];
+      } else {
+        error = json.error;
+      }
+    } catch (e) {
+      error = e.message;
+    }
+    project_loading = false;
+  }
+
+  function exit_projects() {
+    show_projects = false;
+    projects = [];
+  }
+
+  async function select_project(path) {
+    const res = await fetch(`/api/projects/switch?path=${encodeURIComponent(path)}`);
+    const json = await res.json();
+    if (json.ok) {
+      show_projects = false;
+      projects = [];
+      await load_dir("/");
+    } else {
+      error = json.error;
+    }
+  }
+
+  async function create_project_entry() {
+    const name = create_name.trim();
+    if (!name) { creating = false; return; }
+    const res = await fetch("/api/projects/add", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: name }),
+    });
+    const json = await res.json();
+    creating = false;
+    create_name = "";
+    if (json.ok) {
+      projects = json.data || [];
+    } else {
+      error = json.error;
+    }
+  }
+
+  async function delete_project_entry(path) {
+    const res = await fetch(`/api/projects/delete?path=${encodeURIComponent(path)}`);
+    const json = await res.json();
+    if (json.ok) {
+      projects = json.data || [];
+    } else {
+      error = json.error;
+    }
+  }
+
   function move_cursor(delta) {
+    const len = show_projects ? projects.length : entries.length;
     const new_index = cursor_index + delta;
-    if (new_index < 0 || new_index >= entries.length) return;
+    if (new_index < 0 || new_index >= len) return;
     cursor_index = new_index;
     scroll_to_cursor();
   }
@@ -316,6 +387,8 @@
     preview_data = null;
     active_channel = null;
     is_distorting = false;
+    show_projects = false;
+    projects = [];
   });
 
   function activate_current() {
@@ -332,7 +405,8 @@
     if (creating) {
       if (e.key === "Enter") {
         e.preventDefault();
-        create_entry();
+        if (show_projects) create_project_entry();
+        else create_entry();
       } else if (e.key === "Escape") {
         e.preventDefault();
         creating = false;
@@ -368,6 +442,61 @@
     if (channel_active) {
       if (["h","l","j","k","ArrowLeft","ArrowRight","ArrowUp","ArrowDown","d","D","a","A","r","R","x","X","p","P","m","M","Enter"," ","Escape"].includes(e.key)) {
         e.preventDefault();
+      }
+      return;
+    }
+
+    if (show_projects) {
+      switch (e.key) {
+        case "j":
+        case "ArrowDown":
+          e.preventDefault();
+          move_cursor(1);
+          break;
+        case "k":
+        case "ArrowUp":
+          e.preventDefault();
+          move_cursor(-1);
+          break;
+        case "l":
+        case "ArrowRight":
+        case "Enter":
+        case " ":
+          e.preventDefault();
+          const proj = projects[cursor_index];
+          if (proj) select_project(proj.path);
+          break;
+        case "h":
+        case "ArrowLeft":
+        case "Escape":
+          e.preventDefault();
+          exit_projects();
+          break;
+        case "a":
+        case "A":
+          e.preventDefault();
+          creating = true;
+          create_name = "";
+          break;
+        case "d":
+        case "D":
+          e.preventDefault();
+          const entry = projects[cursor_index];
+          if (!entry) break;
+          handle_channel({
+            id: "explorer",
+            props: {
+              mode: "confirm",
+              icon: "mdi:folder-open",
+              name: entry.name,
+              on_confirm: async () => {
+                await delete_project_entry(entry.path);
+              },
+              on_cancel: () => {},
+              on_close: handle_channel_close
+            }
+          });
+          break;
       }
       return;
     }
@@ -446,11 +575,26 @@
 
 <div class="flex flex-col gap-1 py-2 h-full relative">
   <div class="flex items-center gap-2 px-3 py-2 text-sm text-accent-detail/50 border-b border-accent-detail/20 mb-2 flex-shrink-0">
-    <button on:click={go_up} class="hover:text-print transition-colors">
-      <Icon icon="tabler:folder" class="w-4 h-4" />
+    <button on:click={show_projects ? exit_projects : go_up} class="hover:text-print transition-colors">
+      <Icon icon={show_projects ? "tabler:arrow-left" : "tabler:folder"} class="w-4 h-4" />
     </button>
-    {#if creating}
-      <span class="font-mono truncate flex items-center gap-1 text-print">
+    {#if show_projects}
+      {#if creating}
+        <span class="font-mono truncate flex items-center gap-1 text-print flex-1">
+          <span class="text-print-contrast">path:</span>
+          <input
+            bind:value={create_name}
+            bind:this={create_input}
+            placeholder="/home/user/projects"
+            class="bg-transparent outline-none text-print font-mono flex-1 min-w-0"
+            on:blur={() => { if (!create_name.trim()) creating = false; }}
+          />
+        </span>
+      {:else}
+        <span class="font-mono truncate-start text-print-contrast">proyectos</span>
+      {/if}
+    {:else if creating}
+      <span class="font-mono truncate flex items-center gap-1 text-print flex-1">
         <span class="text-print-contrast">add:</span>
         <input
           bind:value={create_name}
@@ -461,7 +605,7 @@
         />
       </span>
     {:else if renaming}
-      <span class="font-mono truncate flex items-center gap-1 text-print">
+      <span class="font-mono truncate flex items-center gap-1 text-print flex-1">
         <span class="text-print-contrast">upd:</span>
         <input
           bind:value={rename_name}
@@ -472,7 +616,7 @@
         />
       </span>
     {:else if moving}
-      <span class="font-mono truncate flex items-center gap-1 text-print">
+      <span class="font-mono truncate flex items-center gap-1 text-print flex-1">
         <span class="text-print-contrast">mv:</span>
         <input
           bind:value={move_name}
@@ -488,7 +632,39 @@
   </div>
 
   <div class="flex-1 overflow-y-auto min-h-0" bind:this={list_ref}>
-    {#if loading}
+    {#if show_projects}
+      {#if project_loading}
+        <div class="flex items-center justify-center py-8">
+          <span class="text-print/50 text-lg">Loading...</span>
+        </div>
+      {:else if error}
+        <div class="flex items-center justify-center py-8">
+          <span class="text-accent-err text-lg">{error}</span>
+        </div>
+      {:else if projects.length === 0 && !creating}
+        <div class="flex items-center justify-center py-8">
+          <span class="text-print/50 text-lg">No hay proyectos</span>
+        </div>
+      {:else}
+        {#each projects as proj, index (proj.path)}
+          <!-- svelte-ignore a11y-click-events-have-key-events -->
+          <div class={"flex items-center gap-2 px-3 py-2.5 rounded-lg transition-colors text-lg group cursor-pointer hover:bg-accent/5"
+              + (cursor_index === index ? " bg-accent/10 hover:bg-accent/10" : "")}
+            data-index={index}
+            on:click={() => {
+              cursor_index = index;
+              select_project(proj.path);
+            }}
+          >
+            <span class="text-accent-detail">
+              <Icon icon="mdi:folder-open" class="w-4 h-4" />
+            </span>
+            <span class="text-print font-medium flex-shrink-0">{proj.name}</span>
+            <span class="text-print/30 text-xs truncate ml-2">{proj.path}</span>
+          </div>
+        {/each}
+      {/if}
+    {:else if loading}
       <div class="flex items-center justify-center py-8">
         <span class="text-print/50 text-lg">Loading...</span>
       </div>

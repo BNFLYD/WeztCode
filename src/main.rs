@@ -144,6 +144,10 @@ fn handle_api(request: tiny_http::Request, url: &str) {
         return handle_keys_set(request);
     }
 
+    if url.starts_with("/api/projects/add") {
+        return handle_projects_add(request);
+    }
+
     let root = crate::config::props::UserProps::load()
         .get("current_dir")
         .map(PathBuf::from)
@@ -163,6 +167,14 @@ fn handle_api(request: tiny_http::Request, url: &str) {
     } else if url.starts_with("/api/terminal/activate") {
         let pane_id = parse_query_param(url, "pane_id").and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
         handle_terminal_activate(pane_id)
+    } else if url.starts_with("/api/projects/list") {
+        handle_projects_list()
+    } else if url.starts_with("/api/projects/delete") {
+        let path = parse_query_param(url, "path").unwrap_or_default();
+        handle_projects_delete(&path)
+    } else if url.starts_with("/api/projects/switch") {
+        let path = parse_query_param(url, "path").unwrap_or_default();
+        handle_projects_switch(&path)
     } else if url.starts_with("/api/keys/delete") {
         let name = parse_query_param(url, "name").unwrap_or_default();
         handle_keys_delete(&name)
@@ -587,6 +599,40 @@ fn handle_active_pane() -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
 fn handle_terminal_ensure_main() -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
     let term = WeztermProtocol::new();
     match term.activate_pane(0) {
+        Ok(_) => json_response(&serde_json::json!({ "ok": true })),
+        Err(e) => json_error(&e),
+    }
+}
+
+fn handle_projects_list() -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
+    let projects = crate::config::project_dirs::list();
+    json_response(&serde_json::json!({ "ok": true, "data": projects }))
+}
+
+fn handle_projects_add(mut request: tiny_http::Request) {
+    let body = read_request_body(&mut request);
+    let parsed: serde_json::Value = serde_json::from_str(&body).unwrap_or_default();
+    let path = parsed.get("path").and_then(|v| v.as_str()).unwrap_or("");
+    let response = match crate::config::project_dirs::add(path) {
+        Ok(projects) => json_response(&serde_json::json!({ "ok": true, "data": projects })),
+        Err(e) => json_error(&e),
+    };
+    let _ = request.respond(response);
+}
+
+fn handle_projects_delete(path: &str) -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
+    match crate::config::project_dirs::remove(path) {
+        Ok(projects) => json_response(&serde_json::json!({ "ok": true, "data": projects })),
+        Err(e) => json_error(&e),
+    }
+}
+
+fn handle_projects_switch(path: &str) -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
+    let dir = std::path::Path::new(path);
+    if !dir.is_dir() {
+        return json_error("Directory not found");
+    }
+    match crate::config::props::UserProps::set("current_dir", path) {
         Ok(_) => json_response(&serde_json::json!({ "ok": true })),
         Err(e) => json_error(&e),
     }

@@ -1,5 +1,6 @@
 pub mod fs;
 pub mod keys;
+pub mod project_dirs;
 pub mod props;
 
 use once_cell::sync::Lazy;
