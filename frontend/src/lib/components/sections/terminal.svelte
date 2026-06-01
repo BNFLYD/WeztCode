@@ -85,13 +85,13 @@
     if (!signal.aborted) loading = false;
   }
 
-  async function spawn_tab(name, icon) {
+  async function spawn_tab(name, icon, program) {
     error = null;
     try {
       const res = await fetch("/api/terminal/spawn", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, icon }),
+        body: JSON.stringify({ name, icon, program }),
       });
       const json = await res.json();
       if (json.ok) {
@@ -107,8 +107,38 @@
     }
   }
 
-  function create_terminal() {
+  async function create_terminal() {
     const input = create_name.trim();
+
+    if (input.startsWith("dterm:")) {
+      const dterm_name = input.slice(6).trim();
+      if (!dterm_name) {
+        error = "Debe especificar un nombre: dterm:Yazi";
+        creating = false;
+        create_name = "";
+        return;
+      }
+      try {
+        const res = await fetch("/api/terminal/default-terms");
+        const json = await res.json();
+        if (json.ok) {
+          const found = json.data.find(t => t.name === dterm_name);
+          if (found) {
+            await spawn_tab(found.name, found.icon, found.program);
+          } else {
+            error = `Terminal por defecto inválida: "${dterm_name}"`;
+          }
+        } else {
+          error = json.error;
+        }
+      } catch (e) {
+        error = e.message;
+      }
+      creating = false;
+      create_name = "";
+      return;
+    }
+
     let name = input;
     let icon = null;
     const slash_idx = input.indexOf("/");
@@ -116,7 +146,7 @@
       name = input.slice(0, slash_idx).trim();
       icon = input.slice(slash_idx + 1).trim();
     }
-    spawn_tab(name || undefined, icon || undefined);
+    await spawn_tab(name || undefined, icon || undefined, undefined);
     creating = false;
     create_name = "";
   }

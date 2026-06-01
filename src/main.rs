@@ -156,6 +156,10 @@ fn handle_api(request: tiny_http::Request, url: &str) {
         return handle_terminal_metadata(request);
     }
 
+    if url.starts_with("/api/terminal/default-terms") {
+        return handle_terminal_default_terms(request);
+    }
+
     if url.starts_with("/api/terminal/edit-defaults") {
         return handle_terminal_edit_defaults(request);
     }
@@ -594,6 +598,12 @@ fn handle_terminal_edit_defaults(request: tiny_http::Request) {
             json_error(&format!("Failed to run nvim: {}", e))
         }
     };
+    let _ = request.respond(response);
+}
+
+fn handle_terminal_default_terms(request: tiny_http::Request) {
+    let terms = crate::config::default_terms::list();
+    let response = json_response(&serde_json::json!({ "ok": true, "data": terms }));
     let _ = request.respond(response);
 }
 
