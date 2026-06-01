@@ -1,5 +1,6 @@
 use crate::config::default_terms::DefaultTerm;
 use crate::terminal::wezterm::{run_cmd_with_timeout, WeztermProtocol};
+use crate::terminal::TerminalProtocol;
 use std::process::Command;
 use std::time::Duration;
 

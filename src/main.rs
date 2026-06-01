@@ -14,6 +14,7 @@ use std::path::{Path, PathBuf};
 
 use once_cell::sync::Lazy;
 
+use config::default_terms::DefaultTerm;
 use config::keys::KeysStore;
 
 static CHAT_SERVICE: Lazy<Mutex<chat::ChatService>> = Lazy::new(|| {
@@ -830,7 +831,7 @@ fn main() {
         .map(|s| s.to_string());
 
     let default_terms = crate::config::default_terms::list();
-    let autostart_terms: Vec<_> = default_terms.iter().filter(|t| t.autostart).collect();
+    let autostart_terms: Vec<DefaultTerm> = default_terms.iter().filter(|t| t.autostart).cloned().collect();
     if autostart_terms.is_empty() {
         let _term2 = WeztermProtocol::new();
         let _ = _term2.spawn_tab(cwd.as_deref(), None);
