@@ -4,5 +4,7 @@ pnpm-lock.yaml
 .svelte-kit/
 .opencode/
 
+frontend/dist/
+
 # API keys (user-level, en ~/.config/weztcode/KEYS.env)
 KEYS.env

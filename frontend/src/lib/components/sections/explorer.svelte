@@ -31,6 +31,7 @@
   let show_projects = false;
   let projects = [];
   let project_loading = false;
+  let pending_g = false;
 
   let channel_obj = null;
   let channel_timeout = null;
@@ -272,10 +273,7 @@
   }
 
   function go_up() {
-    if (current_path === "/") {
-      load_projects();
-      return;
-    }
+    if (current_path === "/") return;
     const parts = current_path.split("/").filter(Boolean);
     const focus_name = parts.pop();
     const parent = parts.length === 0 ? "/" : "/" + parts.join("/");
@@ -389,6 +387,7 @@
     is_distorting = false;
     show_projects = false;
     projects = [];
+    pending_g = false;
   });
 
   function activate_current() {
@@ -401,6 +400,16 @@
   function handle_keydown(e) {
     if (!document.hasFocus()) return;
     if (active_section !== "explorer") return;
+
+    if (pending_g) {
+      if (e.key === "h" || e.key === "H") {
+        e.preventDefault();
+        pending_g = false;
+        load_projects();
+        return;
+      }
+      pending_g = false;
+    }
 
     if (creating) {
       if (e.key === "Enter") {
@@ -556,6 +565,11 @@
         e.preventDefault();
         creating = true;
         create_name = "";
+        break;
+      case "g":
+      case "G":
+        e.preventDefault();
+        pending_g = true;
         break;
       case "Enter":
         e.preventDefault();
