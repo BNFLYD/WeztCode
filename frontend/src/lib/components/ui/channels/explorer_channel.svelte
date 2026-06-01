@@ -120,7 +120,4 @@
       onerror={(e) => console.error("[preview] img error:", e.target.src)}
     />
   {/if}
-  <div
-    class="absolute bottom-0 left-0 right-0 z-20 flex items-center gap-2 px-3 py-1.5 bg-back-deep/80 rounded-md text-sm"
-  ></div>
 {/if}
