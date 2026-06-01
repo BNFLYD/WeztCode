@@ -15,8 +15,8 @@ pub trait TerminalProtocol {
     fn set_right_padding(&self, pixels: u32) -> Result<(), String>;
     fn is_available() -> bool where Self: Sized;
 
-    /// Spawns a new tab, returns pane_id
-    fn spawn_tab(&self, cwd: Option<&str>) -> Result<u32, String>;
+    /// Spawns a new tab with an optional program, returns pane_id
+    fn spawn_tab(&self, cwd: Option<&str>, program: Option<&str>) -> Result<u32, String>;
     /// Kills a pane by ID
     fn kill_pane(&self, pane_id: u32) -> Result<(), String>;
     /// Activates a pane by ID

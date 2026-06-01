@@ -9,10 +9,9 @@
   export let active_section = "term";
 
   let panes = [];
+  let metadata = {};
   let loading = true;
   let error = null;
-  let labels = {};
-  let icons = {};
   let renaming = false;
   let rename_name = "";
   let rename_input;
@@ -25,25 +24,10 @@
   let load_timeout = null;
 
   onMount(() => {
-    try {
-      const saved = localStorage.getItem("terminal_labels");
-      if (saved) labels = JSON.parse(saved);
-    } catch {}
-    try {
-      const saved = localStorage.getItem("terminal_icons");
-      if (saved) icons = JSON.parse(saved);
-    } catch {}
     load_panes();
   });
 
-  function save_metadata() {
-    try {
-      localStorage.setItem("terminal_labels", JSON.stringify(labels));
-      localStorage.setItem("terminal_icons", JSON.stringify(icons));
-    } catch {}
-  }
-
-  function rename_entry() {
+  async function rename_entry() {
     const input = rename_name.trim();
     let name = input;
     let icon = null;
@@ -54,16 +38,21 @@
     }
     const pane = panes[cursor_index];
     if (pane) {
-      if (name) {
-        labels = { ...labels, [pane.pane_id]: name };
+      const res = await fetch("/api/terminal/metadata/set", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pane_id: pane.pane_id,
+          name: name || null,
+          icon: icon || null,
+        }),
+      });
+      const json = await res.json();
+      if (json.ok) {
+        metadata = { ...metadata, [pane.pane_id]: { name: name || null, icon: icon || null } };
       } else {
-        const { [pane.pane_id]: _, ...rest } = labels;
-        labels = rest;
+        error = json.error;
       }
-      if (icon) {
-        icons = { ...icons, [pane.pane_id]: icon };
-      }
-      save_metadata();
     }
     renaming = false;
     rename_name = "";
@@ -80,7 +69,8 @@
       const res = await fetch("/api/terminal/list", { signal });
       const json = await res.json();
       if (json.ok) {
-        panes = (json.data || []).filter((p) => p.tab_id !== 0);
+        panes = (json.data.panes || []).filter((p) => p.tab_id !== 0);
+        metadata = json.data.metadata || {};
         if (saved_state.pane_id !== null) {
           const idx = panes.findIndex(p => p.pane_id === saved_state.pane_id);
           if (idx !== -1) cursor_index = idx;
@@ -98,16 +88,16 @@
   async function spawn_tab(name, icon) {
     error = null;
     try {
-      const res = await fetch("/api/terminal/spawn", { method: "POST" });
+      const res = await fetch("/api/terminal/spawn", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, icon }),
+      });
       const json = await res.json();
       if (json.ok) {
-        if (name) {
-          labels = { ...labels, [json.data.pane_id]: name };
+        if (json.data.name || json.data.icon) {
+          metadata = { ...metadata, [json.data.pane_id]: { name: json.data.name, icon: json.data.icon } };
         }
-        if (icon) {
-          icons = { ...icons, [json.data.pane_id]: icon };
-        }
-        save_metadata();
         schedule_load();
       } else {
         error = json.error;
@@ -137,8 +127,8 @@
   }
 
   function terminal_icon(pane) {
-    const custom = icons[pane.pane_id];
-    if (custom) return custom;
+    const meta = metadata[pane.pane_id];
+    if (meta?.icon) return meta.icon;
     return "file-icons:terminal";
   }
 
@@ -151,11 +141,9 @@
       });
       const json = await res.json();
       if (json.ok) {
-        const { [pane_id]: _, ...rest_labels } = labels;
-        labels = rest_labels;
-        const { [pane_id]: __, ...rest_icons } = icons;
-        icons = rest_icons;
-        save_metadata();
+        await fetch(`/api/terminal/metadata/delete?pane_id=${pane_id}`);
+        const { [pane_id]: _, ...rest } = metadata;
+        metadata = rest;
         schedule_load();
       } else {
         error = json.error;
@@ -242,7 +230,7 @@
       case "R":
         e.preventDefault();
         renaming = true;
-        rename_name = labels[panes[cursor_index]?.pane_id] || "";
+        rename_name = metadata[panes[cursor_index]?.pane_id]?.name || "";
         break;
       case "d":
       case "D":
@@ -342,7 +330,7 @@
               <Icon icon={terminal_icon(pane)} class="w-4 h-4" />
             </span>
             <div class="text-print text-lg truncate leading-tight">
-              {labels[pane.pane_id] || pane.title || `Pane ${pane.pane_id}`}
+              {metadata[pane.pane_id]?.name || pane.title || `Pane ${pane.pane_id}`}
             </div>
           </div>
           <span class="font-bold text-xs text-accent-detail shrink-0"

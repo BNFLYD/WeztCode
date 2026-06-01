@@ -148,6 +148,18 @@ fn handle_api(request: tiny_http::Request, url: &str) {
         return handle_projects_add(request);
     }
 
+    if url.starts_with("/api/terminal/spawn") {
+        return handle_terminal_spawn(request);
+    }
+
+    if url.starts_with("/api/terminal/metadata") {
+        return handle_terminal_metadata(request);
+    }
+
+    if url.starts_with("/api/terminal/edit-defaults") {
+        return handle_terminal_edit_defaults(request);
+    }
+
     let root = crate::config::props::UserProps::load()
         .get("current_dir")
         .map(PathBuf::from)
@@ -155,8 +167,6 @@ fn handle_api(request: tiny_http::Request, url: &str) {
 
     let response: tiny_http::Response<std::io::Cursor<Vec<u8>>> = if url.starts_with("/api/terminal/list") {
         handle_terminal_list()
-    } else if url.starts_with("/api/terminal/spawn") {
-        handle_terminal_spawn()
     } else if url.starts_with("/api/terminal/kill") {
         let pane_id = parse_query_param(url, "pane_id").and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
         handle_terminal_kill(pane_id)
@@ -465,26 +475,51 @@ fn handle_terminal_list() -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
     let term = WeztermProtocol::new();
     match term.list_panes_structured() {
         Ok(panes) => {
-            let data = serde_json::json!({ "ok": true, "data": panes });
+            let metadata = crate::config::terms_metadata::list();
+            let data = serde_json::json!({
+                "ok": true,
+                "data": {
+                    "panes": panes,
+                    "metadata": metadata
+                }
+            });
             json_response(&data)
         }
         Err(e) => json_error(&e),
     }
 }
 
-fn handle_terminal_spawn() -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
+fn handle_terminal_spawn(mut request: tiny_http::Request) {
+    let body = read_request_body(&mut request);
+    let parsed: serde_json::Value = serde_json::from_str(&body).unwrap_or_default();
+    let name = parsed.get("name").and_then(|v| v.as_str()).map(|s| s.to_string());
+    let icon = parsed.get("icon").and_then(|v| v.as_str()).map(|s| s.to_string());
+    let program = parsed.get("program").and_then(|v| v.as_str()).map(|s| s.to_string());
+
     let cwd = crate::config::props::UserProps::load()
         .get("current_dir")
         .filter(|s| !s.is_empty())
         .map(|s| s.to_string());
+
     let term = WeztermProtocol::new();
-    match term.spawn_tab(cwd.as_deref()) {
+    let response = match term.spawn_tab(cwd.as_deref(), program.as_deref()) {
         Ok(pane_id) => {
-            let data = serde_json::json!({ "ok": true, "data": { "pane_id": pane_id } });
+            if name.is_some() || icon.is_some() {
+                let _ = crate::config::terms_metadata::set(pane_id, name.clone(), icon.clone());
+            }
+            let data = serde_json::json!({
+                "ok": true,
+                "data": {
+                    "pane_id": pane_id,
+                    "name": name,
+                    "icon": icon
+                }
+            });
             json_response(&data)
         }
         Err(e) => json_error(&e),
-    }
+    };
+    let _ = request.respond(response);
 }
 
 fn handle_terminal_kill(pane_id: u32) -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
@@ -507,6 +542,59 @@ fn handle_terminal_activate(pane_id: u32) -> tiny_http::Response<std::io::Cursor
         Ok(_) => json_response(&serde_json::json!({ "ok": true })),
         Err(e) => json_error(&e),
     }
+}
+
+fn handle_terminal_metadata(mut request: tiny_http::Request) {
+    let url = request.url().to_string();
+
+    if url.starts_with("/api/terminal/metadata/set") {
+        let body = read_request_body(&mut request);
+        let parsed: serde_json::Value = serde_json::from_str(&body).unwrap_or_default();
+        let pane_id = parsed.get("pane_id").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+        let name = parsed.get("name").and_then(|v| v.as_str()).map(|s| s.to_string());
+        let icon = parsed.get("icon").and_then(|v| v.as_str()).map(|s| s.to_string());
+        let response = match crate::config::terms_metadata::set(pane_id, name, icon) {
+            Ok(_) => json_response(&serde_json::json!({ "ok": true })),
+            Err(e) => json_error(&e),
+        };
+        let _ = request.respond(response);
+        return;
+    }
+
+    if url.starts_with("/api/terminal/metadata/delete") {
+        let pane_id = parse_query_param(&url, "pane_id")
+            .and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
+        let response = match crate::config::terms_metadata::remove(pane_id) {
+            Ok(_) => json_response(&serde_json::json!({ "ok": true })),
+            Err(e) => json_error(&e),
+        };
+        let _ = request.respond(response);
+        return;
+    }
+
+    let metadata = crate::config::terms_metadata::list();
+    let response = json_response(&serde_json::json!({ "ok": true, "data": metadata }));
+    let _ = request.respond(response);
+}
+
+fn handle_terminal_edit_defaults(request: tiny_http::Request) {
+    let path = crate::config::default_terms::detect_path_str();
+    let response = match std::process::Command::new("nvim")
+        .args(["--server", "/tmp/weztcode-nvim.sock", "--remote", &path])
+        .output()
+    {
+        Ok(o) if o.status.success() => {
+            json_response(&serde_json::json!({ "ok": true }))
+        }
+        Ok(o) => {
+            let stderr = String::from_utf8_lossy(&o.stderr);
+            json_error(&format!("nvim failed: {}", stderr))
+        }
+        Err(e) => {
+            json_error(&format!("Failed to run nvim: {}", e))
+        }
+    };
+    let _ = request.respond(response);
 }
 
 fn read_request_body(request: &mut tiny_http::Request) -> String {
@@ -725,16 +813,31 @@ fn main() {
         std::process::exit(1);
     }
 
-    // TODO: technical debt — this creates a visible flicker because spawn_tab()
-    // steals focus and activate_pane(0) returns it. Future: use Lua API from a
-    // background thread to spawn without auto-focus.
-    // Spawn an additional default terminal, then return focus to nvim
+    // Spawn terminal tabs: from default_terms.json or fallback to generic
     let cwd = crate::config::props::UserProps::load()
         .get("current_dir")
         .filter(|s| !s.is_empty())
         .map(|s| s.to_string());
-    let _term2 = WeztermProtocol::new();
-    let _ = _term2.spawn_tab(cwd.as_deref());
+
+    let default_terms = crate::config::default_terms::list();
+    if default_terms.is_empty() {
+        let _term2 = WeztermProtocol::new();
+        let _ = _term2.spawn_tab(cwd.as_deref(), None);
+    } else {
+        let term2 = WeztermProtocol::new();
+        for dt in &default_terms {
+            match term2.spawn_tab(cwd.as_deref(), Some(&dt.program)) {
+                Ok(pane_id) => {
+                    let _ = crate::config::terms_metadata::set(
+                        pane_id,
+                        Some(dt.name.clone()),
+                        Some(dt.icon.clone()),
+                    );
+                }
+                Err(e) => eprintln!("[main] Failed to spawn '{}': {}", dt.name, e),
+            }
+        }
+    }
     let _ = term.activate_pane(0);
 
 //     println!("WeztCode corriendo...");

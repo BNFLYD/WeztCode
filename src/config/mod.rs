@@ -1,7 +1,9 @@
+pub mod default_terms;
 pub mod fs;
 pub mod keys;
 pub mod project_dirs;
 pub mod props;
+pub mod terms_metadata;
 
 use once_cell::sync::Lazy;
 use std::sync::Mutex;

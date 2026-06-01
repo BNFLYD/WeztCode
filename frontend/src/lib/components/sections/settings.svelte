@@ -75,6 +75,10 @@
     show_add_form = false;
   }
 
+  async function open_default_terms() {
+    await fetch("/api/terminal/edit-defaults");
+  }
+
   load_keys();
 </script>
 
@@ -188,5 +192,21 @@
         class="text-[10px] text-accent hover:text-accent-hover self-start"
       >+ agregar key</button>
     {/if}
+  </div>
+
+  <hr class="border-accent-detail my-2" />
+
+  <div class="flex flex-col gap-3">
+    <h3 class="text-xs font-bold text-print uppercase tracking-wide">
+      Terminales por defecto
+    </h3>
+    <p class="text-[10px] text-print-dim">
+      Editá el archivo JSON para definir terminales que se abren al inicio.
+      Se spawnearán automáticamente al reiniciar WeztCode.
+    </p>
+    <button
+      on:click={open_default_terms}
+      class="text-[10px] px-3 py-1.5 bg-accent rounded text-white self-start"
+    >Editar terminales</button>
   </div>
 </div>

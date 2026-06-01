@@ -139,13 +139,21 @@ impl TerminalProtocol for WeztermProtocol {
             .unwrap_or(false)
     }
 
-    fn spawn_tab(&self, cwd: Option<&str>) -> Result<u32, String> {
+    fn spawn_tab(&self, cwd: Option<&str>, program: Option<&str>) -> Result<u32, String> {
         let mut cmd = Command::new("wezterm");
         cmd.args(["cli", "--class", crate::config::WINDOW_CLASS, "spawn"]);
 
         if let Some(dir) = cwd {
             cmd.arg("--cwd").arg(dir);
         }
+
+        if let Some(prog) = program {
+            cmd.arg("--");
+            for arg in prog.split_whitespace() {
+                cmd.arg(arg);
+            }
+        }
+
         let output = run_cmd_with_timeout(&mut cmd, Duration::from_secs(5))?;
 
         if output.status.success() {
