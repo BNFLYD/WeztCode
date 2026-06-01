@@ -818,12 +818,6 @@ fn main() {
         platform.handle_wm_events(receiver);
     }
 
-    // Create overlay with captured geometry (or None if no WM)
-    if let Err(e) = platform.create_overlay(&frontend_url, term_geometry) {
-//         eprintln!("Error al crear overlay: {}", e);
-        std::process::exit(1);
-    }
-
     // Spawn terminal tabs: from default_terms.json or fallback to generic
     let cwd = crate::config::props::UserProps::load()
         .get("current_dir")
@@ -863,10 +857,16 @@ fn main() {
                         Err(e) => eprintln!("[main] Failed to spawn '{}': {}", dt.name, e),
                     }
                 }
-                // Only needed for CLI spawn: switch focus back to pane 0
-                let _ = term.activate_pane(0);
             }
         }
+    }
+    // Always restore focus to pane 0 (both Lua and CLI spawn steal focus)
+    let _ = term.activate_pane(0);
+
+    // Create overlay with captured geometry (or None if no WM)
+    if let Err(e) = platform.create_overlay(&frontend_url, term_geometry) {
+//         eprintln!("Error al crear overlay: {}", e);
+        std::process::exit(1);
     }
 
 //     println!("WeztCode corriendo...");
