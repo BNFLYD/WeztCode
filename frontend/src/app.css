@@ -5,9 +5,6 @@
 /* Colores retrofuturistas personalizados */
 @layer base {
   :root {
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    appearance: none;
     --color-back-deep: theme('colors.back.deep');
     --color-back: theme('colors.back.DEFAULT');
     --color-accent: theme('colors.accent.DEFAULT');
@@ -68,5 +65,4 @@
   body {
     @apply bg-transparent text-[#2ca798];
   }
-
 }
