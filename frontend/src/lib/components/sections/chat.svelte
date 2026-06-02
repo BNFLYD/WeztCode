@@ -225,7 +225,7 @@
       {#if models.length > 0}
         <div class="relative" bind:this={dropdown_container}>
           <button
-            class="px-1 font-mono text-sm text-print/50 rounded hover:text-print transition-colors max-w-[120px] truncate"
+            class="px-1 font-mono text-xs text-print/50 rounded hover:text-print transition-colors max-w-[120px] truncate"
             on:click={toggle_dropdown}
             disabled={switching || streaming}
           >
@@ -233,7 +233,7 @@
           </button>
           {#if show_dropdown}
             <div
-              class="absolute top-full right-2 mt-4 z-50 min-w-full bg-back rounded-md shadow-lg py-1"
+              class="absolute top-full right-1 mt-4 z-50 min-w-full bg-back rounded-md shadow-lg py-1"
             >
               {#each models as m}
                 <button
@@ -252,7 +252,7 @@
       {/if}
 
       <button
-        class="font-mono text-sm pl-2 text-print/50 hover:text-print transition-colors"
+        class="font-mono text-xs pl-2 text-print/50 hover:text-print transition-colors"
         on:click={newConversation}
       >
         %
