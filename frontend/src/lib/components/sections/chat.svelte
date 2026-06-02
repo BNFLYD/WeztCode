@@ -61,7 +61,10 @@
         body: JSON.stringify({ message: text }),
       });
 
-      if (!res.ok || !res.headers.get("Content-Type")?.includes("text/event-stream")) {
+      if (
+        !res.ok ||
+        !res.headers.get("Content-Type")?.includes("text/event-stream")
+      ) {
         const err_text = await res.text();
         assistant_msg.content = `Error del servidor:\n${err_text}`;
         messages = messages;
@@ -140,7 +143,7 @@
       const data = await res.json();
       models = data.data || [];
       if (models.length > 0) {
-        const default_model = models.find(m => m.default);
+        const default_model = models.find((m) => m.default);
         current_model = default_model ? default_model.name : models[0].name;
       }
     } catch {
@@ -176,7 +179,11 @@
   }
 
   function handle_click_outside(e) {
-    if (show_dropdown && dropdown_container && !dropdown_container.contains(e.target)) {
+    if (
+      show_dropdown &&
+      dropdown_container &&
+      !dropdown_container.contains(e.target)
+    ) {
       show_dropdown = false;
     }
   }
@@ -197,43 +204,12 @@
     <span class="font-mono truncate flex items-center gap-1 text-print/50">
       Chat
     </span>
-    {#if models.length > 0}
-      <div class="relative ml-1" bind:this={dropdown_container}>
-        <button
-          class="text-xs px-2 rounded border border-accent-detail/30
-                 hover:bg-accent-detail/10 text-accent-detail/60
-                 hover:text-accent-detail transition-colors max-w-[120px] truncate"
-          on:click={toggle_dropdown}
-          disabled={switching || streaming}
-        >
-          {current_model}
-        </button>
-        {#if show_dropdown}
-          <div
-            class="absolute top-full left-0 mt-1 z-50 min-w-full
-                   bg-back-deep border border-accent-detail/30 rounded
-                   shadow-lg py-1"
-          >
-            {#each models as m}
-              <button
-                class="block w-full text-left text-xs px-3 py-1.5
-                       text-print/70 hover:bg-accent-detail/10
-                       hover:text-accent-detail transition-colors whitespace-nowrap {m.name === current_model ? 'bg-accent-detail/20' : ''}"
-                on:click={() => select_model(m.name)}
-              >
-                {m.name}
-              </button>
-            {/each}
-          </div>
-        {/if}
-      </div>
-    {/if}
     <div class="ml-auto flex items-center gap-2">
       <button
         class="relative text-xs px-2 rounded border border-accent-detail/30
                hover:bg-accent-detail/10 text-accent-detail/60
                hover:text-accent-detail transition-colors"
-        on:click={() => show_warnings = !show_warnings}
+        on:click={() => (show_warnings = !show_warnings)}
       >
         <Icon icon="mdi:alert-outline" class="w-4 h-4" />
         {#if warnings.length > 0}
@@ -245,6 +221,36 @@
           </span>
         {/if}
       </button>
+      {#if models.length > 0}
+        <div class="relative ml-1" bind:this={dropdown_container}>
+          <button
+            class="text-sm px-2 rounded text-print/50 hover:text-print transition-colors max-w-[120px] truncate"
+            on:click={toggle_dropdown}
+            disabled={switching || streaming}
+          >
+            {current_model}
+          </button>
+          {#if show_dropdown}
+            <div
+              class="absolute top-full left-0 mt-4 z-50 min-w-full bg-back-deep rounded shadow-lg py-1"
+            >
+              {#each models as m}
+                <button
+                  class="block w-full text-left text-xs px-3 py-1.5
+                       text-print hover:bg-accent-detail/10
+                       hover:text-accent-detail transition-colors whitespace-nowrap {m.name ===
+                  current_model
+                    ? 'bg-accent-detail/20'
+                    : ''}"
+                  on:click={() => select_model(m.name)}
+                >
+                  {m.name}
+                </button>
+              {/each}
+            </div>
+          {/if}
+        </div>
+      {/if}
       <button
         class="text-xs px-2 rounded border border-accent-detail/30
                hover:bg-accent-detail/10 text-accent-detail/60
