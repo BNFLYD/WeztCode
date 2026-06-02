@@ -1,5 +1,5 @@
 <script>
-  import { afterUpdate } from "svelte";
+  import { afterUpdate, onMount } from "svelte";
   import Icon from "@iconify/svelte";
 
   const STORAGE_KEY = "weztcode_chat_messages";
@@ -13,6 +13,8 @@
   let models = [];
   let current_model = "";
   let switching = false;
+  let show_dropdown = false;
+  let dropdown_container;
 
   function save() {
     const raw = JSON.stringify(messages);
@@ -146,9 +148,16 @@
     }
   }
 
-  async function switch_model(event) {
-    const name = event.target.value;
-    if (!name || name === current_model) return;
+  function toggle_dropdown() {
+    show_dropdown = !show_dropdown;
+  }
+
+  async function select_model(name) {
+    if (!name || name === current_model) {
+      show_dropdown = false;
+      return;
+    }
+    show_dropdown = false;
     switching = true;
     try {
       const res = await fetch("/api/chat/switch-model", {
@@ -161,10 +170,21 @@
         current_model = name;
       }
     } catch {
-      // Si falla, el dropdown se resetea al valor anterior
+      // Si falla, el nombre no se actualiza
     }
     switching = false;
   }
+
+  function handle_click_outside(e) {
+    if (show_dropdown && dropdown_container && !dropdown_container.contains(e.target)) {
+      show_dropdown = false;
+    }
+  }
+
+  onMount(() => {
+    document.addEventListener("click", handle_click_outside);
+    return () => document.removeEventListener("click", handle_click_outside);
+  });
 
   load_models();
 </script>
@@ -178,18 +198,36 @@
       Chat
     </span>
     {#if models.length > 0}
-      <select
-        on:change={switch_model}
-        disabled={switching || streaming}
-        class="text-[10px] px-1 py-0.5 bg-back-deep border border-accent-detail/30
-               rounded text-print/70 outline-none ml-1 max-w-[120px] truncate"
-      >
-        {#each models as m}
-          <option value={m.name} selected={m.name === current_model}>
-            {m.name}
-          </option>
-        {/each}
-      </select>
+      <div class="relative ml-1" bind:this={dropdown_container}>
+        <button
+          class="text-xs px-2 rounded border border-accent-detail/30
+                 hover:bg-accent-detail/10 text-accent-detail/60
+                 hover:text-accent-detail transition-colors max-w-[120px] truncate"
+          on:click={toggle_dropdown}
+          disabled={switching || streaming}
+        >
+          {current_model}
+        </button>
+        {#if show_dropdown}
+          <div
+            class="absolute top-full left-0 mt-1 z-50 min-w-full
+                   bg-back-deep border border-accent-detail/30 rounded
+                   shadow-lg py-1"
+          >
+            {#each models as m}
+              <button
+                class="block w-full text-left text-xs px-3 py-1.5
+                       text-print/70 hover:bg-accent-detail/10
+                       hover:text-accent-detail transition-colors whitespace-nowrap"
+                class:bg-accent-detail/20={m.name === current_model}
+                on:click={() => select_model(m.name)}
+              >
+                {m.name}
+              </button>
+            {/each}
+          </div>
+        {/if}
+      </div>
     {/if}
     <div class="ml-auto flex items-center gap-2">
       <button
