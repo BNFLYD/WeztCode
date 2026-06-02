@@ -202,10 +202,10 @@
         class="relative text-sm pl-2 text-print/50 hover:text-print transition-colors"
         on:click={() => show_warnings = !show_warnings}
       >
-        <Icon icon="mdi:alert-outline" class="w-4 h-4" />
+        <Icon icon="mdi:alert-outline" class="w-4 h-4 z-10" />
         {#if warnings.length > 0}
           <span
-            class="absolute -top-1 -right-1.5 bg-accent-detail text-print/50 text-[10px]
+            class="absolute -top-1 -right-1.5 bg-back text-print/50 text-[10px]
                    rounded-full w-4 h-4 flex items-center justify-center"
           >
             {warnings.length}
@@ -214,7 +214,7 @@
       </button>
 
       {#if models.length > 0}
-      <div class="relative ml-1" bind:this={dropdown_container}>
+      <div class="relative" bind:this={dropdown_container}>
         <button
           class="text-sm px-2 rounded text-print/50 hover:text-print transition-colors max-w-[120px] truncate"
           on:click={toggle_dropdown}
