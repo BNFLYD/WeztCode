@@ -207,13 +207,16 @@
     <div class="ml-auto flex items-center gap-2">
       {#if warnings.length > 0}
         <button
-          class="relative text-sm pl-2 text-print/50 hover:text-print transition-colors"
+          class="relative text-sm px-2 text-print/50 hover:text-print transition-colors group"
           on:click={() => (show_warnings = !show_warnings)}
         >
-          <Icon icon="mdi:alert-outline" class="w-4 h-4 z-10" />
+          <Icon
+            icon="mdi:alert-outline"
+            class="w-4 h-4 z-10 group-hover:text-print"
+          />
           <span
             class="absolute -top-1 -right-1.5 bg-back text-print/50 text-[10px]
-                   rounded-full w-4 h-4 flex items-center justify-center"
+                   rounded-full w-4 h-4 flex items-center justify-center group-hover:text-print"
           >
             {warnings.length}
           </span>
