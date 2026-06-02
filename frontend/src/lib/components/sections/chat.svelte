@@ -215,8 +215,8 @@
             class="w-4 h-4 z-10 group-hover:text-print"
           />
           <span
-            class="absolute -top-1 -right-1.5 bg-back font-bold text-print/50 text-[10px]
-                   rounded-full w-2 h-2 flex items-center justify-center group-hover:text-print"
+            class="absolute -top-1 -right-1 bg-back font-bold text-print/50 text-[10px]
+                   rounded-full w-3 h-3 flex items-center justify-center group-hover:text-print"
           >
             {warnings.length}
           </span>
@@ -226,7 +226,7 @@
       {#if models.length > 0}
         <div class="relative" bind:this={dropdown_container}>
           <button
-            class="text-sm px-2 rounded text-print/50 hover:text-print transition-colors max-w-[120px] truncate"
+            class="px-2 font-mono text-sm text-print/50 rounded hover:text-print transition-colors max-w-[120px] truncate"
             on:click={toggle_dropdown}
             disabled={switching || streaming}
           >
@@ -238,11 +238,11 @@
             >
               {#each models as m}
                 <button
-                  class="block w-full text-left text-xs px-3 py-1.5
+                  class="block w-full text-left text-sm px-3 py-1.5
                        text-print hover:bg-accent-detail/10
                        hover:text-accent-detail transition-colors whitespace-nowrap {m.name ===
                   current_model
-                    ? 'bg-accent-detail/20'
+                    ? 'bg-accent-detail'
                     : ''}"
                   on:click={() => select_model(m.name)}
                 >
@@ -255,7 +255,7 @@
       {/if}
 
       <button
-        class="text-sm pl-2 text-print/50 hover:text-print transition-colors"
+        class="font-mono text-sm pl-2 text-print/50 hover:text-print transition-colors"
         on:click={newConversation}
       >
         %
@@ -265,8 +265,7 @@
 
   {#if show_warnings && warnings.length > 0}
     <div
-      class="mx-3 mb-2 p-2 rounded bg-back border border-accent-detail/20
-             max-h-32 overflow-y-auto text-sm font-mono text-print"
+      class="mx-3 mb-2 p-2 rounded bg-back max-h-40 overflow-y-auto text-sm font-mono text-print"
     >
       {#each warnings as w, i (i)}
         <div class="py-0.5 border-b border-accent-detail/10 last:border-0">
