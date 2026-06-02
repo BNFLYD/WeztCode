@@ -219,7 +219,7 @@
                 class="block w-full text-left text-xs px-3 py-1.5
                        text-print/70 hover:bg-accent-detail/10
                        hover:text-accent-detail transition-colors whitespace-nowrap"
-                class:bg-accent-detail/20={m.name === current_model}
+                class={m.name === current_model ? "bg-accent-detail/20" : ""}
                 on:click={() => select_model(m.name)}
               >
                 {m.name}
