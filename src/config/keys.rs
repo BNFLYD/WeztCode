@@ -42,17 +42,37 @@ impl KeysStore {
         if let Ok(p) = std::env::var(KEYS_PATH_OVERRIDE) {
             return PathBuf::from(p);
         }
-        let config = home_dir().join(".config/weztcode/KEYS.env");
-        if config.exists() {
-            return config;
+
+        let new_path = home_dir().join(".config/weztcode/preferences/models/KEYS.env");
+        let old_path = home_dir().join(".config/weztcode/KEYS.env");
+
+        if new_path.exists() {
+            return new_path;
         }
+
+        if old_path.exists() {
+            if let Some(parent) = new_path.parent() {
+                let _ = fs::create_dir_all(parent);
+            }
+            if fs::rename(&old_path, &new_path).is_ok() {
+                return new_path;
+            }
+            if let Ok(content) = fs::read_to_string(&old_path) {
+                if fs::write(&new_path, &content).is_ok() {
+                    let _ = fs::remove_file(&old_path);
+                    return new_path;
+                }
+            }
+        }
+
         let local = std::env::current_dir()
             .unwrap_or_default()
             .join("KEYS.env");
         if local.exists() {
             return local;
         }
-        home_dir().join(".config/weztcode/KEYS.env")
+
+        new_path
     }
 
     fn parse(content: &str) -> HashMap<String, String> {

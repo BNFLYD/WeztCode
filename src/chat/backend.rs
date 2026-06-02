@@ -12,6 +12,20 @@ pub struct ChatConfig {
 }
 
 impl ChatConfig {
+    pub fn from_default_model() -> Self {
+        if let Some(model) = crate::config::models::get_default() {
+            let resolved_key = crate::config::keys::KeysStore::resolve(&model.api_key);
+            Self {
+                provider: model.provider,
+                model: model.model,
+                api_key: resolved_key,
+                pi_path: find_pi_path(),
+            }
+        } else {
+            Self::from_props()
+        }
+    }
+
     pub fn from_props() -> Self {
         let props = crate::config::props::UserProps::load();
         Self {

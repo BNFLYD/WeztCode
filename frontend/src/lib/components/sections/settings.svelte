@@ -79,6 +79,10 @@
     await fetch("/api/terminal/edit-defaults");
   }
 
+  async function open_models_editor() {
+    await fetch("/api/models/edit-defaults");
+  }
+
   load_keys();
 </script>
 
@@ -116,7 +120,7 @@
   <div class="flex flex-col gap-3">
     <h3 class="text-xs font-bold text-print uppercase tracking-wide">API Keys</h3>
     <p class="text-[10px] text-print-dim">
-      Las keys se almacenan en ~/.config/weztcode/KEYS.env fuera del proyecto.
+      Las keys se almacenan en ~/.config/weztcode/preferences/models/KEYS.env fuera del proyecto.
       Los valores no se muestran por seguridad.
     </p>
 
@@ -208,5 +212,21 @@
       on:click={open_default_terms}
       class="text-[10px] px-3 py-1.5 bg-accent rounded text-white self-start"
     >Editar terminales</button>
+  </div>
+
+  <hr class="border-accent-detail my-2" />
+
+  <div class="flex flex-col gap-3">
+    <h3 class="text-xs font-bold text-print uppercase tracking-wide">
+      Modelos de IA
+    </h3>
+    <p class="text-[10px] text-print-dim">
+      Editá el archivo JSON para definir los modelos disponibles en el chat.
+      El modelo con "default": true se usa al iniciar la app.
+    </p>
+    <button
+      on:click={open_models_editor}
+      class="text-[10px] px-3 py-1.5 bg-accent rounded text-white self-start"
+    >Editar modelos</button>
   </div>
 </div>

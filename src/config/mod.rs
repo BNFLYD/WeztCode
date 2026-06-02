@@ -1,6 +1,7 @@
 pub mod default_terms;
 pub mod fs;
 pub mod keys;
+pub mod models;
 pub mod project_dirs;
 pub mod props;
 pub mod terms_metadata;

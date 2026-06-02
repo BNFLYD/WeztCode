@@ -18,7 +18,7 @@ use config::default_terms::DefaultTerm;
 use config::keys::KeysStore;
 
 static CHAT_SERVICE: Lazy<Mutex<chat::ChatService>> = Lazy::new(|| {
-    let config = chat::ChatConfig::from_props();
+    let config = chat::ChatConfig::from_default_model();
     let backend: Box<dyn chat::AgentBackend> = Box::new(chat::PiAgentBackend::new(config));
     Mutex::new(chat::ChatService::new(backend))
 });
@@ -163,6 +163,14 @@ fn handle_api(request: tiny_http::Request, url: &str) {
 
     if url.starts_with("/api/terminal/edit-defaults") {
         return handle_terminal_edit_defaults(request);
+    }
+
+    if url.starts_with("/api/models/list") {
+        return handle_models_list(request);
+    }
+
+    if url.starts_with("/api/models/edit-defaults") {
+        return handle_models_edit_defaults(request);
     }
 
     let root = crate::config::props::UserProps::load()
@@ -426,6 +434,32 @@ fn handle_keys_list() -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
     let store = KeysStore::load();
     let names = store.list_names();
     json_response(&serde_json::json!({ "ok": true, "keys": names }))
+}
+
+fn handle_models_list(request: tiny_http::Request) {
+    let models = crate::config::models::list();
+    let response = json_response(&serde_json::json!({ "ok": true, "data": models }));
+    let _ = request.respond(response);
+}
+
+fn handle_models_edit_defaults(request: tiny_http::Request) {
+    let path = crate::config::models::detect_path_str();
+    let response = match std::process::Command::new("nvim")
+        .args(["--server", "/tmp/weztcode-nvim.sock", "--remote", &path])
+        .output()
+    {
+        Ok(o) if o.status.success() => {
+            json_response(&serde_json::json!({ "ok": true }))
+        }
+        Ok(o) => {
+            let stderr = String::from_utf8_lossy(&o.stderr);
+            json_error(&format!("nvim failed: {}", stderr))
+        }
+        Err(e) => {
+            json_error(&format!("Failed to run nvim: {}", e))
+        }
+    };
+    let _ = request.respond(response);
 }
 
 fn parse_query_param(url: &str, key: &str) -> Option<String> {
