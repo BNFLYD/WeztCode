@@ -6,6 +6,7 @@ use gtk4_layer_shell::{Edge, KeyboardMode, Layer, LayerShell};
 use webkit6::prelude::*;
 use crate::terminal::TerminalProtocol;
 use webkit6::WebView;
+use webkit6::{UserContentInjectedFrames, UserStyleLevel, UserStyleSheet};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -210,6 +211,25 @@ impl GuiPlatform for Gtk4Platform {
                 webview_for_gesture.grab_focus();
             });
             webview.add_controller(gesture);
+
+            // Force appearance: none on all elements via WebKit UserStyleSheet
+            // to override WebKitGTK native styling for selects, inputs, etc.
+            if let Some(manager) = webview.user_content_manager() {
+                let css = "\
+                    * {\
+                        -webkit-appearance: none !important;\
+                        appearance: none !important;\
+                    }\
+                ";
+                let sheet = webkit6::UserStyleSheet::new(
+                    css,
+                    webkit6::UserContentInjectedFrames::AllFrames,
+                    webkit6::UserStyleLevel::User,
+                    &[], // allow_list — all URLs
+                    &[], // block_list — none excluded
+                );
+                manager.add_style_sheet(&sheet);
+            }
 
 //             println!("GTK: Loading URL: {}", &url);
             webview.load_uri(&url);
