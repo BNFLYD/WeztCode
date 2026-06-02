@@ -26,6 +26,15 @@ impl ChatConfig {
         }
     }
 
+    pub fn from_model_entry(entry: &crate::config::models::ModelEntry) -> Self {
+        Self {
+            provider: entry.provider.clone(),
+            model: entry.model.clone(),
+            api_key: crate::config::keys::KeysStore::resolve(&entry.api_key),
+            pi_path: find_pi_path(),
+        }
+    }
+
     pub fn from_props() -> Self {
         let props = crate::config::props::UserProps::load();
         Self {

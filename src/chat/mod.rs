@@ -17,6 +17,13 @@ impl ChatService {
         Self { backend }
     }
 
+    pub fn switch_backend(&mut self, new_backend: Box<dyn AgentBackend>) -> Result<(), String> {
+        let mut backend = new_backend;
+        backend.spawn()?;
+        self.backend = backend;
+        Ok(())
+    }
+
     pub fn send_message_stream(&mut self, message: &str) -> Result<ChannelReader, String> {
         let rx = self.backend.send_message(message)?;
 

@@ -165,6 +165,10 @@ fn handle_api(request: tiny_http::Request, url: &str) {
         return handle_terminal_edit_defaults(request);
     }
 
+    if url == "/api/chat/switch-model" {
+        return handle_chat_switch_model(request);
+    }
+
     if url.starts_with("/api/models/list") {
         return handle_models_list(request);
     }
@@ -434,6 +438,58 @@ fn handle_keys_list() -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
     let store = KeysStore::load();
     let names = store.list_names();
     json_response(&serde_json::json!({ "ok": true, "keys": names }))
+}
+
+fn handle_chat_switch_model(mut request: tiny_http::Request) {
+    let body = read_request_body(&mut request);
+    let parsed: serde_json::Value = match serde_json::from_str(&body) {
+        Ok(v) => v,
+        Err(_) => {
+            let _ = request.respond(json_error("Invalid JSON body"));
+            return;
+        }
+    };
+
+    let name = match parsed.get("name").and_then(|v| v.as_str()) {
+        Some(n) => n,
+        None => {
+            let _ = request.respond(json_error("Missing 'name' field"));
+            return;
+        }
+    };
+
+    let models = crate::config::models::list();
+    let entry = match models.into_iter().find(|m| m.name == name) {
+        Some(e) => e,
+        None => {
+            let _ = request.respond(json_error(&format!("Model '{}' not found", name)));
+            return;
+        }
+    };
+
+    let config = chat::ChatConfig::from_model_entry(&entry);
+    let new_backend: Box<dyn chat::AgentBackend> = Box::new(chat::PiAgentBackend::new(config));
+
+    let mut service = match CHAT_SERVICE.lock() {
+        Ok(s) => s,
+        Err(_) => {
+            let _ = request.respond(json_error("Chat service lock failed"));
+            return;
+        }
+    };
+
+    match service.switch_backend(new_backend) {
+        Ok(_) => {
+            let _ = request.respond(json_response(&serde_json::json!({
+                "ok": true,
+                "model": entry.name
+            })));
+        }
+        Err(e) => {
+            let safe = config::keys::redact_keys(&format!("Failed to switch model: {}", e));
+            let _ = request.respond(json_error(&safe));
+        }
+    }
 }
 
 fn handle_models_list(request: tiny_http::Request) {

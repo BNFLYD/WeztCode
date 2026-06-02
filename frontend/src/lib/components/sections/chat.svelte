@@ -10,6 +10,9 @@
   let list_ref;
   let warnings = [];
   let show_warnings = false;
+  let models = [];
+  let current_model = "";
+  let switching = false;
 
   function save() {
     const raw = JSON.stringify(messages);
@@ -128,6 +131,42 @@
       send();
     }
   }
+
+  async function load_models() {
+    try {
+      const res = await fetch("/api/models/list");
+      const data = await res.json();
+      models = data.data || [];
+      if (models.length > 0) {
+        const default_model = models.find(m => m.default);
+        current_model = default_model ? default_model.name : models[0].name;
+      }
+    } catch {
+      models = [];
+    }
+  }
+
+  async function switch_model(event) {
+    const name = event.target.value;
+    if (!name || name === current_model) return;
+    switching = true;
+    try {
+      const res = await fetch("/api/chat/switch-model", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        current_model = name;
+      }
+    } catch {
+      // Si falla, el dropdown se resetea al valor anterior
+    }
+    switching = false;
+  }
+
+  load_models();
 </script>
 
 <div class="flex flex-col gap-1 py-2 h-full relative">
@@ -138,6 +177,20 @@
     <span class="font-mono truncate flex items-center gap-1 text-print/50">
       Chat
     </span>
+    {#if models.length > 0}
+      <select
+        on:change={switch_model}
+        disabled={switching || streaming}
+        class="text-[10px] px-1 py-0.5 bg-back-deep border border-accent-detail/30
+               rounded text-print/70 outline-none ml-1 max-w-[120px] truncate"
+      >
+        {#each models as m}
+          <option value={m.name} selected={m.name === current_model}>
+            {m.name}
+          </option>
+        {/each}
+      </select>
+    {/if}
     <div class="ml-auto flex items-center gap-2">
       <button
         class="relative text-xs px-2 rounded border border-accent-detail/30
