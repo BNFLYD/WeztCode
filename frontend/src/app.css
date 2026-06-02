@@ -65,4 +65,24 @@
   body {
     @apply bg-transparent text-[#2ca798];
   }
+
+  select {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-color: var(--color-back-deep);
+    color: theme('colors.print.DEFAULT');
+    border: 1px solid theme('colors.accent.detail / 0.3');
+    border-radius: 6px;
+    padding: 2px 24px 2px 8px;
+    font-size: inherit;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%232ca798'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 6px center;
+  }
+
+  select:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 }
