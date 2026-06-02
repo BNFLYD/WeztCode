@@ -8,6 +8,8 @@
   let input_value = "";
   let streaming = false;
   let list_ref;
+  let warnings = [];
+  let show_warnings = false;
 
   function save() {
     const raw = JSON.stringify(messages);
@@ -23,6 +25,8 @@
 
   function newConversation() {
     messages = [];
+    warnings = [];
+    show_warnings = false;
     localStorage.removeItem(STORAGE_KEY);
   }
 
@@ -89,6 +93,9 @@
                 messages = messages;
                 save();
                 break;
+              case "warning":
+                warnings = [...warnings, data.message];
+                break;
               case "error":
                 assistant_msg.content += `\n\nError: ${data.message}`;
                 messages = messages;
@@ -131,13 +138,47 @@
     <span class="font-mono truncate flex items-center gap-1 text-print/50">
       Chat
     </span>
-    <button
-      class="ml-auto text-xs px-2 py-0.5 rounded border border-accent-detail/30 hover:bg-accent-detail/10 text-accent-detail/60 hover:text-accent-detail transition-colors"
-      on:click={newConversation}
-    >
-      Nueva
-    </button>
+    <div class="ml-auto flex items-center gap-2">
+      <button
+        class="relative text-xs px-2 rounded border border-accent-detail/30
+               hover:bg-accent-detail/10 text-accent-detail/60
+               hover:text-accent-detail transition-colors"
+        on:click={() => show_warnings = !show_warnings}
+      >
+        <Icon icon="mdi:alert-outline" class="w-4 h-4" />
+        {#if warnings.length > 0}
+          <span
+            class="absolute -top-1.5 -right-1.5 bg-err text-white text-[10px]
+                   rounded-full w-4 h-4 flex items-center justify-center"
+          >
+            {warnings.length}
+          </span>
+        {/if}
+      </button>
+      <button
+        class="text-xs px-2 rounded border border-accent-detail/30
+               hover:bg-accent-detail/10 text-accent-detail/60
+               hover:text-accent-detail transition-colors"
+        on:click={newConversation}
+      >
+        Nueva
+      </button>
+    </div>
   </div>
+
+  {#if show_warnings && warnings.length > 0}
+    <div
+      class="mx-3 mb-2 p-2 rounded bg-accent-detail/10 border border-accent-detail/20
+             max-h-32 overflow-y-auto text-xs font-mono text-print/70"
+    >
+      {#each warnings as w, i (i)}
+        <div class="py-0.5 border-b border-accent-detail/10 last:border-0">
+          ⚠ {w}
+        </div>
+      {/each}
+    </div>
+  {/if}
+
   <div class="flex-1 overflow-y-auto px-3 py-2 space-y-3" bind:this={list_ref}>
     {#if messages.length === 0}
       <div class="flex items-center justify-center h-full">

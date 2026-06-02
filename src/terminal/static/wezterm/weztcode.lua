@@ -80,20 +80,15 @@ end)
 
 -- Track the last non-zero pane for toggling to nvim
 local last_non_zero_pane = nil
-local active_pane_file = os.getenv("WEZTCODE_ACTIVE_PANE_FILE")
 
 wezterm.on("update-status", function(window, pane)
     if pane then
         local id = pane:pane_id()
         if id ~= 0 then
             last_non_zero_pane = id
-        end
-        if active_pane_file then
-            local f = io.open(active_pane_file, "w")
-            if f then
-                f:write(tostring(id))
-                f:close()
-            end
+            wezterm.log_info("track: set last_non_zero_pane = " .. id)
+        else
+            wezterm.log_info("track: pane 0, skipping (last_non_zero_pane = " .. tostring(last_non_zero_pane) .. ")")
         end
     end
 end)
@@ -154,20 +149,22 @@ if k then
             if active_id == 0 then
                 local target_id = last_non_zero_pane
                 if not target_id then
+                    -- Fallback: find the highest pane_id (most recently created)
                     local windows = wezterm.mux.all_windows()
                     for _, win in ipairs(windows) do
                         local tabs = win:tabs()
                         for _, tab in ipairs(tabs) do
                             local panes = tab:panes()
                             for _, p in ipairs(panes) do
-                                if p:pane_id() ~= 0 then
-                                    target_id = p:pane_id()
-                                    break
+                                local pid = p:pane_id()
+                                if pid ~= 0 and (not target_id or pid > target_id) then
+                                    target_id = pid
                                 end
                             end
-                            if target_id then break end
                         end
-                        if target_id then break end
+                    end
+                    if target_id then
+                        wezterm.log_info("toggle: fallback target_id = " .. target_id)
                     end
                 end
                 if target_id then
@@ -178,6 +175,16 @@ if k then
                 last_non_zero_pane = active_id
                 local target, _, _ = wezterm.mux.get_pane(0)
                 if target then target:activate() end
+            end
+
+            -- Write active pane to file for Rust backend
+            local active_pane_file = os.getenv("WEZTCODE_ACTIVE_PANE_FILE")
+            if active_pane_file then
+                local f = io.open(active_pane_file, "w")
+                if f then
+                    f:write(tostring(active_id))
+                    f:close()
+                end
             end
         end),
     })

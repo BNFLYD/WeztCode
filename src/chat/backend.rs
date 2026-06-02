@@ -63,6 +63,7 @@ pub enum SseEvent {
     Token { content: String },
     ToolCall { name: String },
     ToolResult { name: String, status: String },
+    Warning { message: String },
     Error { message: String },
     Done,
 }
@@ -80,6 +81,10 @@ impl SseEvent {
             }
             SseEvent::ToolResult { name, status } => {
                 let json = serde_json::json!({"type":"tool_result","name":name,"status":status});
+                format!("data: {}\n\n", json)
+            }
+            SseEvent::Warning { message } => {
+                let json = serde_json::json!({"type":"warning","message":message});
                 format!("data: {}\n\n", json)
             }
             SseEvent::Error { message } => {
@@ -251,8 +256,8 @@ impl AgentBackend for PiAgentBackend {
                         Ok(_) => {
                             let trimmed = line.trim();
                             if !trimmed.is_empty() {
-                                let _ = tx_err.send(SseEvent::Error {
-                                    message: format!("[pi stderr] {}", trimmed),
+                                let _ = tx_err.send(SseEvent::Warning {
+                                    message: trimmed.to_string(),
                                 });
                             }
                         }
