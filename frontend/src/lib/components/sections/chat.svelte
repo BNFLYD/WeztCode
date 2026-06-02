@@ -199,15 +199,13 @@
     </span>
     <div class="ml-auto flex items-center gap-2">
       <button
-        class="relative text-xs px-2 rounded border border-accent-detail/30
-               hover:bg-accent-detail/10 text-accent-detail/60
-               hover:text-accent-detail transition-colors"
+        class="relative text-sm pl-2 text-print/50 hover:text-print transition-colors"
         on:click={() => show_warnings = !show_warnings}
       >
         <Icon icon="mdi:alert-outline" class="w-4 h-4" />
         {#if warnings.length > 0}
           <span
-            class="absolute -top-1.5 -right-1.5 bg-err text-white text-[10px]
+            class="absolute -top-1 -right-1.5 bg-accent-detail text-print/50 text-[10px]
                    rounded-full w-4 h-4 flex items-center justify-center"
           >
             {warnings.length}
@@ -244,10 +242,10 @@
     {/if}
 
       <button
-        class="text-sm pl-2 text-print/60 hover:text-print transition-colors"
+        class="text-sm pl-2 text-print/50 hover:text-print transition-colors"
         on:click={newConversation}
       >
-        Nueva
+        %
       </button>
     </div>
   </div>
