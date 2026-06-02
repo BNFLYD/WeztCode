@@ -204,7 +204,7 @@
     <span class="font-mono truncate flex items-center gap-1 text-print/50">
       Chat
     </span>
-    <div class="ml-auto flex items-center gap-2">
+    <div class="ml-auto flex items-center gap-1">
       <button
         class="relative text-xs px-2 rounded border border-accent-detail/30
                hover:bg-accent-detail/10 text-accent-detail/60
@@ -214,8 +214,7 @@
         <Icon icon="mdi:alert-outline" class="w-4 h-4" />
         {#if warnings.length > 0}
           <span
-            class="absolute -top-1.5 -right-1.5 bg-err text-white text-[10px]
-                   rounded-full w-4 h-4 flex items-center justify-center"
+            class="absolute top-1.5 right-1.5 text-print text-xs rounded-full w-4 h-4 flex items-center justify-center"
           >
             {warnings.length}
           </span>
@@ -257,7 +256,7 @@
                hover:text-accent-detail transition-colors"
         on:click={newConversation}
       >
-        Nueva
+        %
       </button>
     </div>
   </div>
