@@ -215,8 +215,8 @@
             class="w-4 h-4 z-10 group-hover:text-print"
           />
           <span
-            class="absolute -top-1 -right-1.5 bg-back text-print/50 text-[10px]
-                   rounded-full w-4 h-4 flex items-center justify-center group-hover:text-print"
+            class="absolute -top-1 -right-1.5 bg-back font-bold text-print/50 text-[10px]
+                   rounded-full w-2 h-2 flex items-center justify-center group-hover:text-print"
           >
             {warnings.length}
           </span>
@@ -234,7 +234,7 @@
           </button>
           {#if show_dropdown}
             <div
-              class="absolute top-full left-0 mt-4 z-50 min-w-full bg-back-deep rounded shadow-lg py-1"
+              class="absolute top-full left-0 mt-2 z-50 min-w-full bg-back-deep rounded shadow-lg py-1"
             >
               {#each models as m}
                 <button
@@ -265,8 +265,8 @@
 
   {#if show_warnings && warnings.length > 0}
     <div
-      class="mx-3 mb-2 p-2 rounded bg-accent-detail/10 border border-accent-detail/20
-             max-h-32 overflow-y-auto text-xs font-mono text-print/70"
+      class="mx-3 mb-2 p-2 rounded bg-back border border-accent-detail/20
+             max-h-32 overflow-y-auto text-sm font-mono text-print"
     >
       {#each warnings as w, i (i)}
         <div class="py-0.5 border-b border-accent-detail/10 last:border-0">
