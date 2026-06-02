@@ -215,8 +215,7 @@
             class="w-4 h-4 z-10 group-hover:text-print"
           />
           <span
-            class="absolute -top-1 -right-1 bg-back font-bold text-print/50 text-[10px]
-                   rounded-full w-3 h-3 flex items-center justify-center group-hover:text-print"
+            class="absolute -top-1 -right-1 bg-back font-bold text-print/50 text-[10px] rounded-full w-3 h-3 flex items-center justify-center group-hover:text-print"
           >
             {warnings.length}
           </span>
@@ -234,14 +233,14 @@
           </button>
           {#if show_dropdown}
             <div
-              class="absolute top-full left-2 mt-4 z-50 min-w-full bg-back rounded-md shadow-lg py-1"
+              class="absolute top-full right-2 mt-4 z-50 min-w-full bg-back rounded-md shadow-lg py-1"
             >
               {#each models as m}
                 <button
-                  class="font-semibold block w-full text-left text-sm px-3 py-1.5 hover:bg-accent-detail/10 transition-colors whitespace-nowrap rounded-md
+                  class="font-semibold block w-full text-left text-sm px-3 py-1.5 whitespace-nowrap rounded-md
                        {m.name === current_model
-                        ? 'bg-accent-detail text-back'
-                        : 'text-print'}"
+                    ? 'bg-accent-detail text-back transition-colors'
+                    : 'text-print hover:bg-accent-detail/10 transition-colors'}"
                   on:click={() => select_model(m.name)}
                 >
                   {m.name}
