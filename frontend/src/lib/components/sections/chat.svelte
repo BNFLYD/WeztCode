@@ -61,7 +61,10 @@
         body: JSON.stringify({ message: text }),
       });
 
-      if (!res.ok || !res.headers.get("Content-Type")?.includes("text/event-stream")) {
+      if (
+        !res.ok ||
+        !res.headers.get("Content-Type")?.includes("text/event-stream")
+      ) {
         const err_text = await res.text();
         assistant_msg.content = `Error del servidor:\n${err_text}`;
         messages = messages;
@@ -140,7 +143,7 @@
       const data = await res.json();
       models = data.data || [];
       if (models.length > 0) {
-        const default_model = models.find(m => m.default);
+        const default_model = models.find((m) => m.default);
         current_model = default_model ? default_model.name : models[0].name;
       }
     } catch {
@@ -176,7 +179,11 @@
   }
 
   function handle_click_outside(e) {
-    if (show_dropdown && dropdown_container && !dropdown_container.contains(e.target)) {
+    if (
+      show_dropdown &&
+      dropdown_container &&
+      !dropdown_container.contains(e.target)
+    ) {
       show_dropdown = false;
     }
   }
@@ -198,48 +205,51 @@
       Chat
     </span>
     <div class="ml-auto flex items-center gap-2">
-      <button
-        class="relative text-sm pl-2 text-print/50 hover:text-print transition-colors"
-        on:click={() => show_warnings = !show_warnings}
-      >
-        <Icon icon="mdi:alert-outline" class="w-4 h-4 z-10" />
-        {#if warnings.length > 0}
+      {#if warnings.length > 0}
+        <button
+          class="relative text-sm pl-2 text-print/50 hover:text-print transition-colors"
+          on:click={() => (show_warnings = !show_warnings)}
+        >
+          <Icon icon="mdi:alert-outline" class="w-4 h-4 z-10" />
           <span
             class="absolute -top-1 -right-1.5 bg-back text-print/50 text-[10px]
                    rounded-full w-4 h-4 flex items-center justify-center"
           >
             {warnings.length}
           </span>
-        {/if}
-      </button>
+        </button>
+      {/if}
 
       {#if models.length > 0}
-      <div class="relative" bind:this={dropdown_container}>
-        <button
-          class="text-sm px-2 rounded text-print/50 hover:text-print transition-colors max-w-[120px] truncate"
-          on:click={toggle_dropdown}
-          disabled={switching || streaming}
-        >
-          {current_model}
-        </button>
-        {#if show_dropdown}
-          <div
-            class="absolute top-full left-0 mt-4 z-50 min-w-full bg-back-deep rounded shadow-lg py-1"
+        <div class="relative" bind:this={dropdown_container}>
+          <button
+            class="text-sm px-2 rounded text-print/50 hover:text-print transition-colors max-w-[120px] truncate"
+            on:click={toggle_dropdown}
+            disabled={switching || streaming}
           >
-            {#each models as m}
-              <button
-                class="block w-full text-left text-xs px-3 py-1.5
+            {current_model}
+          </button>
+          {#if show_dropdown}
+            <div
+              class="absolute top-full left-0 mt-4 z-50 min-w-full bg-back-deep rounded shadow-lg py-1"
+            >
+              {#each models as m}
+                <button
+                  class="block w-full text-left text-xs px-3 py-1.5
                        text-print hover:bg-accent-detail/10
-                       hover:text-accent-detail transition-colors whitespace-nowrap {m.name === current_model ? 'bg-accent-detail/20' : ''}"
-                on:click={() => select_model(m.name)}
-              >
-                {m.name}
-              </button>
-            {/each}
-          </div>
-        {/if}
-      </div>
-    {/if}
+                       hover:text-accent-detail transition-colors whitespace-nowrap {m.name ===
+                  current_model
+                    ? 'bg-accent-detail/20'
+                    : ''}"
+                  on:click={() => select_model(m.name)}
+                >
+                  {m.name}
+                </button>
+              {/each}
+            </div>
+          {/if}
+        </div>
+      {/if}
 
       <button
         class="text-sm pl-2 text-print/50 hover:text-print transition-colors"
