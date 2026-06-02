@@ -234,15 +234,13 @@
           </button>
           {#if show_dropdown}
             <div
-              class="absolute top-full left-0 mt-4 z-50 min-w-full bg-back-deep rounded shadow-lg py-1"
+              class="absolute top-full left-0 mt-4 z-50 min-w-full bg-back rounded-md shadow-lg py-1"
             >
               {#each models as m}
                 <button
-                  class="block w-full text-left text-sm px-3 py-1.5
-                       text-print hover:bg-accent-detail/10
-                       hover:text-accent-detail transition-colors whitespace-nowrap rounded-md
+                  class="block w-full text-left text-sm px-3 py-1.5 text-print hover:bg-accent-detail/10 transition-colors whitespace-nowrap rounded-md
                        {m.name === current_model
-                        ? 'bg-accent-detail text-back-deep'
+                        ? 'bg-accent-detail text-back'
                         : ''}"
                   on:click={() => select_model(m.name)}
                 >
