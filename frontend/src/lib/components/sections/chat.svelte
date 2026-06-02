@@ -226,7 +226,7 @@
       {#if models.length > 0}
         <div class="relative" bind:this={dropdown_container}>
           <button
-            class="px-2 font-mono text-sm text-print/50 rounded hover:text-print transition-colors max-w-[120px] truncate"
+            class="px-1 font-mono text-sm text-print/50 rounded hover:text-print transition-colors max-w-[120px] truncate"
             on:click={toggle_dropdown}
             disabled={switching || streaming}
           >
@@ -234,16 +234,16 @@
           </button>
           {#if show_dropdown}
             <div
-              class="absolute top-full left-0 mt-2 z-50 min-w-full bg-back-deep rounded shadow-lg py-1"
+              class="absolute top-full left-0 mt-4 z-50 min-w-full bg-back-deep rounded shadow-lg py-1"
             >
               {#each models as m}
                 <button
                   class="block w-full text-left text-sm px-3 py-1.5
                        text-print hover:bg-accent-detail/10
-                       hover:text-accent-detail transition-colors whitespace-nowrap {m.name ===
-                  current_model
-                    ? 'bg-accent-detail'
-                    : ''}"
+                       hover:text-accent-detail transition-colors whitespace-nowrap rounded-md
+                       {m.name === current_model
+                        ? 'bg-accent-detail text-back-deep'
+                        : ''}"
                   on:click={() => select_model(m.name)}
                 >
                   {m.name}
