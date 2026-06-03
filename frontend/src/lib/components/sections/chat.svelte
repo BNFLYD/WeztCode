@@ -260,7 +260,7 @@
       {/if}
 
       <button
-        class="font-mono text-xs pl-2 text-print/50 hover:text-print transition-colors"
+        class="font-mono text-xs text-print/50 hover:text-print transition-colors"
         on:click={newConversation}
       >
         {context_percent}%

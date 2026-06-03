@@ -9,6 +9,7 @@ pub struct ChatConfig {
     pub model: String,
     pub api_key: String,
     pub pi_path: String,
+    pub thinking_level: Option<String>,
 }
 
 impl ChatConfig {
@@ -20,6 +21,7 @@ impl ChatConfig {
                 model: model.model,
                 api_key: resolved_key,
                 pi_path: find_pi_path(),
+                thinking_level: model.thinking_level.clone(),
             }
         } else {
             Self::from_props()
@@ -32,6 +34,7 @@ impl ChatConfig {
             model: entry.model.clone(),
             api_key: crate::config::keys::KeysStore::resolve(&entry.api_key),
             pi_path: find_pi_path(),
+            thinking_level: entry.thinking_level.clone(),
         }
     }
 
@@ -42,6 +45,7 @@ impl ChatConfig {
             model: props.get("llm_model").unwrap_or("openrouter/anthropic/claude-sonnet-4").to_string(),
             api_key: props.get_resolved("llm_api_key").unwrap_or_default(),
             pi_path: find_pi_path(),
+            thinking_level: None,
         }
     }
 }
@@ -167,8 +171,15 @@ impl AgentBackend for PiAgentBackend {
         let mut cmd = Command::new(&self.config.pi_path);
         cmd.args(["--mode", "rpc", "--no-session"])
             .arg("--provider").arg(&self.config.provider)
-            .arg("--model").arg(&self.config.model)
-            .stdin(Stdio::piped())
+            .arg("--model").arg(&self.config.model);
+        if let Some(level) = &self.config.thinking_level {
+            let pi_level = match level.as_str() {
+                "max" => "xhigh",
+                other => other,
+            };
+            cmd.arg("--thinking").arg(pi_level);
+        }
+        cmd.stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
 
