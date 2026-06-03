@@ -765,6 +765,25 @@ fn handle_chat_send(mut request: tiny_http::Request) {
     );
 
     let _ = request.respond(response);
+
+    if let Ok(service) = CHAT_SERVICE.lock() {
+        match service.get_session_stats() {
+            Ok(stats) => eprintln!("[pi] session stats: {}", stats),
+            Err(e) => eprintln!("[pi] session stats error: {}", e),
+        }
+        match service.get_state() {
+            Ok(state) => {
+                if let Ok(json) = serde_json::from_str::<serde_json::Value>(&state) {
+                    let level = json.get("data")
+                        .and_then(|d| d.get("thinkingLevel"))
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("(not found)");
+                    eprintln!("[pi] thinking level: {}", level);
+                }
+            }
+            Err(e) => eprintln!("[pi] get_state error: {}", e),
+        }
+    }
 }
 
 fn handle_active_pane() -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {

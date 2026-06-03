@@ -24,6 +24,14 @@ impl ChatService {
         Ok(())
     }
 
+    pub fn get_session_stats(&self) -> Result<String, String> {
+        self.backend.get_session_stats()
+    }
+
+    pub fn get_state(&self) -> Result<String, String> {
+        self.backend.get_state()
+    }
+
     pub fn send_message_stream(&mut self, message: &str) -> Result<ChannelReader, String> {
         let rx = self.backend.send_message(message)?;
 
