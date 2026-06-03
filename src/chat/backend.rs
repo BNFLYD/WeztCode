@@ -152,6 +152,7 @@ pub struct PiAgentBackend {
     stdin: Option<Mutex<ChildStdin>>,
     stdout: Option<Arc<Mutex<ChildStdout>>>,
     stderr: Option<Arc<Mutex<ChildStderr>>>,
+    thinking_configured: bool,
 }
 
 impl PiAgentBackend {
@@ -162,6 +163,7 @@ impl PiAgentBackend {
             stdin: None,
             stdout: None,
             stderr: None,
+            thinking_configured: false,
         }
     }
 }
@@ -170,16 +172,8 @@ impl AgentBackend for PiAgentBackend {
     fn spawn(&mut self) -> Result<(), String> {
         let mut cmd = Command::new(&self.config.pi_path);
         cmd.args(["--mode", "rpc", "--no-session"])
-            .arg("--provider").arg(&self.config.provider);
-        if let Some(level) = &self.config.thinking_level {
-            let pi_level = match level.as_str() {
-                "max" => "xhigh",
-                other => other,
-            };
-            cmd.arg("--model").arg(format!("{}:{}", self.config.model, pi_level));
-        } else {
-            cmd.arg("--model").arg(&self.config.model);
-        }
+            .arg("--provider").arg(&self.config.provider)
+            .arg("--model").arg(&self.config.model);
         cmd.stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
@@ -256,6 +250,31 @@ impl AgentBackend for PiAgentBackend {
             })?
             .clone();
         let stderr_arc = self.stderr.as_ref().map(Arc::clone);
+
+        if let Some(level) = &self.config.thinking_level {
+            if !self.thinking_configured {
+                let pi_level = match level.as_str() {
+                    "max" => "xhigh",
+                    other => other,
+                };
+                let set_msg = serde_json::json!({
+                    "type": "set_thinking_level",
+                    "level": pi_level,
+                });
+                let set_str = serde_json::to_string(&set_msg).unwrap_or_default();
+
+                {
+                    let mut stdin_lock = stdin.lock().map_err(|e| format!("stdin lock: {}", e))?;
+                    writeln!(stdin_lock, "{}", set_str)
+                        .map_err(|e| format!("Failed to write set_thinking_level: {}", e))?;
+                    stdin_lock.flush()
+                        .map_err(|e| format!("Failed to flush set_thinking_level: {}", e))?;
+                }
+
+                self.thinking_configured = true;
+                eprintln!("[pi] set_thinking_level: {}", pi_level);
+            }
+        }
 
         let request = serde_json::json!({
             "type": "prompt",
@@ -449,6 +468,7 @@ impl AgentBackend for PiAgentBackend {
         self.stdin = None;
         self.stdout = None;
         self.stderr = None;
+        self.thinking_configured = false;
         if let Some(mut child) = self.child.take() {
             let _ = child.kill();
             let _ = child.wait();
