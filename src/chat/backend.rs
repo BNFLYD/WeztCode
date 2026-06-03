@@ -170,14 +170,15 @@ impl AgentBackend for PiAgentBackend {
     fn spawn(&mut self) -> Result<(), String> {
         let mut cmd = Command::new(&self.config.pi_path);
         cmd.args(["--mode", "rpc", "--no-session"])
-            .arg("--provider").arg(&self.config.provider)
-            .arg("--model").arg(&self.config.model);
+            .arg("--provider").arg(&self.config.provider);
         if let Some(level) = &self.config.thinking_level {
             let pi_level = match level.as_str() {
                 "max" => "xhigh",
                 other => other,
             };
-            cmd.arg("--thinking").arg(pi_level);
+            cmd.arg("--model").arg(format!("{}:{}", self.config.model, pi_level));
+        } else {
+            cmd.arg("--model").arg(&self.config.model);
         }
         cmd.stdin(Stdio::piped())
             .stdout(Stdio::piped())
