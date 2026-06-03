@@ -149,7 +149,7 @@ fn env_var_for_provider(provider: &str) -> &'static str {
 pub struct PiAgentBackend {
     config: ChatConfig,
     child: Option<Child>,
-    stdin: Option<Mutex<ChildStdin>>,
+    stdin: Option<Arc<Mutex<ChildStdin>>>,
     stdout: Option<Arc<Mutex<ChildStdout>>>,
     stderr: Option<Arc<Mutex<ChildStderr>>>,
     thinking_configured: bool,
@@ -165,6 +165,41 @@ impl PiAgentBackend {
             stderr: None,
             thinking_configured: false,
         }
+    }
+
+    pub fn get_session_stats(&self) -> Result<String, String> {
+        let stdin = self.stdin.as_ref()
+            .ok_or_else(|| "Pi not spawned (stdin is None)".to_string())?;
+        let stdout_arc = self.stdout.as_ref()
+            .ok_or_else(|| "Pi not spawned (stdout is None)".to_string())?
+            .clone();
+
+        let msg = serde_json::json!({"type": "get_session_stats"});
+        let msg_str = serde_json::to_string(&msg).map_err(|e| format!("JSON serialize: {}", e))?;
+
+        {
+            let mut stdin_lock = stdin.lock().map_err(|e| format!("stdin lock: {}", e))?;
+            writeln!(stdin_lock, "{}", msg_str)
+                .map_err(|e| format!("Failed to write get_session_stats: {}", e))?;
+            stdin_lock.flush()
+                .map_err(|e| format!("Failed to flush get_session_stats: {}", e))?;
+        }
+
+        let mut stdout_lock = stdout_arc.lock().map_err(|e| format!("stdout lock: {}", e))?;
+        let mut bytes = Vec::new();
+        let mut buf = [0u8; 1];
+        loop {
+            match stdout_lock.read(&mut buf) {
+                Ok(0) => break,
+                Ok(_) => {
+                    if buf[0] == b'\n' { break; }
+                    bytes.push(buf[0]);
+                }
+                Err(e) => return Err(format!("stdout read error: {}", e)),
+            }
+        }
+
+        String::from_utf8(bytes).map_err(|e| format!("Invalid UTF-8: {}", e))
     }
 }
 
@@ -226,7 +261,7 @@ impl AgentBackend for PiAgentBackend {
             }
         }
 
-        self.stdin = Some(Mutex::new(stdin));
+        self.stdin = Some(Arc::new(Mutex::new(stdin)));
         self.stdout = Some(Arc::new(Mutex::new(stdout)));
         self.stderr = Some(Arc::new(Mutex::new(stderr)));
         self.child = Some(child);
@@ -257,6 +292,8 @@ impl AgentBackend for PiAgentBackend {
                     "max" => "xhigh",
                     other => other,
                 };
+
+                // --- Send set_thinking_level RPC ---
                 let set_msg = serde_json::json!({
                     "type": "set_thinking_level",
                     "level": pi_level,
@@ -271,8 +308,86 @@ impl AgentBackend for PiAgentBackend {
                         .map_err(|e| format!("Failed to flush set_thinking_level: {}", e))?;
                 }
 
+                // --- Read set_thinking_level response synchronously ---
+                {
+                    let mut stdout_lock = stdout_arc.lock().map_err(|e| format!("stdout lock: {}", e))?;
+                    let mut bytes = Vec::new();
+                    let mut buf = [0u8; 1];
+                    loop {
+                        match stdout_lock.read(&mut buf) {
+                            Ok(0) => break,
+                            Ok(_) => {
+                                if buf[0] == b'\n' { break; }
+                                bytes.push(buf[0]);
+                            }
+                            Err(e) => {
+                                eprintln!("[pi] error reading set_thinking_level response: {}", e);
+                                break;
+                            }
+                        }
+                    }
+                    if !bytes.is_empty() {
+                        let response = String::from_utf8_lossy(&bytes);
+                        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&response) {
+                            let success = json.get("success").and_then(|v| v.as_bool()).unwrap_or(false);
+                            if success {
+                                eprintln!("[pi] set_thinking_level confirmed: {} ✓", pi_level);
+                            } else {
+                                let err = json.get("error").and_then(|v| v.as_str()).unwrap_or("unknown");
+                                eprintln!("[pi] set_thinking_level FAILED: {} (level: {})", err, pi_level);
+                            }
+                        } else {
+                            eprintln!("[pi] set_thinking_level response (unparsed): {}", response);
+                        }
+                    }
+                }
+
+                // --- Send get_state RPC to verify actual level post-clamping ---
+                let get_state_msg = serde_json::json!({"type": "get_state"});
+                let get_state_str = serde_json::to_string(&get_state_msg).unwrap_or_default();
+
+                {
+                    let mut stdin_lock = stdin.lock().map_err(|e| format!("stdin lock: {}", e))?;
+                    writeln!(stdin_lock, "{}", get_state_str)
+                        .map_err(|e| format!("Failed to write get_state: {}", e))?;
+                    stdin_lock.flush()
+                        .map_err(|e| format!("Failed to flush get_state: {}", e))?;
+                }
+
+                // --- Read get_state response ---
+                {
+                    let mut stdout_lock = stdout_arc.lock().map_err(|e| format!("stdout lock: {}", e))?;
+                    let mut bytes = Vec::new();
+                    let mut buf = [0u8; 1];
+                    loop {
+                        match stdout_lock.read(&mut buf) {
+                            Ok(0) => break,
+                            Ok(_) => {
+                                if buf[0] == b'\n' { break; }
+                                bytes.push(buf[0]);
+                            }
+                            Err(e) => {
+                                eprintln!("[pi] error reading get_state response: {}", e);
+                                break;
+                            }
+                        }
+                    }
+                    if !bytes.is_empty() {
+                        let response = String::from_utf8_lossy(&bytes);
+                        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&response) {
+                            let actual_level = json.get("data")
+                                .and_then(|d| d.get("thinkingLevel"))
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("(not found)");
+                            eprintln!("[pi] actual thinking level after set: {}", actual_level);
+                        } else {
+                            eprintln!("[pi] get_state response (unparsed): {}", response);
+                        }
+                    }
+                }
+
                 self.thinking_configured = true;
-                eprintln!("[pi] set_thinking_level: {}", pi_level);
+                eprintln!("[pi] thinking_level configured successfully");
             }
         }
 
