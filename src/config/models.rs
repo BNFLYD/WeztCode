@@ -10,6 +10,8 @@ pub struct ModelEntry {
     pub api_key: String,
     #[serde(default)]
     pub default: bool,
+    #[serde(default)]
+    pub max_context: Option<u64>,
 }
 
 fn home_dir() -> PathBuf {

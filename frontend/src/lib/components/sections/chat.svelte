@@ -193,6 +193,14 @@
     return () => document.removeEventListener("click", handle_click_outside);
   });
 
+  function estimateTokens(text) {
+    return Math.ceil(text.length / 4);
+  }
+
+  $: used_tokens = messages.reduce((sum, msg) => sum + estimateTokens(msg.content), 0);
+  $: context_limit = models.find(m => m.name === current_model)?.max_context ?? 4096;
+  $: context_percent = context_limit > 0 ? Math.round((used_tokens / context_limit) * 100) : 0;
+
   load_models();
 </script>
 
@@ -255,7 +263,7 @@
         class="font-mono text-xs pl-2 text-print/50 hover:text-print transition-colors"
         on:click={newConversation}
       >
-        %
+        {context_percent}%
       </button>
     </div>
   </div>
