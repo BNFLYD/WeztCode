@@ -56,7 +56,7 @@ fn find_pi_path() -> String {
     let props = crate::config::props::UserProps::load();
     if let Some(path) = props.get("pi_path").filter(|s| !s.is_empty()) {
         let resolved = path.to_string();
-        eprintln!("[pi] find_pi_path: explicit pi_path = {}", resolved);
+        // eprintln!("[pi] find_pi_path: explicit pi_path = {}", resolved);
         return resolved;
     }
 
@@ -70,7 +70,7 @@ fn find_pi_path() -> String {
 
     for candidate in &candidates {
         if std::path::Path::new(candidate).exists() {
-            eprintln!("[pi] find_pi_path: found at {}", candidate);
+            // eprintln!("[pi] find_pi_path: found at {}", candidate);
             return candidate.to_string();
         }
     }
@@ -79,11 +79,11 @@ fn find_pi_path() -> String {
     let local_pi = cwd.join("node_modules/.bin/pi");
     if local_pi.exists() {
         let resolved = local_pi.to_string_lossy().to_string();
-        eprintln!("[pi] find_pi_path: found local at {}", resolved);
+        // eprintln!("[pi] find_pi_path: found local at {}", resolved);
         return resolved;
     }
 
-    eprintln!("[pi] find_pi_path: fallback to 'pi' (PATH lookup)");
+    // eprintln!("[pi] find_pi_path: fallback to 'pi' (PATH lookup)");
     "pi".to_string()
 }
 
@@ -151,7 +151,7 @@ pub fn sync_pi_model_overrides() -> Result<(), String> {
     fs::write(&pi_models_path, &content)
         .map_err(|e| format!("Failed to write {}: {}", pi_models_path.display(), e))?;
 
-    eprintln!("[pi] synced model overrides to {}", pi_models_path.display());
+    // eprintln!("[pi] synced model overrides to {}", pi_models_path.display());
     Ok(())
 }
 
@@ -335,7 +335,7 @@ impl AgentBackend for PiAgentBackend {
         let env_key = env_var_for_provider(&self.config.provider);
         cmd.env(env_key, &self.config.api_key);
 
-        eprintln!("[pi] spawn: path={}, provider={}, model={}", self.config.pi_path, self.config.provider, self.config.model);
+        // eprintln!("[pi] spawn: path={}, provider={}, model={}", self.config.pi_path, self.config.provider, self.config.model);
 
         let mut child = cmd.spawn().map_err(|e| {
             let msg = format!("Failed to spawn pi: {}", e);
@@ -343,7 +343,7 @@ impl AgentBackend for PiAgentBackend {
             msg
         })?;
 
-        eprintln!("[pi] spawned with PID={}", child.id());
+        // eprintln!("[pi] spawned with PID={}", child.id());
 
         let stdin = child.stdin.take()
             .ok_or_else(|| {
@@ -373,7 +373,7 @@ impl AgentBackend for PiAgentBackend {
                 return Err(msg);
             }
             Ok(None) => {
-                eprintln!("[pi] spawn: pi is still running after 200ms, good");
+                // eprintln!("[pi] spawn: pi is still running after 200ms, good");
             }
             Err(e) => {
                 eprintln!("[pi] spawn: try_wait error: {}", e);
@@ -440,7 +440,7 @@ impl AgentBackend for PiAgentBackend {
                                 bytes.push(buf[0]);
                             }
                             Err(e) => {
-                                eprintln!("[pi] error reading set_thinking_level response: {}", e);
+                                // eprintln!("[pi] error reading set_thinking_level response: {}", e);
                                 break;
                             }
                         }
@@ -450,13 +450,13 @@ impl AgentBackend for PiAgentBackend {
                         if let Ok(json) = serde_json::from_str::<serde_json::Value>(&response) {
                             let success = json.get("success").and_then(|v| v.as_bool()).unwrap_or(false);
                             if success {
-                                eprintln!("[pi] set_thinking_level confirmed: {} ✓", pi_level);
+                                // eprintln!("[pi] set_thinking_level confirmed: {} ✓", pi_level);
                             } else {
                                 let err = json.get("error").and_then(|v| v.as_str()).unwrap_or("unknown");
-                                eprintln!("[pi] set_thinking_level FAILED: {} (level: {})", err, pi_level);
+                                // eprintln!("[pi] set_thinking_level FAILED: {} (level: {})", err, pi_level);
                             }
                         } else {
-                            eprintln!("[pi] set_thinking_level response (unparsed): {}", response);
+                            // eprintln!("[pi] set_thinking_level response (unparsed): {}", response);
                         }
                     }
                 }
@@ -486,27 +486,18 @@ impl AgentBackend for PiAgentBackend {
                                 bytes.push(buf[0]);
                             }
                             Err(e) => {
-                                eprintln!("[pi] error reading get_state response: {}", e);
+                                // eprintln!("[pi] error reading get_state response: {}", e);
                                 break;
                             }
                         }
                     }
                     if !bytes.is_empty() {
-                        let response = String::from_utf8_lossy(&bytes);
-                        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&response) {
-                            let actual_level = json.get("data")
-                                .and_then(|d| d.get("thinkingLevel"))
-                                .and_then(|v| v.as_str())
-                                .unwrap_or("(not found)");
-                            eprintln!("[pi] actual thinking level after set: {}", actual_level);
-                        } else {
-                            eprintln!("[pi] get_state response (unparsed): {}", response);
-                        }
+                        // get_state verification (logged via main.rs after each message)
                     }
                 }
 
                 self.thinking_configured = true;
-                eprintln!("[pi] thinking_level configured successfully");
+                // eprintln!("[pi] thinking_level configured successfully");
             }
         }
 
@@ -525,7 +516,7 @@ impl AgentBackend for PiAgentBackend {
                 .map_err(|e| format!("Failed to flush pi stdin: {}", e))?;
         }
 
-        eprintln!("[pi] send_message: sending prompt, starting reader threads");
+        // eprintln!("[pi] send_message: sending prompt, starting reader threads");
 
         // Thread for stderr: capture pi warnings/errors and forward them as SseEvent::Error
         if let Some(stderr_arc) = stderr_arc {
@@ -575,7 +566,7 @@ impl AgentBackend for PiAgentBackend {
                 line.clear();
                 match reader.read_line(&mut line) {
                     Ok(0) => {
-                        eprintln!("[pi] reader: EOF (pi process closed stdout)");
+                        // eprintln!("[pi] reader: EOF (pi process closed stdout)");
                         let _ = tx.send(SseEvent::Done);
                         break;
                     }
@@ -586,7 +577,7 @@ impl AgentBackend for PiAgentBackend {
                     }
                     Ok(n) => {
                         let trimmed = line.trim();
-                        eprintln!("[pi] reader: got {} bytes: {}", n, trimmed.chars().take(120).collect::<String>());
+                        // eprintln!("[pi] reader: got {} bytes: {}", n, trimmed.chars().take(120).collect::<String>());
                         if trimmed.is_empty() {
                             continue;
                         }
