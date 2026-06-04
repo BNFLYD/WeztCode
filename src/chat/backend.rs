@@ -162,6 +162,7 @@ pub enum SseEvent {
     ToolResult { name: String, status: String },
     Warning { message: String },
     Error { message: String },
+    SessionStats { json: String },
     Done,
 }
 
@@ -187,6 +188,10 @@ impl SseEvent {
             SseEvent::Error { message } => {
                 let json = serde_json::json!({"type":"error","message":message});
                 format!("data: {}\n\n", json)
+            }
+            SseEvent::SessionStats { json } => {
+                let payload = serde_json::json!({"type":"session_stats","json":json});
+                format!("data: {}\n\n", payload)
             }
             SseEvent::Done => {
                 format!("data: {}\n\n", serde_json::json!({"type":"done"}))
@@ -545,6 +550,8 @@ impl AgentBackend for PiAgentBackend {
             });
         }
 
+        let stdin_arc = stdin.clone();
+
         // Thread for stdout: parse JSON event stream
         thread::spawn(move || {
             let mut stdout_lock = match stdout_arc.lock() {
@@ -561,23 +568,20 @@ impl AgentBackend for PiAgentBackend {
 
             let mut reader = BufReader::new(&mut *stdout_lock);
             let mut line = String::new();
+            let mut agent_ended = false;
 
             loop {
                 line.clear();
                 match reader.read_line(&mut line) {
                     Ok(0) => {
-                        // eprintln!("[pi] reader: EOF (pi process closed stdout)");
-                        let _ = tx.send(SseEvent::Done);
                         break;
                     }
                     Err(e) => {
                         eprintln!("[pi] reader: read error: {}", e);
-                        let _ = tx.send(SseEvent::Done);
                         break;
                     }
                     Ok(n) => {
                         let trimmed = line.trim();
-                        // eprintln!("[pi] reader: got {} bytes: {}", n, trimmed.chars().take(120).collect::<String>());
                         if trimmed.is_empty() {
                             continue;
                         }
@@ -600,7 +604,6 @@ impl AgentBackend for PiAgentBackend {
                                             let _ = tx.send(SseEvent::Error {
                                                 message: err.to_string(),
                                             });
-                                            let _ = tx.send(SseEvent::Done);
                                             break;
                                         }
                                     }
@@ -657,7 +660,7 @@ impl AgentBackend for PiAgentBackend {
                                         });
                                     }
                                     "agent_end" => {
-                                        let _ = tx.send(SseEvent::Done);
+                                        agent_ended = true;
                                         break;
                                     }
                                     "error" => {
@@ -668,14 +671,12 @@ impl AgentBackend for PiAgentBackend {
                                         let _ = tx.send(SseEvent::Error {
                                             message: msg.to_string(),
                                         });
-                                        let _ = tx.send(SseEvent::Done);
                                         break;
                                     }
                                     _ => {}
                                 }
                             }
                             Err(_) => {
-                                // Non-JSON line (shouldn't happen in RPC mode)
                                 let _ = tx.send(SseEvent::Token {
                                     content: trimmed.to_string(),
                                 });
@@ -684,6 +685,45 @@ impl AgentBackend for PiAgentBackend {
                     }
                 }
             }
+
+            // Release stdout lock before doing RPC
+            drop(reader);
+            drop(stdout_lock);
+
+            // After stream ends, fetch and send real session stats
+            if agent_ended {
+                if let Some(stdin) = stdin_arc {
+                    let msg = serde_json::json!({"type": "get_session_stats"});
+                    if let Ok(s) = serde_json::to_string(&msg) {
+                        if let Ok(lock) = stdin.lock() {
+                            let _ = writeln!(&*lock, "{}", s);
+                            let _ = (&*lock).flush();
+                        }
+                    }
+
+                    if let Ok(mut stdout_lock) = stdout_arc.lock() {
+                        let mut bytes = Vec::new();
+                        let mut buf = [0u8; 1];
+                        loop {
+                            match stdout_lock.read(&mut buf) {
+                                Ok(0) => break,
+                                Ok(_) => {
+                                    if buf[0] == b'\n' { break; }
+                                    bytes.push(buf[0]);
+                                }
+                                Err(_) => break,
+                            }
+                        }
+                        if !bytes.is_empty() {
+                            if let Ok(s) = String::from_utf8(bytes) {
+                                let _ = tx.send(SseEvent::SessionStats { json: s });
+                            }
+                        }
+                    }
+                }
+            }
+
+            let _ = tx.send(SseEvent::Done);
         });
 
         Ok(rx)

@@ -15,6 +15,8 @@
   let switching = false;
   let show_dropdown = false;
   let dropdown_container;
+  let real_context_percent = null;
+  let real_context_window = null;
 
   function save() {
     const raw = JSON.stringify(messages);
@@ -109,6 +111,18 @@
                 messages = messages;
                 save();
                 break;
+              case "session_stats":
+                try {
+                  const raw = JSON.parse(data.json);
+                  const ctx = raw.data?.contextUsage;
+                  if (ctx?.percent !== undefined) {
+                    real_context_percent = Math.round(ctx.percent);
+                  }
+                  if (ctx?.contextWindow) {
+                    real_context_window = ctx.contextWindow;
+                  }
+                } catch {}
+                break;
               case "done":
                 break;
             }
@@ -200,6 +214,7 @@
   $: used_tokens = messages.reduce((sum, msg) => sum + estimateTokens(msg.content), 0);
   $: context_limit = models.find(m => m.name === current_model)?.max_context ?? 4096;
   $: context_percent = context_limit > 0 ? Math.round((used_tokens / context_limit) * 100) : 0;
+  $: display_percent = real_context_percent ?? context_percent;
 
   load_models();
 </script>
@@ -263,7 +278,7 @@
         class="font-mono text-xs text-print/50 hover:text-print transition-colors"
         on:click={newConversation}
       >
-        {context_percent}%
+        {display_percent}%
       </button>
     </div>
   </div>
