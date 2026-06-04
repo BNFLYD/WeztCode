@@ -692,32 +692,30 @@ impl AgentBackend for PiAgentBackend {
 
             // After stream ends, fetch and send real session stats
             if agent_ended {
-                if let Some(stdin) = stdin_arc {
-                    let msg = serde_json::json!({"type": "get_session_stats"});
-                    if let Ok(s) = serde_json::to_string(&msg) {
-                        if let Ok(lock) = stdin.lock() {
-                            let _ = writeln!(&*lock, "{}", s);
-                            let _ = (&*lock).flush();
+                let msg = serde_json::json!({"type": "get_session_stats"});
+                if let Ok(s) = serde_json::to_string(&msg) {
+                    if let Ok(lock) = stdin_arc.lock() {
+                        let _ = writeln!(&*lock, "{}", s);
+                        let _ = (&*lock).flush();
+                    }
+                }
+
+                if let Ok(mut stdout_lock) = stdout_arc.lock() {
+                    let mut bytes = Vec::new();
+                    let mut buf = [0u8; 1];
+                    loop {
+                        match stdout_lock.read(&mut buf) {
+                            Ok(0) => break,
+                            Ok(_) => {
+                                if buf[0] == b'\n' { break; }
+                                bytes.push(buf[0]);
+                            }
+                            Err(_) => break,
                         }
                     }
-
-                    if let Ok(mut stdout_lock) = stdout_arc.lock() {
-                        let mut bytes = Vec::new();
-                        let mut buf = [0u8; 1];
-                        loop {
-                            match stdout_lock.read(&mut buf) {
-                                Ok(0) => break,
-                                Ok(_) => {
-                                    if buf[0] == b'\n' { break; }
-                                    bytes.push(buf[0]);
-                                }
-                                Err(_) => break,
-                            }
-                        }
-                        if !bytes.is_empty() {
-                            if let Ok(s) = String::from_utf8(bytes) {
-                                let _ = tx.send(SseEvent::SessionStats { json: s });
-                            }
+                    if !bytes.is_empty() {
+                        if let Ok(s) = String::from_utf8(bytes) {
+                            let _ = tx.send(SseEvent::SessionStats { json: s });
                         }
                     }
                 }
