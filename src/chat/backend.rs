@@ -1,4 +1,6 @@
+use std::fs;
 use std::io::{BufRead, BufReader, Read, Write};
+use std::path::PathBuf;
 use std::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command, Stdio};
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
@@ -83,6 +85,74 @@ fn find_pi_path() -> String {
 
     eprintln!("[pi] find_pi_path: fallback to 'pi' (PATH lookup)");
     "pi".to_string()
+}
+
+pub fn sync_pi_model_overrides() -> Result<(), String> {
+    let models = crate::config::models::list();
+    let with_reasoning: Vec<_> = models.iter()
+        .filter(|m| m.reasoning.unwrap_or(false))
+        .collect();
+
+    if with_reasoning.is_empty() {
+        return Ok(());
+    }
+
+    let home = std::env::var("HOME")
+        .or_else(|_| std::env::var("USERPROFILE"))
+        .map_err(|_| "HOME/USERPROFILE not set".to_string())?;
+    let pi_dir = PathBuf::from(&home).join(".pi/agent");
+    let pi_models_path = pi_dir.join("models.json");
+
+    let mut config: serde_json::Value = if pi_models_path.exists() {
+        let content = fs::read_to_string(&pi_models_path)
+            .map_err(|e| format!("Failed to read {}: {}", pi_models_path.display(), e))?;
+        serde_json::from_str(&content).unwrap_or(serde_json::json!({}))
+    } else {
+        serde_json::json!({})
+    };
+
+    if !config.is_object() {
+        config = serde_json::json!({});
+    }
+    if config.get("providers").is_none() {
+        config["providers"] = serde_json::json!({});
+    }
+
+    for model in &with_reasoning {
+        let provider = &model.provider;
+        let model_name = &model.model;
+
+        let provider_entry = config["providers"]
+            .as_object_mut()
+            .ok_or_else(|| "providers not an object".to_string())?
+            .entry(provider.clone())
+            .or_insert_with(|| serde_json::json!({}));
+        let provider_obj = provider_entry.as_object_mut()
+            .ok_or_else(|| format!("provider {} entry not an object", provider))?;
+
+        let overrides = provider_obj.entry("modelOverrides")
+            .or_insert_with(|| serde_json::json!({}));
+        let overrides_obj = overrides.as_object_mut()
+            .ok_or_else(|| "modelOverrides not an object".to_string())?;
+
+        let model_entry = overrides_obj.entry(model_name.clone())
+            .or_insert_with(|| serde_json::json!({}));
+        let model_obj = model_entry.as_object_mut()
+            .ok_or_else(|| format!("model {} entry not an object", model_name))?;
+
+        model_obj.insert("reasoning".to_string(), serde_json::json!(true));
+    }
+
+    fs::create_dir_all(&pi_dir)
+        .map_err(|e| format!("Failed to create {}: {}", pi_dir.display(), e))?;
+
+    let content = serde_json::to_string_pretty(&config)
+        .map_err(|e| format!("JSON serialize: {}", e))?;
+    fs::write(&pi_models_path, &content)
+        .map_err(|e| format!("Failed to write {}: {}", pi_models_path.display(), e))?;
+
+    eprintln!("[pi] synced model overrides to {}", pi_models_path.display());
+    Ok(())
 }
 
 #[derive(Debug, Clone)]

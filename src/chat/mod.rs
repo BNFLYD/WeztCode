@@ -11,6 +11,9 @@ pub struct ChatService {
 
 impl ChatService {
     pub fn new(mut backend: Box<dyn AgentBackend>) -> Self {
+        if let Err(e) = sync_pi_model_overrides() {
+            eprintln!("[chat] Failed to sync pi model overrides: {}", e);
+        }
         if let Err(e) = backend.spawn() {
             eprintln!("[chat] Failed to spawn agent backend: {}", e);
         }
@@ -19,6 +22,9 @@ impl ChatService {
 
     pub fn switch_backend(&mut self, new_backend: Box<dyn AgentBackend>) -> Result<(), String> {
         let mut backend = new_backend;
+        if let Err(e) = sync_pi_model_overrides() {
+            eprintln!("[chat] Failed to sync pi model overrides: {}", e);
+        }
         backend.spawn()?;
         self.backend = backend;
         Ok(())

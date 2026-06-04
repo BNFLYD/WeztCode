@@ -14,6 +14,8 @@ pub struct ModelEntry {
     pub max_context: Option<u64>,
     #[serde(default)]
     pub thinking_level: Option<String>,
+    #[serde(default)]
+    pub reasoning: Option<bool>,
 }
 
 fn home_dir() -> PathBuf {
