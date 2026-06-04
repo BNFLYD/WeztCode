@@ -30,7 +30,10 @@
     }
   }
 
-  function newConversation() {
+  async function newConversation() {
+    try {
+      await fetch("/api/chat/new-session", { method: "POST" });
+    } catch {}
     messages = [];
     warnings = [];
     show_warnings = false;

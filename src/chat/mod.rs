@@ -38,6 +38,10 @@ impl ChatService {
         self.backend.get_state()
     }
 
+    pub fn new_session(&mut self) -> Result<(), String> {
+        self.backend.new_session()
+    }
+
     pub fn send_message_stream(&mut self, message: &str) -> Result<ChannelReader, String> {
         let rx = self.backend.send_message(message)?;
 

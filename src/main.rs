@@ -165,6 +165,10 @@ fn handle_api(request: tiny_http::Request, url: &str) {
         return handle_terminal_edit_defaults(request);
     }
 
+    if url == "/api/chat/new-session" {
+        return handle_chat_new_session(request);
+    }
+
     if url == "/api/chat/switch-model" {
         return handle_chat_switch_model(request);
     }
@@ -487,6 +491,26 @@ fn handle_chat_switch_model(mut request: tiny_http::Request) {
         }
         Err(e) => {
             let safe = config::keys::redact_keys(&format!("Failed to switch model: {}", e));
+            let _ = request.respond(json_error(&safe));
+        }
+    }
+}
+
+fn handle_chat_new_session(mut request: tiny_http::Request) {
+    let mut service = match CHAT_SERVICE.lock() {
+        Ok(s) => s,
+        Err(_) => {
+            let _ = request.respond(json_error("Chat service lock failed"));
+            return;
+        }
+    };
+
+    match service.new_session() {
+        Ok(_) => {
+            let _ = request.respond(json_response(&serde_json::json!({ "ok": true })));
+        }
+        Err(e) => {
+            let safe = config::keys::redact_keys(&format!("Failed to start new session: {}", e));
             let _ = request.respond(json_error(&safe));
         }
     }

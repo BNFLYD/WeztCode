@@ -210,6 +210,9 @@ pub trait AgentBackend: Send {
     fn get_state(&self) -> Result<String, String> {
         Err("get_state not supported by this backend".to_string())
     }
+    fn new_session(&mut self) -> Result<(), String> {
+        Err("new_session not supported by this backend".to_string())
+    }
 }
 
 fn env_var_for_provider(provider: &str) -> &'static str {
@@ -317,6 +320,53 @@ impl PiAgentBackend {
 
         String::from_utf8(bytes).map_err(|e| format!("Invalid UTF-8: {}", e))
     }
+
+    pub fn new_session(&mut self) -> Result<(), String> {
+        let stdin = self.stdin.as_ref()
+            .ok_or_else(|| "Pi not spawned (stdin is None)".to_string())?;
+        let stdout_arc = self.stdout.as_ref()
+            .ok_or_else(|| "Pi not spawned (stdout is None)".to_string())?
+            .clone();
+
+        let msg = serde_json::json!({"type": "new_session"});
+        let msg_str = serde_json::to_string(&msg).map_err(|e| format!("JSON serialize: {}", e))?;
+
+        {
+            let mut stdin_lock = stdin.lock().map_err(|e| format!("stdin lock: {}", e))?;
+            writeln!(stdin_lock, "{}", msg_str)
+                .map_err(|e| format!("Failed to write new_session: {}", e))?;
+            stdin_lock.flush()
+                .map_err(|e| format!("Failed to flush new_session: {}", e))?;
+        }
+
+        let mut stdout_lock = stdout_arc.lock().map_err(|e| format!("stdout lock: {}", e))?;
+        let mut bytes = Vec::new();
+        let mut buf = [0u8; 1];
+        loop {
+            match stdout_lock.read(&mut buf) {
+                Ok(0) => break,
+                Ok(_) => {
+                    if buf[0] == b'\n' { break; }
+                    bytes.push(buf[0]);
+                }
+                Err(e) => return Err(format!("stdout read error: {}", e)),
+            }
+        }
+
+        let response = String::from_utf8(bytes).map_err(|e| format!("Invalid UTF-8: {}", e))?;
+        let json: serde_json::Value = serde_json::from_str(&response)
+            .map_err(|e| format!("JSON parse error: {}", e))?;
+
+        let success = json.get("success").and_then(|v| v.as_bool()).unwrap_or(false);
+        if success {
+            Ok(())
+        } else {
+            let err = json.get("error")
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown error");
+            Err(err.to_string())
+        }
+    }
 }
 
 impl AgentBackend for PiAgentBackend {
@@ -328,9 +378,13 @@ impl AgentBackend for PiAgentBackend {
         PiAgentBackend::get_state(self)
     }
 
+    fn new_session(&mut self) -> Result<(), String> {
+        PiAgentBackend::new_session(self)
+    }
+
     fn spawn(&mut self) -> Result<(), String> {
         let mut cmd = Command::new(&self.config.pi_path);
-        cmd.args(["--mode", "rpc", "--no-session"])
+        cmd.args(["--mode", "rpc"])
             .arg("--provider").arg(&self.config.provider)
             .arg("--model").arg(&self.config.model);
         cmd.stdin(Stdio::piped())
@@ -777,6 +831,10 @@ pub struct NullBackend;
 
 impl AgentBackend for NullBackend {
     fn spawn(&mut self) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn new_session(&mut self) -> Result<(), String> {
         Ok(())
     }
 
