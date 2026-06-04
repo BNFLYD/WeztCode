@@ -215,10 +215,10 @@
 
   $: used_tokens = messages.reduce((sum, msg) => sum + estimateTokens(msg.content), 0);
   $: context_limit = models.find(m => m.name === current_model)?.max_context ?? 4096;
-  $: context_percent = context_limit > 0 ? Math.round((used_tokens / context_limit) * 100) : 0;
+  $: context_percent = context_limit > 0 ? ((used_tokens / context_limit) * 100) : 0;
   $: indicator = Math.round(real_context_percent ?? context_percent);
 
-  load_models();
+  load_models();  
 </script>
 
 <div class="flex flex-col gap-1 py-2 h-full relative">
