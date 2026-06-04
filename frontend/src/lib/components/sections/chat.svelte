@@ -34,6 +34,8 @@
     messages = [];
     warnings = [];
     show_warnings = false;
+    real_context_percent = null;
+    real_context_window = null;
     localStorage.removeItem(STORAGE_KEY);
   }
 
@@ -116,7 +118,7 @@
                   const raw = JSON.parse(data.json);
                   const ctx = raw.data?.contextUsage;
                   if (ctx?.percent !== undefined) {
-                    real_context_percent = (real_context_percent ?? 0) + Math.round(ctx.percent);
+                    real_context_percent = (real_context_percent ?? 0) + ctx.percent;
                   }
                   if (ctx?.contextWindow) {
                     real_context_window = ctx.contextWindow;
@@ -214,7 +216,7 @@
   $: used_tokens = messages.reduce((sum, msg) => sum + estimateTokens(msg.content), 0);
   $: context_limit = models.find(m => m.name === current_model)?.max_context ?? 4096;
   $: context_percent = context_limit > 0 ? Math.round((used_tokens / context_limit) * 100) : 0;
-  $: display_percent = real_context_percent ?? context_percent;
+  $: indicator = Math.round(real_context_percent ?? context_percent);
 
   load_models();
 </script>
@@ -278,7 +280,7 @@
         class="font-mono text-xs text-print/50 hover:text-print transition-colors"
         on:click={newConversation}
       >
-        {display_percent}%
+        {indicator}%
       </button>
     </div>
   </div>
