@@ -116,7 +116,7 @@
                   const raw = JSON.parse(data.json);
                   const ctx = raw.data?.contextUsage;
                   if (ctx?.percent !== undefined) {
-                    real_context_percent = Math.round(ctx.percent);
+                    real_context_percent = (real_context_percent ?? 0) + Math.round(ctx.percent);
                   }
                   if (ctx?.contextWindow) {
                     real_context_window = ctx.contextWindow;
