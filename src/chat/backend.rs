@@ -2,7 +2,7 @@ use std::fs;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::path::PathBuf;
 use std::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command, Stdio};
-use std::sync::{mpsc, Arc, Mutex};
+use std::sync::{Arc, Mutex};
 use std::thread;
 
 #[derive(Clone)]
@@ -202,7 +202,7 @@ impl SseEvent {
 
 pub trait AgentBackend: Send {
     fn spawn(&mut self) -> Result<(), String>;
-    fn send_message(&mut self, message: &str) -> Result<mpsc::Receiver<SseEvent>, String>;
+    fn send_message(&mut self, message: &str) -> Result<tokio::sync::mpsc::Receiver<SseEvent>, String>;
     fn shutdown(&mut self);
     fn get_session_stats(&self) -> Result<String, String> {
         Err("get_session_stats not supported by this backend".to_string())
@@ -382,72 +382,8 @@ impl AgentBackend for PiAgentBackend {
         PiAgentBackend::new_session(self)
     }
 
-    fn spawn(&mut self) -> Result<(), String> {
-        let mut cmd = Command::new(&self.config.pi_path);
-        cmd.args(["--mode", "rpc"])
-            .arg("--provider").arg(&self.config.provider)
-            .arg("--model").arg(&self.config.model);
-        cmd.stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
-
-        let env_key = env_var_for_provider(&self.config.provider);
-        cmd.env(env_key, &self.config.api_key);
-
-        // eprintln!("[pi] spawn: path={}, provider={}, model={}", self.config.pi_path, self.config.provider, self.config.model);
-
-        let mut child = cmd.spawn().map_err(|e| {
-            let msg = format!("Failed to spawn pi: {}", e);
-            eprintln!("[pi] {}", msg);
-            msg
-        })?;
-
-        // eprintln!("[pi] spawned with PID={}", child.id());
-
-        let stdin = child.stdin.take()
-            .ok_or_else(|| {
-                let msg = "Failed to capture pi stdin".to_string();
-                eprintln!("[pi] {}", msg);
-                msg
-            })?;
-        let stdout = child.stdout.take()
-            .ok_or_else(|| {
-                let msg = "Failed to capture pi stdout".to_string();
-                eprintln!("[pi] {}", msg);
-                msg
-            })?;
-        let stderr = child.stderr.take()
-            .ok_or_else(|| {
-                let msg = "Failed to capture pi stderr".to_string();
-                eprintln!("[pi] {}", msg);
-                msg
-            })?;
-
-        // Pequeña pausa para detectar si pi muere inmediatamente (como rpc-client.ts)
-        std::thread::sleep(std::time::Duration::from_millis(200));
-        match child.try_wait() {
-            Ok(Some(status)) => {
-                let msg = format!("pi exited immediately with status={}", status);
-                eprintln!("[pi] spawn: {}", msg);
-                return Err(msg);
-            }
-            Ok(None) => {
-                // eprintln!("[pi] spawn: pi is still running after 200ms, good");
-            }
-            Err(e) => {
-                eprintln!("[pi] spawn: try_wait error: {}", e);
-            }
-        }
-
-        self.stdin = Some(Arc::new(Mutex::new(stdin)));
-        self.stdout = Some(Arc::new(Mutex::new(stdout)));
-        self.stderr = Some(Arc::new(Mutex::new(stderr)));
-        self.child = Some(child);
-        Ok(())
-    }
-
-    fn send_message(&mut self, message: &str) -> Result<mpsc::Receiver<SseEvent>, String> {
-        let (tx, rx) = mpsc::channel();
+    fn send_message(&mut self, message: &str) -> Result<tokio::sync::mpsc::Receiver<SseEvent>, String> {
+        let (tx, rx) = tokio::sync::mpsc::channel(64);
 
         let stdin = self.stdin.as_ref()
             .ok_or_else(|| {
@@ -575,8 +511,6 @@ impl AgentBackend for PiAgentBackend {
                 .map_err(|e| format!("Failed to flush pi stdin: {}", e))?;
         }
 
-        // eprintln!("[pi] send_message: sending prompt, starting reader threads");
-
         // Thread for stderr: capture pi warnings/errors and forward them as SseEvent::Error
         if let Some(stderr_arc) = stderr_arc {
             let tx_err = tx.clone();
@@ -594,7 +528,7 @@ impl AgentBackend for PiAgentBackend {
                         Ok(_) => {
                             let trimmed = line.trim();
                             if !trimmed.is_empty() {
-                                let _ = tx_err.send(SseEvent::Warning {
+                                let _ = tx_err.blocking_send(SseEvent::Warning {
                                     message: trimmed.to_string(),
                                 });
                             }
@@ -612,10 +546,10 @@ impl AgentBackend for PiAgentBackend {
                 Ok(g) => g,
                 Err(_) => {
                     eprintln!("[pi] reader: stdout lock failed");
-                    let _ = tx.send(SseEvent::Error {
+                    let _ = tx.blocking_send(SseEvent::Error {
                         message: "stdout lock failed".to_string(),
                     });
-                    let _ = tx.send(SseEvent::Done);
+                    let _ = tx.blocking_send(SseEvent::Done);
                     return;
                 }
             };
@@ -655,7 +589,7 @@ impl AgentBackend for PiAgentBackend {
                                             let err = json.get("error")
                                                 .and_then(|v| v.as_str())
                                                 .unwrap_or("Unknown error");
-                                            let _ = tx.send(SseEvent::Error {
+                                            let _ = tx.blocking_send(SseEvent::Error {
                                                 message: err.to_string(),
                                             });
                                             break;
@@ -666,7 +600,7 @@ impl AgentBackend for PiAgentBackend {
                                             match ae.get("type").and_then(|v| v.as_str()) {
                                                 Some("text_delta") => {
                                                     if let Some(delta) = ae.get("delta").and_then(|v| v.as_str()) {
-                                                        let _ = tx.send(SseEvent::Token {
+                                                        let _ = tx.blocking_send(SseEvent::Token {
                                                             content: delta.to_string(),
                                                         });
                                                     }
@@ -676,7 +610,7 @@ impl AgentBackend for PiAgentBackend {
                                                         let name = tc.get("name")
                                                             .and_then(|v| v.as_str())
                                                             .unwrap_or("tool");
-                                                        let _ = tx.send(SseEvent::ToolCall {
+                                                        let _ = tx.blocking_send(SseEvent::ToolCall {
                                                             name: name.to_string(),
                                                         });
                                                     }
@@ -685,7 +619,7 @@ impl AgentBackend for PiAgentBackend {
                                                     let reason = ae.get("reason")
                                                                 .and_then(|v| v.as_str())
                                                                 .unwrap_or("unknown");
-                                                    let _ = tx.send(SseEvent::Error {
+                                                    let _ = tx.blocking_send(SseEvent::Error {
                                                         message: format!("Stream error: {}", reason),
                                                     });
                                                 }
@@ -697,7 +631,7 @@ impl AgentBackend for PiAgentBackend {
                                         let name = json.get("toolName")
                                             .and_then(|v| v.as_str())
                                             .unwrap_or("tool");
-                                        let _ = tx.send(SseEvent::ToolCall {
+                                        let _ = tx.blocking_send(SseEvent::ToolCall {
                                             name: name.to_string(),
                                         });
                                     }
@@ -708,7 +642,7 @@ impl AgentBackend for PiAgentBackend {
                                         let is_err = json.get("isError")
                                             .and_then(|v| v.as_bool())
                                             .unwrap_or(false);
-                                        let _ = tx.send(SseEvent::ToolResult {
+                                        let _ = tx.blocking_send(SseEvent::ToolResult {
                                             name: name.to_string(),
                                             status: if is_err { "error" } else { "ok" }.to_string(),
                                         });
@@ -719,10 +653,10 @@ impl AgentBackend for PiAgentBackend {
                                     }
                                     "error" => {
                                         let msg = json.get("error")
-                                                            .and_then(|v| v.as_str())
-                                                            .or_else(|| json.get("message").and_then(|v| v.as_str()))
-                                                            .unwrap_or("Unknown error");
-                                        let _ = tx.send(SseEvent::Error {
+                                                                            .and_then(|v| v.as_str())
+                                                                            .or_else(|| json.get("message").and_then(|v| v.as_str()))
+                                                                            .unwrap_or("Unknown error");
+                                        let _ = tx.blocking_send(SseEvent::Error {
                                             message: msg.to_string(),
                                         });
                                         break;
@@ -731,7 +665,7 @@ impl AgentBackend for PiAgentBackend {
                                 }
                             }
                             Err(_) => {
-                                let _ = tx.send(SseEvent::Token {
+                                let _ = tx.blocking_send(SseEvent::Token {
                                     content: trimmed.to_string(),
                                 });
                             }
@@ -769,16 +703,80 @@ impl AgentBackend for PiAgentBackend {
                     }
                     if !bytes.is_empty() {
                         if let Ok(s) = String::from_utf8(bytes) {
-                            let _ = tx.send(SseEvent::SessionStats { json: s });
+                            let _ = tx.blocking_send(SseEvent::SessionStats { json: s });
                         }
                     }
                 }
             }
 
-            let _ = tx.send(SseEvent::Done);
+            let _ = tx.blocking_send(SseEvent::Done);
         });
 
         Ok(rx)
+    }
+
+    fn spawn(&mut self) -> Result<(), String> {
+        let mut cmd = Command::new(&self.config.pi_path);
+        cmd.args(["--mode", "rpc"])
+            .arg("--provider").arg(&self.config.provider)
+            .arg("--model").arg(&self.config.model);
+        cmd.stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+
+        let env_key = env_var_for_provider(&self.config.provider);
+        cmd.env(env_key, &self.config.api_key);
+
+        // eprintln!("[pi] spawn: path={}, provider={}, model={}", self.config.pi_path, self.config.provider, self.config.model);
+
+        let mut child = cmd.spawn().map_err(|e| {
+            let msg = format!("Failed to spawn pi: {}", e);
+            eprintln!("[pi] {}", msg);
+            msg
+        })?;
+
+        // eprintln!("[pi] spawned with PID={}", child.id());
+
+        let stdin = child.stdin.take()
+            .ok_or_else(|| {
+                let msg = "Failed to capture pi stdin".to_string();
+                eprintln!("[pi] {}", msg);
+                msg
+            })?;
+        let stdout = child.stdout.take()
+            .ok_or_else(|| {
+                let msg = "Failed to capture pi stdout".to_string();
+                eprintln!("[pi] {}", msg);
+                msg
+            })?;
+        let stderr = child.stderr.take()
+            .ok_or_else(|| {
+                let msg = "Failed to capture pi stderr".to_string();
+                eprintln!("[pi] {}", msg);
+                msg
+            })?;
+
+        // Pequeña pausa para detectar si pi muere inmediatamente (como rpc-client.ts)
+        std::thread::sleep(std::time::Duration::from_millis(200));
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                let msg = format!("pi exited immediately with status={}", status);
+                eprintln!("[pi] spawn: {}", msg);
+                return Err(msg);
+            }
+            Ok(None) => {
+                // eprintln!("[pi] spawn: pi is still running after 200ms, good");
+            }
+            Err(e) => {
+                eprintln!("[pi] spawn: try_wait error: {}", e);
+            }
+        }
+
+        self.stdin = Some(Arc::new(Mutex::new(stdin)));
+        self.stdout = Some(Arc::new(Mutex::new(stdout)));
+        self.stderr = Some(Arc::new(Mutex::new(stderr)));
+        self.child = Some(child);
+        Ok(())
     }
 
     fn shutdown(&mut self) {
@@ -793,40 +791,6 @@ impl AgentBackend for PiAgentBackend {
     }
 }
 
-pub struct ChannelReader {
-    rx: mpsc::Receiver<Vec<u8>>,
-    buffer: Vec<u8>,
-    pos: usize,
-}
-
-impl ChannelReader {
-    pub fn new(rx: mpsc::Receiver<Vec<u8>>) -> Self {
-        Self {
-            rx,
-            buffer: Vec::new(),
-            pos: 0,
-        }
-    }
-}
-
-impl Read for ChannelReader {
-    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        if self.pos >= self.buffer.len() {
-            match self.rx.recv() {
-                Ok(chunk) => {
-                    self.buffer = chunk;
-                    self.pos = 0;
-                }
-                Err(_) => return Ok(0),
-            }
-        }
-        let n = std::cmp::min(buf.len(), self.buffer.len() - self.pos);
-        buf[..n].copy_from_slice(&self.buffer[self.pos..self.pos + n]);
-        self.pos += n;
-        Ok(n)
-    }
-}
-
 pub struct NullBackend;
 
 impl AgentBackend for NullBackend {
@@ -838,14 +802,14 @@ impl AgentBackend for NullBackend {
         Ok(())
     }
 
-    fn send_message(&mut self, message: &str) -> Result<mpsc::Receiver<SseEvent>, String> {
-        let (tx, rx) = mpsc::channel();
+    fn send_message(&mut self, message: &str) -> Result<tokio::sync::mpsc::Receiver<SseEvent>, String> {
+        let (tx, rx) = tokio::sync::mpsc::channel(64);
         let msg = message.to_string();
         thread::spawn(move || {
-            let _ = tx.send(SseEvent::Token {
+            let _ = tx.blocking_send(SseEvent::Token {
                 content: format!("[echo] {}\n\n(Conecta Pi Agent para respuestas reales)", msg),
             });
-            let _ = tx.send(SseEvent::Done);
+            let _ = tx.blocking_send(SseEvent::Done);
         });
         Ok(rx)
     }

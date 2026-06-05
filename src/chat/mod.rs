@@ -2,7 +2,6 @@ mod backend;
 
 pub use backend::*;
 
-use std::sync::mpsc;
 use std::thread;
 
 pub struct ChatService {
@@ -42,30 +41,19 @@ impl ChatService {
         self.backend.new_session()
     }
 
-    pub fn send_message_stream(&mut self, message: &str) -> Result<ChannelReader, String> {
-        let rx = self.backend.send_message(message)?;
-
-        let (byte_tx, byte_rx) = mpsc::channel();
+    pub fn send_message_stream(&mut self, message: &str) -> Result<tokio::sync::mpsc::Receiver<String>, String> {
+        let mut rx = self.backend.send_message(message)?;
+        let (tx, out_rx) = tokio::sync::mpsc::channel::<String>(64);
 
         thread::spawn(move || {
-            loop {
-                match rx.recv() {
-                    Ok(event) => {
-                        let sse = event.to_sse_string();
-                        let bytes = sse.into_bytes();
-                        if byte_tx.send(bytes).is_err() {
-                            break;
-                        }
-                        if matches!(event, SseEvent::Done) {
-                            break;
-                        }
-                    }
-                    Err(_) => break,
-                }
+            while let Some(event) = rx.blocking_recv() {
+                let sse_str = event.to_sse_string();
+                if tx.blocking_send(sse_str).is_err() { break; }
+                if matches!(event, SseEvent::Done) { break; }
             }
         });
 
-        Ok(ChannelReader::new(byte_rx))
+        Ok(out_rx)
     }
 }
 

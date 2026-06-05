@@ -1,39 +1,43 @@
-use std::path::Path;
+use std::collections::HashMap;
 
-use crate::api::{json_error, json_response};
+use axum::extract::Query;
+use axum::response::IntoResponse;
 
-pub fn handle_editor_open(
-    rel_path: &str,
-    root: &Path,
-) -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
-    eprintln!("[editor_open] rel_path={:?}, root={:?}", rel_path, root);
+use crate::api::{err_json, get_current_root};
 
-    let full_path = match crate::config::fs::sanitize_path(rel_path, root) {
-        Ok(p) => p,
-        Err(e) => {
-            eprintln!("[editor_open] sanitize_path error: {}", e);
-            return json_error(&e);
+pub async fn handle_editor_open(
+    Query(params): Query<HashMap<String, String>>,
+) -> impl IntoResponse {
+    let rel_path = params.get("path").map(|s| s.to_string()).unwrap_or_default();
+
+    let result = tokio::task::spawn_blocking(move || {
+        let root = get_current_root();
+        let full_path = crate::config::fs::sanitize_path(&rel_path, &root)
+            .map_err(|e| format!("{}", e))?;
+
+        if !full_path.is_file() {
+            return Err("Not a file".to_string());
         }
-    };
 
-    if !full_path.is_file() {
-        return json_error("Not a file");
-    }
+        let output = std::process::Command::new("nvim")
+            .args([
+                "--server",
+                "/tmp/weztcode-nvim.sock",
+                "--remote",
+                &full_path.to_string_lossy(),
+            ])
+            .output()
+            .map_err(|e| format!("Failed to run nvim: {}", e))?;
 
-    match std::process::Command::new("nvim")
-        .args([
-            "--server",
-            "/tmp/weztcode-nvim.sock",
-            "--remote",
-            &full_path.to_string_lossy(),
-        ])
-        .output()
-    {
-        Ok(o) if o.status.success() => json_response(&serde_json::json!({ "ok": true })),
-        Ok(o) => {
-            let stderr = String::from_utf8_lossy(&o.stderr);
-            json_error(&format!("nvim --remote failed: {}", stderr))
+        if output.status.success() {
+            Ok(())
+        } else {
+            Err(format!("nvim --remote failed: {}", String::from_utf8_lossy(&output.stderr)))
         }
-        Err(e) => json_error(&format!("Failed to run nvim: {}", e)),
+    }).await.unwrap();
+
+    match result {
+        Ok(_) => crate::api::ok_json(serde_json::json!({"ok": true})),
+        Err(e) => err_json(&e),
     }
 }

@@ -9,8 +9,10 @@ use terminal::{TerminalProtocol, WeztermProtocol};
 use std::sync::{mpsc, Mutex};
 use std::thread;
 use std::time::Duration;
-use std::fs::read_to_string;
 use std::path::PathBuf;
+
+use axum::Router;
+use tower_http::services::ServeDir;
 
 use once_cell::sync::Lazy;
 
@@ -90,48 +92,25 @@ fn setup_padding_hook() -> Result<(), String> {
 }
 
 fn start_http_server(port: u16) -> thread::JoinHandle<()> {
-    let server = tiny_http::Server::http(format!("127.0.0.1:{}", port)).unwrap();
-
     thread::spawn(move || {
-        for request in server.incoming_requests() {
-            let url = request.url().to_string();
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
 
-            if url.starts_with("/api/") {
-                api::dispatch(request, &url);
-            } else {
-                let path = if url == "/" {
-                    "frontend/dist/index.html".to_string()
-                } else {
-                    format!("frontend/dist{}", url)
-                };
+        rt.block_on(async {
+            let app = Router::new()
+                .nest("/api", api::router())
+                .fallback_service(
+                    ServeDir::new("frontend/dist")
+                        .append_index_html_on_directories(true)
+                );
 
-                let content_type = if path.ends_with(".js") {
-                    "application/javascript"
-                } else if path.ends_with(".css") {
-                    "text/css"
-                } else if path.ends_with(".html") {
-                    "text/html"
-                } else {
-                    "application/octet-stream"
-                };
-
-                match read_to_string(&path) {
-                    Ok(content) => {
-                        let response = tiny_http::Response::from_string(content)
-                            .with_header(tiny_http::Header {
-                                field: "Content-Type".parse().unwrap(),
-                                value: content_type.parse().unwrap(),
-                            });
-                        let _ = request.respond(response);
-                    }
-                    Err(_) => {
-                        let response = tiny_http::Response::from_string("Not found")
-                            .with_status_code(404);
-                        let _ = request.respond(response);
-                    }
-                }
-            }
-        }
+            let listener = tokio::net::TcpListener::bind(
+                format!("127.0.0.1:{}", port)
+            ).await.unwrap();
+            axum::serve(listener, app).await.unwrap();
+        });
     })
 }
 

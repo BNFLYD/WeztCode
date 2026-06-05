@@ -1,175 +1,180 @@
-use crate::api::{json_error, json_response, parse_query_param, read_request_body};
+use std::collections::HashMap;
+
+use axum::extract::{Json, Query};
+use axum::response::IntoResponse;
+
+use crate::api::{err_json, ok_json};
 use crate::terminal::{TerminalProtocol, WeztermProtocol};
 
-pub fn handle_terminal_list() -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
-    let term = WeztermProtocol::new();
-    match term.list_panes_structured() {
-        Ok(panes) => {
-            let metadata = crate::config::terms_metadata::list();
-            let data = serde_json::json!({
-                "ok": true,
-                "data": {
-                    "panes": panes,
-                    "metadata": metadata
-                }
-            });
-            json_response(&data)
-        }
-        Err(e) => json_error(&e),
+pub async fn handle_terminal_list() -> impl IntoResponse {
+    let result = tokio::task::spawn_blocking(|| {
+        let term = WeztermProtocol::new();
+        let panes = term.list_panes_structured()?;
+        let metadata = crate::config::terms_metadata::list();
+        Ok::<_, String>((panes, metadata))
+    }).await.unwrap();
+
+    match result {
+        Ok((panes, metadata)) => ok_json(serde_json::json!({
+            "ok": true,
+            "data": { "panes": panes, "metadata": metadata }
+        })),
+        Err(e) => err_json(&e),
     }
 }
 
-pub fn handle_terminal_spawn(mut request: tiny_http::Request) {
-    let body = read_request_body(&mut request);
-    let parsed: serde_json::Value = serde_json::from_str(&body).unwrap_or_default();
-    let name = parsed
-        .get("name")
-        .and_then(|v| v.as_str())
-        .map(|s| s.to_string());
-    let icon = parsed
-        .get("icon")
-        .and_then(|v| v.as_str())
-        .map(|s| s.to_string());
-    let program = parsed
-        .get("program")
-        .and_then(|v| v.as_str())
-        .map(|s| s.to_string());
+pub async fn handle_terminal_spawn(Json(body): Json<serde_json::Value>) -> impl IntoResponse {
+    let name = body.get("name").and_then(|v| v.as_str()).map(|s| s.to_string());
+    let icon = body.get("icon").and_then(|v| v.as_str()).map(|s| s.to_string());
+    let program = body.get("program").and_then(|v| v.as_str()).map(|s| s.to_string());
 
-    let cwd = crate::config::props::UserProps::load()
-        .get("current_dir")
-        .filter(|s| !s.is_empty())
-        .map(|s| s.to_string());
-
-    let term = WeztermProtocol::new();
-    let response = match term.spawn_tab(cwd.as_deref(), program.as_deref()) {
-        Ok(pane_id) => {
-            if name.is_some() || icon.is_some() {
-                let _ = crate::config::terms_metadata::set(pane_id, name.clone(), icon.clone());
-            }
-            let data = serde_json::json!({
-                "ok": true,
-                "data": {
-                    "pane_id": pane_id,
-                    "name": name,
-                    "icon": icon
-                }
-            });
-            json_response(&data)
-        }
-        Err(e) => json_error(&e),
-    };
-    let _ = request.respond(response);
-}
-
-pub fn handle_terminal_kill(pane_id: u32) -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
-    if pane_id == 0 {
-        return json_error("Invalid pane_id");
-    }
-    let term = WeztermProtocol::new();
-    match term.kill_pane(pane_id) {
-        Ok(_) => json_response(&serde_json::json!({ "ok": true })),
-        Err(e) => json_error(&e),
-    }
-}
-
-pub fn handle_terminal_activate(pane_id: u32) -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
-    if pane_id == 0 {
-        return json_error("Invalid pane_id");
-    }
-    let term = WeztermProtocol::new();
-    match term.activate_pane(pane_id) {
-        Ok(_) => json_response(&serde_json::json!({ "ok": true })),
-        Err(e) => json_error(&e),
-    }
-}
-
-pub fn handle_terminal_metadata(mut request: tiny_http::Request) {
-    let url = request.url().to_string();
-
-    if url.starts_with("/api/terminal/metadata/set") {
-        let body = read_request_body(&mut request);
-        let parsed: serde_json::Value = serde_json::from_str(&body).unwrap_or_default();
-        let pane_id = parsed
-            .get("pane_id")
-            .and_then(|v| v.as_u64())
-            .unwrap_or(0) as u32;
-        let name = parsed
-            .get("name")
-            .and_then(|v| v.as_str())
+    let result = tokio::task::spawn_blocking(move || {
+        let cwd = crate::config::props::UserProps::load()
+            .get("current_dir")
+            .filter(|s| !s.is_empty())
             .map(|s| s.to_string());
-        let icon = parsed
-            .get("icon")
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_string());
-        let response = match crate::config::terms_metadata::set(pane_id, name, icon) {
-            Ok(_) => json_response(&serde_json::json!({ "ok": true })),
-            Err(e) => json_error(&e),
-        };
-        let _ = request.respond(response);
-        return;
-    }
 
-    if url.starts_with("/api/terminal/metadata/delete") {
-        let pane_id = parse_query_param(&url, "pane_id")
-            .and_then(|s| s.parse::<u32>().ok())
-            .unwrap_or(0);
-        let response = match crate::config::terms_metadata::remove(pane_id) {
-            Ok(_) => json_response(&serde_json::json!({ "ok": true })),
-            Err(e) => json_error(&e),
-        };
-        let _ = request.respond(response);
-        return;
-    }
+        let term = WeztermProtocol::new();
+        let pane_id = term.spawn_tab(cwd.as_deref(), program.as_deref())?;
 
-    let metadata = crate::config::terms_metadata::list();
-    let response = json_response(&serde_json::json!({ "ok": true, "data": metadata }));
-    let _ = request.respond(response);
+        if name.is_some() || icon.is_some() {
+            let _ = crate::config::terms_metadata::set(pane_id, name.clone(), icon.clone());
+        }
+        Ok::<_, String>(serde_json::json!({
+            "pane_id": pane_id,
+            "name": name,
+            "icon": icon
+        }))
+    }).await.unwrap();
+
+    match result {
+        Ok(data) => ok_json(serde_json::json!({"ok": true, "data": data})),
+        Err(e) => err_json(&e),
+    }
 }
 
-pub fn handle_terminal_edit_defaults(request: tiny_http::Request) {
+pub async fn handle_terminal_kill(
+    Query(params): Query<HashMap<String, String>>,
+) -> impl IntoResponse {
+    let pane_id = params.get("pane_id")
+        .and_then(|s| s.parse::<u32>().ok())
+        .unwrap_or(0);
+    if pane_id == 0 { return err_json("Invalid pane_id"); }
+
+    let result = tokio::task::spawn_blocking(move || {
+        let term = WeztermProtocol::new();
+        term.kill_pane(pane_id)
+    }).await.unwrap();
+
+    match result {
+        Ok(_) => ok_json(serde_json::json!({"ok": true})),
+        Err(e) => err_json(&e),
+    }
+}
+
+pub async fn handle_terminal_activate(
+    Query(params): Query<HashMap<String, String>>,
+) -> impl IntoResponse {
+    let pane_id = params.get("pane_id")
+        .and_then(|s| s.parse::<u32>().ok())
+        .unwrap_or(0);
+    if pane_id == 0 { return err_json("Invalid pane_id"); }
+
+    let result = tokio::task::spawn_blocking(move || {
+        let term = WeztermProtocol::new();
+        term.activate_pane(pane_id)
+    }).await.unwrap();
+
+    match result {
+        Ok(_) => ok_json(serde_json::json!({"ok": true})),
+        Err(e) => err_json(&e),
+    }
+}
+
+pub async fn handle_terminal_metadata_get() -> impl IntoResponse {
+    let result = tokio::task::spawn_blocking(|| {
+        crate::config::terms_metadata::list()
+    }).await.unwrap();
+    ok_json(serde_json::json!({"ok": true, "data": result}))
+}
+
+pub async fn handle_terminal_metadata_set(
+    Json(body): Json<serde_json::Value>,
+) -> impl IntoResponse {
+    let pane_id = body.get("pane_id").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+    let name = body.get("name").and_then(|v| v.as_str()).map(String::from);
+    let icon = body.get("icon").and_then(|v| v.as_str()).map(String::from);
+
+    let result = tokio::task::spawn_blocking(move || {
+        crate::config::terms_metadata::set(pane_id, name, icon)
+    }).await.unwrap();
+
+    match result {
+        Ok(_) => ok_json(serde_json::json!({"ok": true})),
+        Err(e) => err_json(&e),
+    }
+}
+
+pub async fn handle_terminal_metadata_delete(
+    Query(params): Query<HashMap<String, String>>,
+) -> impl IntoResponse {
+    let pane_id = params.get("pane_id")
+        .and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
+
+    let result = tokio::task::spawn_blocking(move || {
+        crate::config::terms_metadata::remove(pane_id)
+    }).await.unwrap();
+
+    match result {
+        Ok(_) => ok_json(serde_json::json!({"ok": true})),
+        Err(e) => err_json(&e),
+    }
+}
+
+pub async fn handle_terminal_edit_defaults() -> impl IntoResponse {
     let path = crate::config::default_terms::detect_path_str();
-    let response = match std::process::Command::new("nvim")
-        .args(["--server", "/tmp/weztcode-nvim.sock", "--remote", &path])
-        .output()
-    {
-        Ok(o) if o.status.success() => json_response(&serde_json::json!({ "ok": true })),
-        Ok(o) => {
-            let stderr = String::from_utf8_lossy(&o.stderr);
-            json_error(&format!("nvim failed: {}", stderr))
-        }
-        Err(e) => json_error(&format!("Failed to run nvim: {}", e)),
-    };
-    let _ = request.respond(response);
-}
+    let result = tokio::task::spawn_blocking(move || {
+        std::process::Command::new("nvim")
+            .args(["--server", "/tmp/weztcode-nvim.sock", "--remote", &path])
+            .output()
+    }).await.unwrap();
 
-pub fn handle_terminal_default_terms(request: tiny_http::Request) {
-    let terms = crate::config::default_terms::list();
-    let response = json_response(&serde_json::json!({ "ok": true, "data": terms }));
-    let _ = request.respond(response);
-}
-
-pub fn handle_active_pane() -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
-    let path = match std::env::var("WEZTCODE_ACTIVE_PANE_FILE") {
-        Ok(p) => p,
-        Err(_) => return json_error("ACTIVE_PANE_FILE not set"),
-    };
-    match std::fs::read_to_string(&path) {
-        Ok(content) => {
-            let pane_id = content.trim().parse::<u32>().unwrap_or(0);
-            let data = serde_json::json!({
-                "ok": true,
-                "data": { "pane_id": pane_id }
-            });
-            json_response(&data)
-        }
-        Err(e) => json_error(&format!("Failed to read active_pane: {}", e)),
+    match result {
+        Ok(o) if o.status.success() => ok_json(serde_json::json!({"ok": true})),
+        Ok(o) => err_json(&format!("nvim failed: {}", String::from_utf8_lossy(&o.stderr))),
+        Err(e) => err_json(&format!("Failed to run nvim: {}", e)),
     }
 }
 
-pub fn handle_terminal_ensure_main() -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
-    let term = WeztermProtocol::new();
-    match term.activate_pane(0) {
-        Ok(_) => json_response(&serde_json::json!({ "ok": true })),
-        Err(e) => json_error(&e),
+pub async fn handle_terminal_default_terms() -> impl IntoResponse {
+    let terms = crate::config::default_terms::list();
+    ok_json(serde_json::json!({"ok": true, "data": terms}))
+}
+
+pub async fn handle_active_pane() -> impl IntoResponse {
+    let result = tokio::task::spawn_blocking(|| {
+        let path = std::env::var("WEZTCODE_ACTIVE_PANE_FILE")
+            .map_err(|_| "ACTIVE_PANE_FILE not set".to_string())?;
+        let content = std::fs::read_to_string(&path)
+            .map_err(|e| format!("Failed to read active_pane: {}", e))?;
+        let pane_id = content.trim().parse::<u32>().unwrap_or(0);
+        Ok::<_, String>(pane_id)
+    }).await.unwrap();
+
+    match result {
+        Ok(pane_id) => ok_json(serde_json::json!({"ok": true, "data": {"pane_id": pane_id}})),
+        Err(e) => err_json(&e),
+    }
+}
+
+pub async fn handle_terminal_ensure_main() -> impl IntoResponse {
+    let result = tokio::task::spawn_blocking(|| {
+        let term = WeztermProtocol::new();
+        term.activate_pane(0)
+    }).await.unwrap();
+
+    match result {
+        Ok(_) => ok_json(serde_json::json!({"ok": true})),
+        Err(e) => err_json(&e),
     }
 }

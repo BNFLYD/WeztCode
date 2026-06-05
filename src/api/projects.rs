@@ -1,35 +1,62 @@
-use crate::api::{json_error, json_response, read_request_body};
+use std::collections::HashMap;
 
-pub fn handle_projects_list() -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
+use axum::extract::{Json, Query};
+use axum::response::IntoResponse;
+
+use crate::api::{err_json, ok_json};
+
+pub async fn handle_projects_list() -> impl IntoResponse {
     let projects = crate::config::project_dirs::list();
-    json_response(&serde_json::json!({ "ok": true, "data": projects }))
+    ok_json(serde_json::json!({"ok": true, "data": projects}))
 }
 
-pub fn handle_projects_add(mut request: tiny_http::Request) {
-    let body = read_request_body(&mut request);
-    let parsed: serde_json::Value = serde_json::from_str(&body).unwrap_or_default();
-    let path = parsed.get("path").and_then(|v| v.as_str()).unwrap_or("");
-    let response = match crate::config::project_dirs::add(path) {
-        Ok(projects) => json_response(&serde_json::json!({ "ok": true, "data": projects })),
-        Err(e) => json_error(&e),
-    };
-    let _ = request.respond(response);
-}
+pub async fn handle_projects_add(
+    Json(body): Json<serde_json::Value>,
+) -> impl IntoResponse {
+    let path = body.get("path").and_then(|v| v.as_str()).unwrap_or("").to_string();
 
-pub fn handle_projects_delete(path: &str) -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
-    match crate::config::project_dirs::remove(path) {
-        Ok(projects) => json_response(&serde_json::json!({ "ok": true, "data": projects })),
-        Err(e) => json_error(&e),
+    let result = tokio::task::spawn_blocking(move || {
+        crate::config::project_dirs::add(&path)
+    }).await.unwrap();
+
+    match result {
+        Ok(projects) => ok_json(serde_json::json!({"ok": true, "data": projects})),
+        Err(e) => err_json(&e),
     }
 }
 
-pub fn handle_projects_switch(path: &str) -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
-    let dir = std::path::Path::new(path);
-    if !dir.is_dir() {
-        return json_error("Directory not found");
+pub async fn handle_projects_delete(
+    Query(params): Query<HashMap<String, String>>,
+) -> impl IntoResponse {
+    let path = params.get("path").map(|s| s.to_string()).unwrap_or_default();
+
+    let result = tokio::task::spawn_blocking(move || {
+        crate::config::project_dirs::remove(&path)
+    }).await.unwrap();
+
+    match result {
+        Ok(projects) => ok_json(serde_json::json!({"ok": true, "data": projects})),
+        Err(e) => err_json(&e),
     }
-    match crate::config::props::UserProps::set("current_dir", path) {
-        Ok(_) => json_response(&serde_json::json!({ "ok": true })),
-        Err(e) => json_error(&e),
+}
+
+pub async fn handle_projects_switch(
+    Json(body): Json<serde_json::Value>,
+) -> impl IntoResponse {
+    let path = body.get("path").and_then(|v| v.as_str()).unwrap_or("").to_string();
+
+    let result = tokio::task::spawn_blocking(move || {
+        let dir = std::path::Path::new(&path);
+        if !dir.is_dir() {
+            return Err("Directory not found".to_string());
+        }
+        crate::config::props::UserProps::set("current_dir", &path)
+            .map_err(|e| e.to_string())?;
+        Ok::<_, String>(())
+    }).await.unwrap();
+
+    match result {
+        Ok(_) => ok_json(serde_json::json!({"ok": true})),
+        Err(e) => err_json(&e),
     }
 }
