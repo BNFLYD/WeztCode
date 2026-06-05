@@ -41,9 +41,9 @@ pub async fn handle_projects_delete(
 }
 
 pub async fn handle_projects_switch(
-    Json(body): Json<serde_json::Value>,
+    Query(params): Query<HashMap<String, String>>,
 ) -> impl IntoResponse {
-    let path = body.get("path").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let path = params.get("path").map(|s| s.to_string()).unwrap_or_default();
 
     let result = tokio::task::spawn_blocking(move || {
         let dir = std::path::Path::new(&path);
