@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use axum::{
     http::StatusCode,
     response::Json,
-    routing::{delete, get, post},
+    routing::{get, post},
     Router,
 };
 
@@ -25,28 +25,28 @@ pub fn router() -> Router {
         .route("/keys/list", get(keys::handle_keys_list))
         .route("/terminal/list", get(terminal::handle_terminal_list))
         .route("/terminal/spawn", post(terminal::handle_terminal_spawn))
-        .route("/terminal/kill", get(terminal::handle_terminal_kill))
-        .route("/terminal/activate", get(terminal::handle_terminal_activate))
+        .route("/terminal/kill", post(terminal::handle_terminal_kill))
+        .route("/terminal/activate", post(terminal::handle_terminal_activate))
         .route("/terminal/active-pane", get(terminal::handle_active_pane))
-        .route("/terminal/ensure-main", get(terminal::handle_terminal_ensure_main))
+        .route("/terminal/ensure-main", post(terminal::handle_terminal_ensure_main))
         .route("/terminal/metadata", get(terminal::handle_terminal_metadata_get))
         .route("/terminal/metadata/set", post(terminal::handle_terminal_metadata_set))
-        .route("/terminal/metadata/delete", delete(terminal::handle_terminal_metadata_delete))
-        .route("/terminal/edit-defaults", post(terminal::handle_terminal_edit_defaults))
+        .route("/terminal/metadata/delete", get(terminal::handle_terminal_metadata_delete))
+        .route("/terminal/edit-defaults", get(terminal::handle_terminal_edit_defaults))
         .route("/terminal/default-terms", get(terminal::handle_terminal_default_terms))
         .route("/projects/list", get(projects::handle_projects_list))
         .route("/projects/add", post(projects::handle_projects_add))
         .route("/projects/delete", get(projects::handle_projects_delete))
         .route("/projects/switch", get(projects::handle_projects_switch))
         .route("/models/list", get(models::handle_models_list))
-        .route("/models/edit-defaults", post(models::handle_models_edit_defaults))
+        .route("/models/edit-defaults", get(models::handle_models_edit_defaults))
         .route("/editor/open", get(editor::handle_editor_open))
         .route("/fs/ls", get(fs::handle_ls))
         .route("/fs/read", get(fs::handle_read))
-        .route("/fs/create", post(fs::handle_create))
-        .route("/fs/delete", delete(fs::handle_delete))
-        .route("/fs/rename", post(fs::handle_rename))
-        .route("/fs/move", post(fs::handle_move))
+        .route("/fs/create", get(fs::handle_create))
+        .route("/fs/delete", get(fs::handle_delete))
+        .route("/fs/rename", get(fs::handle_rename))
+        .route("/fs/move", get(fs::handle_move))
         .route("/fs/image", get(fs::handle_image))
 }
 

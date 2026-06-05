@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use axum::extract::{Json, Query};
+use axum::extract::Query;
 use axum::http::{header, StatusCode};
 use axum::response::{IntoResponse, Response};
 
@@ -56,9 +56,9 @@ pub async fn handle_read(
 }
 
 pub async fn handle_create(
-    Json(body): Json<serde_json::Value>,
+    Query(params): Query<HashMap<String, String>>,
 ) -> impl IntoResponse {
-    let rel_path = body.get("path").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let rel_path = params.get("path").map(|s| s.to_string()).unwrap_or_default();
 
     let result = tokio::task::spawn_blocking(move || {
         let root = get_current_root();
@@ -88,10 +88,10 @@ pub async fn handle_delete(
 }
 
 pub async fn handle_rename(
-    Json(body): Json<serde_json::Value>,
+    Query(params): Query<HashMap<String, String>>,
 ) -> impl IntoResponse {
-    let rel_path = body.get("path").and_then(|v| v.as_str()).unwrap_or("").to_string();
-    let new_name = body.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let rel_path = params.get("path").map(|s| s.to_string()).unwrap_or_default();
+    let new_name = params.get("name").map(|s| s.to_string()).unwrap_or_default();
 
     let result = tokio::task::spawn_blocking(move || {
         let root = get_current_root();
@@ -105,10 +105,10 @@ pub async fn handle_rename(
 }
 
 pub async fn handle_move(
-    Json(body): Json<serde_json::Value>,
+    Query(params): Query<HashMap<String, String>>,
 ) -> impl IntoResponse {
-    let rel_path = body.get("path").and_then(|v| v.as_str()).unwrap_or("").to_string();
-    let dest = body.get("dest").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let rel_path = params.get("path").map(|s| s.to_string()).unwrap_or_default();
+    let dest = params.get("dest").map(|s| s.to_string()).unwrap_or_default();
 
     let result = tokio::task::spawn_blocking(move || {
         let root = get_current_root();
