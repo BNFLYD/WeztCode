@@ -131,6 +131,13 @@ fn main() {
     // Create signal channel for toplevel_id capture
     let (capture_signal_tx, capture_signal_rx) = mpsc::channel::<()>();
 
+    // Start HTTP server first (concurrente con terminal)
+    let http_port = 8765;
+    let _http_thread = start_http_server(http_port);
+
+    // Wait for server to start
+    thread::sleep(Duration::from_millis(100));
+
     let term = WeztermProtocol::new();
     let class = config::WINDOW_CLASS;
 
@@ -139,13 +146,6 @@ fn main() {
 //         eprintln!("Error al iniciar terminal: {}", e);
         std::process::exit(1);
     }
-
-    // Start HTTP server first
-    let http_port = 8765;
-    let _http_thread = start_http_server(http_port);
-
-    // Wait for server to start
-    thread::sleep(Duration::from_millis(100));
 
     let frontend_url = format!("http://127.0.0.1:{}/", http_port);
 //     println!("Frontend URL: {}", frontend_url);
