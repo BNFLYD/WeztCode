@@ -4,6 +4,7 @@ use axum::{
     response::IntoResponse,
 };
 use futures::stream::Stream;
+use tokio_stream::StreamExt;
 use std::convert::Infallible;
 
 use crate::api::{err_json, ok_json, ApiResponse};
