@@ -76,10 +76,20 @@
   }
 
   async function open_default_terms() {
+    const res = await fetch('/api/terminal/active-pane');
+    const json = await res.json();
+    if (json.ok && json.data.pane_id !== 0) {
+      await fetch('/api/terminal/ensure-main', { method: 'POST' });
+    }
     await fetch("/api/terminal/edit-defaults");
   }
 
   async function open_models_editor() {
+    const res = await fetch('/api/terminal/active-pane');
+    const json = await res.json();
+    if (json.ok && json.data.pane_id !== 0) {
+      await fetch('/api/terminal/ensure-main', { method: 'POST' });
+    }
     await fetch("/api/models/edit-defaults");
   }
 
