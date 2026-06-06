@@ -80,15 +80,26 @@ end)
 
 -- Track the last non-zero pane for toggling to nvim
 local last_non_zero_pane = nil
+local last_written_pane = nil
 
 wezterm.on("update-status", function(window, pane)
     if pane then
         local id = pane:pane_id()
+
         if id ~= 0 then
             last_non_zero_pane = id
-            wezterm.log_info("track: set last_non_zero_pane = " .. id)
-        else
-            wezterm.log_info("track: pane 0, skipping (last_non_zero_pane = " .. tostring(last_non_zero_pane) .. ")")
+        end
+
+        if id ~= last_written_pane then
+            last_written_pane = id
+            local active_pane_file = os.getenv("WEZTCODE_ACTIVE_PANE_FILE")
+            if active_pane_file then
+                local f = io.open(active_pane_file, "w")
+                if f then
+                    f:write(tostring(id))
+                    f:close()
+                end
+            end
         end
     end
 end)
@@ -175,16 +186,6 @@ if k then
                 last_non_zero_pane = active_id
                 local target, _, _ = wezterm.mux.get_pane(0)
                 if target then target:activate() end
-            end
-
-            -- Write active pane to file for Rust backend
-            local active_pane_file = os.getenv("WEZTCODE_ACTIVE_PANE_FILE")
-            if active_pane_file then
-                local f = io.open(active_pane_file, "w")
-                if f then
-                    f:write(tostring(active_id))
-                    f:close()
-                end
             end
         end),
     })
