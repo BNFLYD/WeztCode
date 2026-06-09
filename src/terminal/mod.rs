@@ -40,7 +40,6 @@ pub trait TerminalProtocol {
     }
 }
 
-pub mod lua_spawn;
 pub mod wezterm;
 
 pub use wezterm::WeztermProtocol;
