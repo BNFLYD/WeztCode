@@ -6,6 +6,7 @@ mod chat;
 
 use gui::{GuiPlatform, Gtk4Platform};
 use terminal::{TerminalProtocol, WeztermProtocol};
+use std::io::Read;
 use std::sync::{mpsc, Mutex};
 use std::thread;
 use std::time::Duration;
@@ -24,7 +25,7 @@ static CHAT_SERVICE: Lazy<Mutex<chat::ChatService>> = Lazy::new(|| {
     Mutex::new(chat::ChatService::new(backend))
 });
 
-fn setup_padding_hook() -> Result<(), String> {
+fn setup_padding_hook() -> Result<PathBuf, String> {
     let user_config = std::env::var("WEZTERM_CONFIG_FILE").ok()
         .or_else(|| {
             let home = if cfg!(target_os = "windows") {
@@ -84,11 +85,7 @@ fn setup_padding_hook() -> Result<(), String> {
     std::env::set_var("WEZTCODE_PAD_FILE", pad_str);
     std::env::set_var("WEZTCODE_ACTIVE_PANE_FILE", active_str);
 
-//     println!("[Main] Padding hook: WEZTERM_CONFIG_FILE={}", lua_str);
-//     println!("[Main] Padding hook: WEZTCODE_PAD_FILE={}", pad_str);
-//     println!("[Main] Padding hook: WEZTCODE_USER_CONFIG={}", user_config);
-
-    Ok(())
+    Ok(weztcode_dir)
 }
 
 fn start_http_server(port: u16) -> thread::JoinHandle<()> {
@@ -123,9 +120,29 @@ fn main() {
     }
 
     // Configure padding hook before spawning terminal
-    if let Err(e) = setup_padding_hook() {
-//         println!("[Main] Warning: padding hook setup failed: {}", e);
-//         println!("[Main] Continuando sin hook de padding...");
+    let weztcode_dir = match setup_padding_hook() {
+        Ok(dir) => dir,
+        Err(_) => {
+            let temp = if cfg!(target_os = "windows") {
+                std::env::var("TEMP").unwrap_or_else(|_| "C:\\Temp".to_string())
+            } else {
+                std::env::var("XDG_RUNTIME_DIR")
+                    .or_else(|_| std::env::var("TMPDIR"))
+                    .unwrap_or_else(|_| "/tmp".to_string())
+            };
+            std::path::PathBuf::from(temp).join("weztcode")
+        }
+    };
+
+    // Create FIFO for wezterm ready signal (replaces fixed timer)
+    let fifo_path = weztcode_dir.join(config::READY_FIFO_NAME);
+    let mut has_fifo = true;
+    let _ = std::fs::remove_file(&fifo_path);
+    if let Err(_e) = nix::unistd::mkfifo(&fifo_path, nix::sys::stat::Mode::S_IRWXU) {
+        has_fifo = false;
+    }
+    if has_fifo {
+        std::env::set_var("WEZTCODE_READY_FIFO", fifo_path.to_str().unwrap_or(""));
     }
 
     // Create signal channel for toplevel_id capture
@@ -164,9 +181,24 @@ fn main() {
         // Set capture signal channel for toplevel_id capture
         wm.set_capture_signal(capture_signal_rx);
 
-        // Wait for terminal to be ready, then send capture signal
-//         println!("[Main] Waiting for terminal to be ready...");
-        thread::sleep(Duration::from_millis(1200));
+        // Wait for terminal to be ready (via FIFO or fallback timer)
+        if has_fifo {
+            let (ready_tx, ready_rx) = mpsc::channel::<()>();
+            let fifo = fifo_path.clone();
+            thread::spawn(move || {
+                if let Ok(mut f) = std::fs::File::open(&fifo) {
+                    let mut buf = [0u8; 1];
+                    f.read_exact(&mut buf).ok();
+                }
+                let _ = ready_tx.send(());
+            });
+            match ready_rx.recv_timeout(Duration::from_secs(5)) {
+                Ok(_) => {}
+                Err(_) => {}
+            }
+        } else {
+            thread::sleep(Duration::from_millis(1200));
+        }
 
         // Send signal to start toplevel_id capture now that terminal is ready
 //         println!("[Main] Sending capture signal to WM thread...");

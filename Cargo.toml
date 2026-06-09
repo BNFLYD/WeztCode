@@ -19,3 +19,4 @@ futures = "0.3"
 wayland-client = "0.31.14"
 wayland-protocols = { version = "0.32.12", features = ["client", "unstable"] }
 wayland-protocols-wlr = { version = "0.3", features = ["client"] }
+nix = "0.29"

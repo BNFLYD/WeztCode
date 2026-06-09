@@ -104,7 +104,24 @@ wezterm.on("update-status", function(window, pane)
     end
 end)
 
---- Ocultar completamente la barra de tabs (WeztCode maneja su propia UI)
+-- Signal readiness via FIFO for faster GTK init (no polling)
+wezterm.on("gui-startup", function()
+    local fifo = os.getenv("WEZTCODE_READY_FIFO")
+    if fifo then
+        local ok, err = pcall(function()
+            local f = io.open(fifo, "w")
+            if f then
+                f:write("1")
+                f:close()
+            end
+        end)
+        if not ok then
+            wezterm.log_warn("failed to write ready fifo: " .. tostring(err))
+        end
+    end
+end)
+
+-- Ocultar completamente la barra de tabs (WeztCode maneja su propia UI)
 user_config.enable_tab_bar = false
 
 -- 5. Keybindings de navegación entre tabs
