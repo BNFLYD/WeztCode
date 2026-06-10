@@ -131,7 +131,9 @@
               case "done":
                 break;
             }
-          } catch {}
+          } catch (e) {
+            console.error("[chat] SSE parse error:", e, "line:", line);
+          }
         }
       }
     } catch (e) {

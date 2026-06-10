@@ -170,31 +170,25 @@ impl SseEvent {
     pub fn to_sse_string(&self) -> String {
         match self {
             SseEvent::Token { content } => {
-                let json = serde_json::json!({"type":"token","content":content});
-                format!("data: {}\n\n", json)
+                serde_json::json!({"type":"token","content":content}).to_string()
             }
             SseEvent::ToolCall { name } => {
-                let json = serde_json::json!({"type":"tool_call","name":name});
-                format!("data: {}\n\n", json)
+                serde_json::json!({"type":"tool_call","name":name}).to_string()
             }
             SseEvent::ToolResult { name, status } => {
-                let json = serde_json::json!({"type":"tool_result","name":name,"status":status});
-                format!("data: {}\n\n", json)
+                serde_json::json!({"type":"tool_result","name":name,"status":status}).to_string()
             }
             SseEvent::Warning { message } => {
-                let json = serde_json::json!({"type":"warning","message":message});
-                format!("data: {}\n\n", json)
+                serde_json::json!({"type":"warning","message":message}).to_string()
             }
             SseEvent::Error { message } => {
-                let json = serde_json::json!({"type":"error","message":message});
-                format!("data: {}\n\n", json)
+                serde_json::json!({"type":"error","message":message}).to_string()
             }
             SseEvent::SessionStats { json } => {
-                let payload = serde_json::json!({"type":"session_stats","json":json});
-                format!("data: {}\n\n", payload)
+                serde_json::json!({"type":"session_stats","json":json}).to_string()
             }
             SseEvent::Done => {
-                format!("data: {}\n\n", serde_json::json!({"type":"done"}))
+                serde_json::json!({"type":"done"}).to_string()
             }
         }
     }
