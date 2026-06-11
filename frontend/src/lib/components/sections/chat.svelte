@@ -18,6 +18,7 @@
   let real_context_percent = null;
   let real_context_window = null;
   let sub_agents = [];
+  let builtins = [];
   let current_agent = null;
   let show_agent_dropdown = false;
   let agent_dropdown_container;
@@ -189,6 +190,13 @@
       }
     } catch {
       sub_agents = [];
+    }
+    try {
+      const res = await fetch("/api/sub-agents/builtins");
+      const data = await res.json();
+      builtins = data.data || [];
+    } catch {
+      builtins = [];
     }
   }
 
@@ -485,6 +493,13 @@
           </div>
         {/if}
       </div>
+      {#if builtins.length > 0 && !current_agent}
+        <div class="px-1 pb-1">
+          <span class="text-[9px] text-print-dim/30 font-mono">
+            Builtins: {builtins.join(", ")}
+          </span>
+        </div>
+      {/if}
     {/if}
   </div>
 </div>

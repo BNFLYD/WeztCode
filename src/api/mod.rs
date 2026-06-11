@@ -45,6 +45,7 @@ pub fn router() -> Router {
         .route("/sub-agents/switch", post(sub_agents::handle_switch))
         .route("/sub-agents/install", post(sub_agents::handle_install))
         .route("/sub-agents/edit", get(sub_agents::handle_edit))
+        .route("/sub-agents/builtins", get(sub_agents::handle_builtins))
         .route("/editor/open", get(editor::handle_editor_open))
         .route("/fs/ls", get(fs::handle_ls))
         .route("/fs/read", get(fs::handle_read))

@@ -89,3 +89,16 @@ pub fn get_default() -> Option<SubAgentEntry> {
 pub fn agent_dirs_list() -> Vec<PathBuf> {
     agent_dirs().into_iter().filter(|d| d.exists()).collect()
 }
+
+pub fn builtins() -> Vec<&'static str> {
+    vec![
+        "scout",
+        "researcher",
+        "planner",
+        "worker",
+        "reviewer",
+        "context-builder",
+        "oracle",
+        "delegate",
+    ]
+}

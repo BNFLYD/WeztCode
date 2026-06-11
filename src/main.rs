@@ -18,12 +18,9 @@ use tower_http::services::ServeDir;
 use once_cell::sync::Lazy;
 
 use config::default_terms::DefaultTerm;
-use api::chat::set_last_system_prompt;
 
 static CHAT_SERVICE: Lazy<Mutex<chat::ChatService>> = Lazy::new(|| {
-    // Check if there's a default sub-agent configured
     let config = if let Some(agent) = config::sub_agents::get_default() {
-        set_last_system_prompt(Some(agent.system_prompt.clone()));
         chat::ChatConfig::from_sub_agent(&agent)
     } else {
         chat::ChatConfig::from_default_model()

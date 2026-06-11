@@ -6,21 +6,10 @@ use axum::{
 use futures::stream::Stream;
 use tokio_stream::StreamExt;
 use std::convert::Infallible;
-use std::sync::Mutex;
 
 use crate::api::{err_json, ok_json, ApiResponse};
 use crate::chat;
 use crate::config;
-
-// Carries the system_prompt across model switches (model override preserves agent context)
-static LAST_SYSTEM_PROMPT: once_cell::sync::Lazy<Mutex<Option<String>>> =
-    once_cell::sync::Lazy::new(|| Mutex::new(None));
-
-pub fn set_last_system_prompt(prompt: Option<String>) {
-    if let Ok(mut guard) = LAST_SYSTEM_PROMPT.lock() {
-        *guard = prompt;
-    }
-}
 
 pub async fn handle_chat_send(
     Json(body): Json<serde_json::Value>,
@@ -72,13 +61,7 @@ pub async fn handle_chat_switch_model(
             .find(|m| m.name == name)
             .ok_or_else(|| format!("Model '{}' not found", name))?;
 
-        // Preserve system_prompt from current sub-agent (model override keeps agent context)
-        let current_system_prompt = LAST_SYSTEM_PROMPT.lock()
-            .ok()
-            .and_then(|g| g.clone());
-
-        let mut config = chat::ChatConfig::from_model_entry(&entry);
-        config.system_prompt = current_system_prompt;
+        let config = chat::ChatConfig::from_model_entry(&entry);
         let new_backend: Box<dyn chat::AgentBackend> = Box::new(chat::PiAgentBackend::new(config));
 
         let mut service = crate::CHAT_SERVICE.lock()

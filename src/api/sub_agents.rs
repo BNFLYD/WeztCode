@@ -1,6 +1,6 @@
 use axum::{extract::Json, response::IntoResponse};
 
-use crate::api::{err_json, ok_json, ApiResponse};
+use crate::api::{err_json, ok_json};
 use crate::chat;
 use crate::config;
 
@@ -35,9 +35,6 @@ pub async fn handle_switch(
         let config = chat::ChatConfig::from_sub_agent(&entry);
         let new_backend: Box<dyn chat::AgentBackend> =
             Box::new(chat::PiAgentBackend::new(config));
-
-        // Set system_prompt carry-over so model override preserves agent context
-        crate::api::chat::set_last_system_prompt(Some(entry.system_prompt.clone()));
 
         let mut service = crate::CHAT_SERVICE
             .lock()
@@ -143,4 +140,9 @@ pub async fn handle_edit() -> impl IntoResponse {
         Ok(_) => ok_json(serde_json::json!({"ok": true, "dir": dir.to_string_lossy()})),
         Err(e) => err_json(&e),
     }
+}
+
+pub async fn handle_builtins() -> impl IntoResponse {
+    let builtins = config::sub_agents::builtins();
+    ok_json(serde_json::json!({"ok": true, "data": builtins}))
 }
