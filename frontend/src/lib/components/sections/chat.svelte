@@ -168,7 +168,7 @@
         current_model = default_model ? default_model.name : models[0].name;
       }
     } catch {
-      models = [];
+      // no-op: models mantiene su valor anterior
     }
   }
 
