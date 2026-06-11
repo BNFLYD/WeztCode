@@ -90,13 +90,14 @@ pub async fn handle_edit() -> impl IntoResponse {
             .unwrap_or_default();
         let user_dir = std::path::PathBuf::from(&home).join(".pi/agent/agents");
         let _ = std::fs::create_dir_all(&user_dir);
+        let dir_str = user_dir.to_string_lossy().to_string();
         let result = tokio::task::spawn_blocking(move || {
             let output = std::process::Command::new("nvim")
                 .args([
                     "--server",
                     "/tmp/weztcode-nvim.sock",
                     "--remote",
-                    &user_dir.to_string_lossy(),
+                    &dir_str,
                 ])
                 .output()
                 .map_err(|e| format!("Failed to run nvim: {}", e))?;
@@ -117,13 +118,14 @@ pub async fn handle_edit() -> impl IntoResponse {
     }
 
     let dir = dirs[0].clone();
+    let dir_str = dir.to_string_lossy().to_string();
     let result = tokio::task::spawn_blocking(move || {
         let output = std::process::Command::new("nvim")
             .args([
                 "--server",
                 "/tmp/weztcode-nvim.sock",
                 "--remote",
-                &dir.to_string_lossy(),
+                &dir_str,
             ])
             .output()
             .map_err(|e| format!("Failed to run nvim: {}", e))?;

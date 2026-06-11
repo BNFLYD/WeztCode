@@ -45,12 +45,13 @@ impl ChatConfig {
 
     pub fn from_sub_agent(entry: &crate::config::sub_agents::SubAgentEntry) -> Self {
         let provider = entry.model.split('/').next().unwrap_or("openrouter").to_string();
+        let api_key = crate::config::keys::KeysStore::resolve(
+            &format!("KEYS.{}", provider.to_uppercase())
+        );
         Self {
             provider,
             model: entry.model.clone(),
-            api_key: crate::config::keys::KeysStore::resolve(
-                &format!("KEYS.{}", provider.to_uppercase())
-            ),
+            api_key,
             pi_path: find_pi_path(),
             thinking_level: None,
             system_prompt: Some(entry.system_prompt.clone()),
