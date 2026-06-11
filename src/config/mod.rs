@@ -4,6 +4,7 @@ pub mod keys;
 pub mod models;
 pub mod project_dirs;
 pub mod props;
+pub mod sub_agents;
 pub mod terms_metadata;
 
 use once_cell::sync::Lazy;

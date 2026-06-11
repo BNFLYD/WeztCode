@@ -12,6 +12,7 @@ pub struct ChatConfig {
     pub api_key: String,
     pub pi_path: String,
     pub thinking_level: Option<String>,
+    pub system_prompt: Option<String>,
 }
 
 impl ChatConfig {
@@ -24,6 +25,7 @@ impl ChatConfig {
                 api_key: resolved_key,
                 pi_path: find_pi_path(),
                 thinking_level: model.thinking_level.clone(),
+                system_prompt: None,
             }
         } else {
             Self::from_props()
@@ -37,6 +39,21 @@ impl ChatConfig {
             api_key: crate::config::keys::KeysStore::resolve(&entry.api_key),
             pi_path: find_pi_path(),
             thinking_level: entry.thinking_level.clone(),
+            system_prompt: None,
+        }
+    }
+
+    pub fn from_sub_agent(entry: &crate::config::sub_agents::SubAgentEntry) -> Self {
+        let provider = entry.model.split('/').next().unwrap_or("openrouter").to_string();
+        Self {
+            provider,
+            model: entry.model.clone(),
+            api_key: crate::config::keys::KeysStore::resolve(
+                &format!("KEYS.{}", provider.to_uppercase())
+            ),
+            pi_path: find_pi_path(),
+            thinking_level: None,
+            system_prompt: Some(entry.system_prompt.clone()),
         }
     }
 
@@ -48,6 +65,7 @@ impl ChatConfig {
             api_key: props.get_resolved("llm_api_key").unwrap_or_default(),
             pi_path: find_pi_path(),
             thinking_level: None,
+            system_prompt: None,
         }
     }
 }
@@ -231,6 +249,7 @@ pub struct PiAgentBackend {
     stdout: Option<Arc<Mutex<ChildStdout>>>,
     stderr: Option<Arc<Mutex<ChildStderr>>>,
     thinking_configured: bool,
+    system_prompt_sent: bool,
 }
 
 impl PiAgentBackend {
@@ -242,7 +261,12 @@ impl PiAgentBackend {
             stdout: None,
             stderr: None,
             thinking_configured: false,
+            system_prompt_sent: false,
         }
+    }
+
+    pub fn config(&self) -> &ChatConfig {
+        &self.config
     }
 
     pub fn get_state(&self) -> Result<String, String> {
@@ -316,6 +340,7 @@ impl PiAgentBackend {
     }
 
     pub fn new_session(&mut self) -> Result<(), String> {
+        self.system_prompt_sent = false;
         let stdin = self.stdin.as_ref()
             .ok_or_else(|| "Pi not spawned (stdin is None)".to_string())?;
         let stdout_arc = self.stdout.as_ref()
@@ -490,9 +515,21 @@ impl AgentBackend for PiAgentBackend {
             }
         }
 
+        // Inject system prompt on first message if configured
+        let effective_message = if let Some(sp) = &self.config.system_prompt {
+            if !self.system_prompt_sent {
+                self.system_prompt_sent = true;
+                format!("{}\n\n{}", sp, message)
+            } else {
+                message.to_string()
+            }
+        } else {
+            message.to_string()
+        };
+
         let request = serde_json::json!({
             "type": "prompt",
-            "message": message,
+            "message": effective_message,
         });
 
         let request_str = serde_json::to_string(&request).unwrap_or_default();
@@ -778,6 +815,7 @@ impl AgentBackend for PiAgentBackend {
         self.stdout = None;
         self.stderr = None;
         self.thinking_configured = false;
+        self.system_prompt_sent = false;
         if let Some(mut child) = self.child.take() {
             let _ = child.kill();
             let _ = child.wait();

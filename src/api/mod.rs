@@ -4,6 +4,7 @@ pub mod fs;
 pub mod keys;
 pub mod models;
 pub mod projects;
+pub mod sub_agents;
 pub mod terminal;
 
 use std::path::PathBuf;
@@ -40,6 +41,10 @@ pub fn router() -> Router {
         .route("/projects/switch", get(projects::handle_projects_switch))
         .route("/models/list", get(models::handle_models_list))
         .route("/models/edit-defaults", get(models::handle_models_edit_defaults))
+        .route("/sub-agents/list", get(sub_agents::handle_list))
+        .route("/sub-agents/switch", post(sub_agents::handle_switch))
+        .route("/sub-agents/install", post(sub_agents::handle_install))
+        .route("/sub-agents/edit", get(sub_agents::handle_edit))
         .route("/editor/open", get(editor::handle_editor_open))
         .route("/fs/ls", get(fs::handle_ls))
         .route("/fs/read", get(fs::handle_read))

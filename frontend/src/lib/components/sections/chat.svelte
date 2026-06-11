@@ -17,6 +17,10 @@
   let dropdown_container;
   let real_context_percent = null;
   let real_context_window = null;
+  let sub_agents = [];
+  let current_agent = null;
+  let show_agent_dropdown = false;
+  let agent_dropdown_container;
 
   function save() {
     const raw = JSON.stringify(messages);
@@ -172,6 +176,22 @@
     }
   }
 
+  async function load_sub_agents() {
+    try {
+      const res = await fetch("/api/sub-agents/list");
+      const data = await res.json();
+      sub_agents = data.data || [];
+      if (sub_agents.length > 0) {
+        const default_agent = sub_agents.find((a) => a.default);
+        if (default_agent) {
+          current_agent = default_agent.name;
+        }
+      }
+    } catch {
+      sub_agents = [];
+    }
+  }
+
   function toggle_dropdown() {
     show_dropdown = !show_dropdown;
   }
@@ -192,11 +212,50 @@
       const data = await res.json();
       if (data.ok) {
         current_model = name;
+        // Model override: clear agent indicator since user chose manually
+        current_agent = null;
       }
     } catch {
       // Si falla, el nombre no se actualiza
     }
     switching = false;
+  }
+
+  function toggle_agent_dropdown() {
+    show_agent_dropdown = !show_agent_dropdown;
+    if (show_agent_dropdown) {
+      show_dropdown = false;
+    }
+  }
+
+  async function select_agent(name) {
+    show_agent_dropdown = false;
+    if (name === current_agent) return;
+    if (!name) {
+      // "ninguno" — switch back to default model without agent
+      current_agent = null;
+      const default_model = models.find((m) => m.default);
+      if (default_model) {
+        await select_model(default_model.name);
+      }
+      return;
+    }
+    try {
+      const res = await fetch("/api/sub-agents/switch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        current_agent = data.data.agent;
+        current_model = data.data.model;
+        // Clear conversation when switching agent
+        await newConversation();
+      }
+    } catch {
+      // Si falla, no se actualiza
+    }
   }
 
   function handle_click_outside(e) {
@@ -206,6 +265,13 @@
       !dropdown_container.contains(e.target)
     ) {
       show_dropdown = false;
+    }
+    if (
+      show_agent_dropdown &&
+      agent_dropdown_container &&
+      !agent_dropdown_container.contains(e.target)
+    ) {
+      show_agent_dropdown = false;
     }
   }
 
@@ -223,7 +289,8 @@
   $: context_percent = context_limit > 0 ? ((used_tokens / context_limit) * 100) : 0;
   $: indicator = Math.round(real_context_percent ?? context_percent);
 
-  load_models();  
+  load_models();
+  load_sub_agents();
 </script>
 
 <div class="flex flex-col gap-1 py-2 h-full relative">
@@ -250,6 +317,15 @@
             {warnings.length}
           </span>
         </button>
+      {/if}
+
+      {#if current_agent}
+        <span
+          class="px-1.5 py-0.5 text-[10px] font-mono text-accent-detail bg-accent-detail/10 rounded-full truncate max-w-[80px]"
+          title="Agent activo: {current_agent}"
+        >
+          {current_agent}
+        </span>
       {/if}
 
       {#if models.length > 0}
@@ -368,5 +444,47 @@
         />
       </div>
     </div>
+
+    <!-- Sub-agent dropdown -->
+    {#if sub_agents.length > 0 || current_agent}
+      <div class="relative px-1 pb-1" bind:this={agent_dropdown_container}>
+        <button
+          class="flex items-center gap-1 px-2 py-0.5 text-[10px] font-mono text-print/40 hover:text-print/70 transition-colors rounded"
+          on:click={toggle_agent_dropdown}
+        >
+          <Icon icon="mdi:robot" class="w-3 h-3" />
+          {current_agent || "Sin agente"}
+          <Icon icon="mdi:chevron-down" class="w-3 h-3" />
+        </button>
+
+        {#if show_agent_dropdown}
+          <div
+            class="absolute bottom-full left-1 mb-1 z-50 min-w-[140px] bg-back rounded-md shadow-lg py-1 border border-accent-detail/20"
+          >
+            {#each sub_agents as agent}
+              <button
+                class="block w-full text-left text-xs px-3 py-1.5 whitespace-nowrap rounded-md
+                     {agent.name === current_agent
+                  ? 'bg-accent-detail/20 text-accent-detail'
+                  : 'text-print/60 hover:bg-accent-detail/10 hover:text-print/90 transition-colors'}"
+                on:click={() => select_agent(agent.name)}
+              >
+                {agent.name}
+                {#if agent.default}
+                  <span class="text-[8px] text-print-dim ml-1">(default)</span>
+                {/if}
+              </button>
+            {/each}
+            <hr class="border-accent-detail/10 my-1" />
+            <button
+              class="block w-full text-left text-xs px-3 py-1.5 text-print-dim hover:text-print/90 transition-colors"
+              on:click={() => select_agent(null)}
+            >
+              (ninguno)
+            </button>
+          </div>
+        {/if}
+      </div>
+    {/if}
   </div>
 </div>
