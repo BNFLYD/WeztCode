@@ -662,8 +662,8 @@
       {:else}
         {#each projects as proj, index (proj.path)}
           <!-- svelte-ignore a11y-click-events-have-key-events -->
-          <div class={"flex items-center gap-2 px-3 py-2.5 rounded-lg transition-colors text-lg group cursor-pointer"
-              + (cursor_index === index ? " bg-accent/10" : "hover:bg-accent/5")}
+          <div class={"flex items-center gap-2 px-3 py-2.5 rounded-lg text-lg group cursor-pointer"
+              + (cursor_index === index ? "bg-accent/10 transition-colors" : "hover:bg-accent/5 transition-colors")}
             data-index={index}
             on:click={() => {
               cursor_index = index;
@@ -693,8 +693,8 @@
     {:else}
       {#each entries as entry, index (entry.path)}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <div class={"flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-lg group cursor-pointer"
-            + (cursor_index === index ? " bg-accent/10 hover:bg-accent/10" : "hover:bg-accent/5")
+        <div class={"flex items-center gap-2 px-3 py-1.5 rounded-lg text-lg group cursor-pointer"
+            + (cursor_index === index ? "bg-accent/10 transition-colors" : "hover:bg-accent/5 transition-colors")
             + (clipboard?.entry.path === entry.path ? " opacity-40" : "")}
           data-index={index}
         on:click={() => {

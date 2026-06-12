@@ -44,6 +44,21 @@ impl ChatConfig {
     }
 
     pub fn from_sub_agent(entry: &crate::config::sub_agents::SubAgentEntry) -> Self {
+        // Intentar resolver por name en models.json
+        let models = crate::config::models::list();
+        if let Some(model_entry) = models.iter().find(|m| m.name == entry.model) {
+            let resolved_key = crate::config::keys::KeysStore::resolve(&model_entry.api_key);
+            return Self {
+                provider: model_entry.provider.clone(),
+                model: model_entry.model.clone(),
+                api_key: resolved_key,
+                pi_path: find_pi_path(),
+                thinking_level: model_entry.thinking_level.clone(),
+                tools: entry.tools.clone(),
+            };
+        }
+
+        // Fallback: tratar entry.model como ID directo
         let provider = entry.model.split('/').next().unwrap_or("openrouter").to_string();
         let api_key = crate::config::keys::KeysStore::resolve(
             &format!("KEYS.{}", provider.to_uppercase())
