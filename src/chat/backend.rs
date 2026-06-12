@@ -751,6 +751,7 @@ impl AgentBackend for PiAgentBackend {
 
         // eprintln!("[pi] spawn: path={}, provider={}, model={}", self.config.pi_path, self.config.provider, self.config.model);
 
+        cmd.current_dir(crate::config::current_root::get());
         let mut child = cmd.spawn().map_err(|e| {
             let msg = format!("Failed to spawn pi: {}", e);
             eprintln!("[pi] {}", msg);

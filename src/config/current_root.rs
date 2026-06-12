@@ -24,7 +24,5 @@ pub fn set(path: &str) -> Result<(), String> {
         *lock.write().unwrap() = root.clone();
     }
     crate::config::props::UserProps::set("current_dir", path)?;
-    std::env::set_current_dir(&root)
-        .map_err(|e| format!("Failed to set cwd: {}", e))?;
     Ok(())
 }
