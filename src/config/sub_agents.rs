@@ -6,6 +6,7 @@ pub struct SubAgentEntry {
     pub name: String,
     pub description: Option<String>,
     pub model: String,
+    #[serde(default)]
     pub system_prompt: String,
     pub tools: Option<String>,
     pub skills: Option<String>,
