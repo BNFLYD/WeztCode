@@ -232,10 +232,14 @@ fn main() {
     }
 
     // Spawn terminal tabs: from default_terms.json or fallback to generic
-    let cwd = crate::config::props::UserProps::load()
-        .get("current_dir")
-        .filter(|s| !s.is_empty())
-        .map(|s| s.to_string());
+    let cwd = std::env::current_dir().ok()
+        .map(|p| p.to_string_lossy().to_string())
+        .or_else(|| {
+            crate::config::props::UserProps::load()
+                .get("current_dir")
+                .filter(|s| !s.is_empty())
+                .map(|s| s.to_string())
+        });
 
     let default_terms = crate::config::default_terms::list();
     let autostart_terms: Vec<DefaultTerm> = default_terms.iter().filter(|t| t.autostart).cloned().collect();

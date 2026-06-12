@@ -29,10 +29,14 @@ pub async fn handle_terminal_spawn(Json(body): Json<serde_json::Value>) -> impl 
     let program = body.get("program").and_then(|v| v.as_str()).map(|s| s.to_string());
 
     let result = tokio::task::spawn_blocking(move || {
-        let cwd = crate::config::props::UserProps::load()
-            .get("current_dir")
-            .filter(|s| !s.is_empty())
-            .map(|s| s.to_string());
+        let cwd = std::env::current_dir().ok()
+            .map(|p| p.to_string_lossy().to_string())
+            .or_else(|| {
+                crate::config::props::UserProps::load()
+                    .get("current_dir")
+                    .filter(|s| !s.is_empty())
+                    .map(|s| s.to_string())
+            });
 
         let term = WeztermProtocol::new();
         let pane_id = term.spawn_tab(cwd.as_deref(), program.as_deref())?;

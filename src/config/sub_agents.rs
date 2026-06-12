@@ -25,10 +25,12 @@ fn agent_dirs() -> Vec<PathBuf> {
     }
 
     // Project scope: .pi/agents/ (relative to current_dir)
-    let current_dir = crate::config::props::UserProps::load()
-        .get("current_dir")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
+    let current_dir = std::env::current_dir().unwrap_or_else(|_| {
+        crate::config::props::UserProps::load()
+            .get("current_dir")
+            .map(PathBuf::from)
+            .unwrap_or_default()
+    });
     dirs.push(current_dir.join(".pi/agents"));
 
     dirs
