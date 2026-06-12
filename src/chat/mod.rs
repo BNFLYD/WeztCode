@@ -41,6 +41,10 @@ impl ChatService {
         self.backend.new_session()
     }
 
+    pub fn restart_backend(&mut self) -> Result<(), String> {
+        self.backend.restart()
+    }
+
     pub fn send_message_stream(&mut self, message: &str) -> Result<tokio::sync::mpsc::Receiver<String>, String> {
         let mut rx = self.backend.send_message(message)?;
         let (tx, out_rx) = tokio::sync::mpsc::channel::<String>(64);

@@ -217,6 +217,12 @@ pub trait AgentBackend: Send {
     fn spawn(&mut self) -> Result<(), String>;
     fn send_message(&mut self, message: &str) -> Result<tokio::sync::mpsc::Receiver<SseEvent>, String>;
     fn shutdown(&mut self);
+
+    fn restart(&mut self) -> Result<(), String> {
+        self.shutdown();
+        self.spawn()
+    }
+
     fn get_session_stats(&self) -> Result<String, String> {
         Err("get_session_stats not supported by this backend".to_string())
     }

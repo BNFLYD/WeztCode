@@ -51,6 +51,7 @@ pub async fn handle_projects_switch(
             return Err("Directory not found".to_string());
         }
         crate::config::current_root::set(&path)?;
+        crate::CHAT_SERVICE.lock().unwrap().restart_backend()?;
         Ok::<_, String>(())
     }).await.unwrap();
 
