@@ -61,9 +61,11 @@ impl TerminalProtocol for WeztermProtocol {
         let props = crate::config::props::UserProps::load();
 
         let editor = props.get("user_editor").map(|s| s.to_string());
-        let current_dir = props.get("current_dir")
-            .filter(|s| !s.is_empty())
-            .map(|s| s.to_string());
+        let current_dir = {
+            let root = crate::config::current_root::get();
+            let s = root.to_string_lossy().to_string();
+            if s.is_empty() { None } else { Some(s) }
+        };
 
         let mut cmd = Command::new("wezterm");
         cmd.arg("start").arg("--class").arg(class);

@@ -50,10 +50,7 @@ pub async fn handle_projects_switch(
         if !dir.is_dir() {
             return Err("Directory not found".to_string());
         }
-        std::env::set_current_dir(dir)
-            .map_err(|e| format!("Failed to set cwd: {}", e))?;
-        crate::config::props::UserProps::set("current_dir", &path)
-            .map_err(|e| e.to_string())?;
+        crate::config::current_root::set(&path)?;
         Ok::<_, String>(())
     }).await.unwrap();
 

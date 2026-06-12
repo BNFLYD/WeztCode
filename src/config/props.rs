@@ -1,12 +1,19 @@
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
+use std::sync::OnceLock;
+
+static PROPS_DIR: OnceLock<PathBuf> = OnceLock::new();
 
 pub struct UserProps {
     props: HashMap<String, String>,
 }
 
 impl UserProps {
+    pub fn init() {
+        PROPS_DIR.set(std::env::current_dir().unwrap_or_default()).ok();
+    }
+
     pub fn load() -> Self {
         let mut props = HashMap::new();
 
@@ -69,8 +76,10 @@ impl UserProps {
     }
 
     fn path() -> PathBuf {
-        std::env::current_dir()
-            .unwrap_or_default()
+        PROPS_DIR
+            .get()
+            .cloned()
+            .unwrap_or_else(|| std::env::current_dir().unwrap_or_default())
             .join("user_props.lua")
     }
 }

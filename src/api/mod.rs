@@ -67,10 +67,5 @@ pub fn err_json(msg: &str) -> ApiResponse {
 }
 
 fn get_current_root() -> PathBuf {
-    std::env::current_dir().unwrap_or_else(|_| {
-        crate::config::props::UserProps::load()
-            .get("current_dir")
-            .map(PathBuf::from)
-            .unwrap_or_default()
-    })
+    crate::config::current_root::get()
 }

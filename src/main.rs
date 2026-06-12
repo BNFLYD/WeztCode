@@ -123,6 +123,10 @@ fn main() {
         std::process::exit(1);
     }
 
+    // Initialise persistent props directory and current root
+    crate::config::props::UserProps::init();
+    crate::config::current_root::init();
+
     // Configure padding hook before spawning terminal
     let weztcode_dir = match setup_padding_hook() {
         Ok(dir) => dir,
@@ -232,14 +236,11 @@ fn main() {
     }
 
     // Spawn terminal tabs: from default_terms.json or fallback to generic
-    let cwd = std::env::current_dir().ok()
-        .map(|p| p.to_string_lossy().to_string())
-        .or_else(|| {
-            crate::config::props::UserProps::load()
-                .get("current_dir")
-                .filter(|s| !s.is_empty())
-                .map(|s| s.to_string())
-        });
+    let cwd = {
+        let root = crate::config::current_root::get();
+        let s = root.to_string_lossy().to_string();
+        if s.is_empty() { None } else { Some(s) }
+    };
 
     let default_terms = crate::config::default_terms::list();
     let autostart_terms: Vec<DefaultTerm> = default_terms.iter().filter(|t| t.autostart).cloned().collect();

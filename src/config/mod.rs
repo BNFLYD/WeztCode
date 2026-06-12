@@ -1,3 +1,4 @@
+pub mod current_root;
 pub mod default_terms;
 pub mod fs;
 pub mod keys;
