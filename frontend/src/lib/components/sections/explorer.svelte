@@ -169,7 +169,7 @@
     const res = await fetch('/api/terminal/active-pane');
     const json = await res.json();
     if (json.ok && json.data.pane_id !== 0) {
-      await fetch('/api/terminal/ensure-main', { method: 'POST' });
+      await fetch('/api/terminal/ensure-main', { method: 'POST' }); 
     }
     fetch(`/api/editor/open?path=${encodeURIComponent(path)}`);
   }
@@ -662,8 +662,8 @@
       {:else}
         {#each projects as proj, index (proj.path)}
           <!-- svelte-ignore a11y-click-events-have-key-events -->
-          <div class={"flex items-center gap-2 px-3 py-2.5 rounded-lg transition-colors text-lg group cursor-pointer hover:bg-accent/5"
-              + (cursor_index === index ? " bg-accent/10 hover:bg-accent/10" : "")}
+          <div class={"flex items-center gap-2 px-3 py-2.5 rounded-lg transition-colors text-lg group cursor-pointer"
+              + (cursor_index === index ? " bg-accent/10 hover:bg-accent/10" : "hover:bg-accent/5")}
             data-index={index}
             on:click={() => {
               cursor_index = index;
@@ -693,8 +693,8 @@
     {:else}
       {#each entries as entry, index (entry.path)}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <div class={"flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-lg group cursor-pointer hover:bg-accent/5"
-            + (cursor_index === index ? " bg-accent/10 hover:bg-accent/10" : "")
+        <div class={"flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-lg group cursor-pointer"
+            + (cursor_index === index ? " bg-accent/10 hover:bg-accent/10" : "hover:bg-accent/5")
             + (clipboard?.entry.path === entry.path ? " opacity-40" : "")}
           data-index={index}
         on:click={() => {
