@@ -44,9 +44,10 @@ impl ChatConfig {
     }
 
     pub fn from_sub_agent(entry: &crate::config::sub_agents::SubAgentEntry) -> Self {
-        // Intentar resolver por name en models.json
+        // Intentar resolver por name en models.json (case-insensitive, trimmed)
         let models = crate::config::models::list();
-        if let Some(model_entry) = models.iter().find(|m| m.name == entry.model) {
+        let agent_model = entry.model.trim();
+        if let Some(model_entry) = models.iter().find(|m| m.name.trim().eq_ignore_ascii_case(agent_model)) {
             let resolved_key = crate::config::keys::KeysStore::resolve(&model_entry.api_key);
             return Self {
                 provider: model_entry.provider.clone(),
@@ -58,11 +59,10 @@ impl ChatConfig {
             };
         }
 
-        // Fallback: tratar entry.model como ID directo
-        let provider = entry.model.split('/').next().unwrap_or("openrouter").to_string();
-        let api_key = crate::config::keys::KeysStore::resolve(
-            &format!("KEYS.{}", provider.to_uppercase())
-        );
+        // Fallback: usar provider y api_key de user_props.lua
+        let props = crate::config::props::UserProps::load();
+        let provider = props.get("llm_provider").unwrap_or("openrouter").to_string();
+        let api_key = props.get_resolved("llm_api_key").unwrap_or_default();
         Self {
             provider,
             model: entry.model.clone(),
