@@ -347,7 +347,7 @@
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <div
           class={"flex items-center gap-2 px-3 py-2.5 transition-colors rounded-lg cursor-pointer" +
-            (cursor_index === index ? "bg-accent/10 transition-colors" : "hover:bg-accent/5 transition-colors")}
+            (cursor_index === index ? "bg-accent/10" : "hover:bg-accent/5")}
           title={pane.title || `Pane ${pane.pane_id}`}
           data-index={index}
           on:click={() => {
