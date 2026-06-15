@@ -29,13 +29,24 @@ impl ChatService {
         Ok(())
     }
 
-    pub fn switch_agent(&mut self, entry: &crate::config::sub_agents::SubAgentEntry) {
+    pub fn switch_agent(&mut self, entry: &crate::config::sub_agents::SubAgentEntry) -> Result<(), String> {
         let prompt = if entry.system_prompt.is_empty() {
             None
         } else {
             Some(entry.system_prompt.clone())
         };
         self.backend.set_agent_prompt(prompt);
+
+        let models = crate::config::models::list();
+        let agent_model = entry.model.trim();
+        if let Some(model_entry) = models.iter().find(|m| m.name.trim().eq_ignore_ascii_case(agent_model)) {
+            let current_model = self.backend.config().model.clone();
+            if current_model != model_entry.model {
+                self.backend.set_model_rpc(&model_entry.provider, &model_entry.model)?;
+            }
+        }
+
+        Ok(())
     }
 
     pub fn get_session_stats(&self) -> Result<String, String> {

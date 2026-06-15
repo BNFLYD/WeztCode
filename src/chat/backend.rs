@@ -244,6 +244,10 @@ pub trait AgentBackend: Send {
 
     fn set_agent_prompt(&mut self, _prompt: Option<String>) {}
 
+    fn set_model_rpc(&mut self, _provider: &str, _model_id: &str) -> Result<(), String> {
+        Err("set_model_rpc not supported by this backend".to_string())
+    }
+
     fn config(&self) -> &ChatConfig;
 }
 
@@ -409,6 +413,59 @@ impl PiAgentBackend {
             Err(err.to_string())
         }
     }
+
+    pub fn set_model_rpc(&mut self, provider: &str, model_id: &str) -> Result<(), String> {
+        let stdin = self.stdin.as_ref()
+            .ok_or_else(|| "Pi not spawned (stdin is None)".to_string())?;
+        let stdout_arc = self.stdout.as_ref()
+            .ok_or_else(|| "Pi not spawned (stdout is None)".to_string())?
+            .clone();
+
+        let msg = serde_json::json!({
+            "type": "set_model",
+            "provider": provider,
+            "modelId": model_id,
+        });
+        let msg_str = serde_json::to_string(&msg).map_err(|e| format!("JSON serialize: {}", e))?;
+
+        {
+            let mut stdin_lock = stdin.lock().map_err(|e| format!("stdin lock: {}", e))?;
+            writeln!(stdin_lock, "{}", msg_str)
+                .map_err(|e| format!("Failed to write set_model: {}", e))?;
+            stdin_lock.flush()
+                .map_err(|e| format!("Failed to flush set_model: {}", e))?;
+        }
+
+        let mut stdout_lock = stdout_arc.lock().map_err(|e| format!("stdout lock: {}", e))?;
+        let mut bytes = Vec::new();
+        let mut buf = [0u8; 1];
+        loop {
+            match stdout_lock.read(&mut buf) {
+                Ok(0) => break,
+                Ok(_) => {
+                    if buf[0] == b'\n' { break; }
+                    bytes.push(buf[0]);
+                }
+                Err(e) => return Err(format!("stdout read error: {}", e)),
+            }
+        }
+
+        let response = String::from_utf8(bytes).map_err(|e| format!("Invalid UTF-8: {}", e))?;
+        let json: serde_json::Value = serde_json::from_str(&response)
+            .map_err(|e| format!("JSON parse error: {}", e))?;
+
+        let success = json.get("success").and_then(|v| v.as_bool()).unwrap_or(false);
+        if success {
+            self.config.model = model_id.to_string();
+            self.config.provider = provider.to_string();
+            Ok(())
+        } else {
+            let err = json.get("error")
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown");
+            Err(format!("set_model failed: {}", err))
+        }
+    }
 }
 
 impl AgentBackend for PiAgentBackend {
@@ -426,6 +483,10 @@ impl AgentBackend for PiAgentBackend {
 
     fn set_agent_prompt(&mut self, prompt: Option<String>) {
         PiAgentBackend::set_agent_prompt(self, prompt);
+    }
+
+    fn set_model_rpc(&mut self, provider: &str, model_id: &str) -> Result<(), String> {
+        PiAgentBackend::set_model_rpc(self, provider, model_id)
     }
 
     fn config(&self) -> &ChatConfig {
