@@ -56,18 +56,10 @@ pub async fn handle_chat_switch_model(
     };
 
     let result = tokio::task::spawn_blocking(move || {
-        let models = crate::config::models::list();
-        let entry = models.into_iter()
-            .find(|m| m.name == name)
-            .ok_or_else(|| format!("Model '{}' not found", name))?;
-
-        let config = chat::ChatConfig::from_model_entry(&entry);
-        let new_backend: Box<dyn chat::AgentBackend> = Box::new(chat::PiAgentBackend::new(config));
-
         let mut service = crate::CHAT_SERVICE.lock()
             .map_err(|e| format!("Lock: {}", e))?;
-        service.switch_backend(new_backend)?;
-        Ok::<_, String>(entry.name)
+        let model_name = service.switch_model_rpc(&name)?;
+        Ok::<_, String>(model_name)
     }).await.unwrap();
 
     match result {

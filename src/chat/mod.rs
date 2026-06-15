@@ -49,6 +49,22 @@ impl ChatService {
         Ok(())
     }
 
+    pub fn switch_model_rpc(&mut self, model_name: &str) -> Result<String, String> {
+        let models = crate::config::models::list();
+        let entry = models.into_iter()
+            .find(|m| m.name == model_name)
+            .ok_or_else(|| format!("Model '{}' not found", model_name))?;
+
+        self.backend.set_agent_prompt(None);
+
+        let current_model = self.backend.config().model.clone();
+        if current_model != entry.model {
+            self.backend.set_model_rpc(&entry.provider, &entry.model)?;
+        }
+
+        Ok(entry.name)
+    }
+
     pub fn get_session_stats(&self) -> Result<String, String> {
         self.backend.get_session_stats()
     }
