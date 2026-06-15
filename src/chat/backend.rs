@@ -12,7 +12,6 @@ pub struct ChatConfig {
     pub api_key: String,
     pub pi_path: String,
     pub thinking_level: Option<String>,
-    pub system_prompt: Option<String>,
 }
 
 impl ChatConfig {
@@ -25,7 +24,6 @@ impl ChatConfig {
                 api_key: resolved_key,
                 pi_path: find_pi_path(),
                 thinking_level: model.thinking_level.clone(),
-                system_prompt: None,
             }
         } else {
             Self::from_props()
@@ -39,7 +37,6 @@ impl ChatConfig {
             api_key: crate::config::keys::KeysStore::resolve(&entry.api_key),
             pi_path: find_pi_path(),
             thinking_level: entry.thinking_level.clone(),
-            system_prompt: None,
         }
     }
 
@@ -55,7 +52,6 @@ impl ChatConfig {
                 api_key: resolved_key,
                 pi_path: find_pi_path(),
                 thinking_level: model_entry.thinking_level.clone(),
-                system_prompt: (!entry.system_prompt.is_empty()).then(|| entry.system_prompt.clone()),
             };
         }
 
@@ -69,7 +65,6 @@ impl ChatConfig {
             api_key,
             pi_path: find_pi_path(),
             thinking_level: None,
-            system_prompt: (!entry.system_prompt.is_empty()).then(|| entry.system_prompt.clone()),
         }
     }
 
@@ -81,7 +76,6 @@ impl ChatConfig {
             api_key: props.get_resolved("llm_api_key").unwrap_or_default(),
             pi_path: find_pi_path(),
             thinking_level: None,
-            system_prompt: None,
         }
     }
 }
@@ -247,6 +241,10 @@ pub trait AgentBackend: Send {
     fn new_session(&mut self) -> Result<(), String> {
         Err("new_session not supported by this backend".to_string())
     }
+
+    fn set_agent_prompt(&mut self, _prompt: Option<String>) {}
+
+    fn config(&self) -> &ChatConfig;
 }
 
 fn env_var_for_provider(provider: &str) -> &'static str {
@@ -271,6 +269,7 @@ pub struct PiAgentBackend {
     stdout: Option<Arc<Mutex<ChildStdout>>>,
     stderr: Option<Arc<Mutex<ChildStderr>>>,
     thinking_configured: bool,
+    current_agent_prompt: Option<String>,
 }
 
 impl PiAgentBackend {
@@ -282,7 +281,12 @@ impl PiAgentBackend {
             stdout: None,
             stderr: None,
             thinking_configured: false,
+            current_agent_prompt: None,
         }
+    }
+
+    pub fn set_agent_prompt(&mut self, prompt: Option<String>) {
+        self.current_agent_prompt = prompt;
     }
 
     pub fn config(&self) -> &ChatConfig {
@@ -420,6 +424,14 @@ impl AgentBackend for PiAgentBackend {
         PiAgentBackend::new_session(self)
     }
 
+    fn set_agent_prompt(&mut self, prompt: Option<String>) {
+        PiAgentBackend::set_agent_prompt(self, prompt);
+    }
+
+    fn config(&self) -> &ChatConfig {
+        PiAgentBackend::config(self)
+    }
+
     fn send_message(&mut self, message: &str) -> Result<tokio::sync::mpsc::Receiver<SseEvent>, String> {
         let (tx, rx) = tokio::sync::mpsc::channel(64);
 
@@ -534,9 +546,15 @@ impl AgentBackend for PiAgentBackend {
             }
         }
 
+        let final_message = if let Some(prompt) = self.current_agent_prompt.take() {
+            format!("[System instructions]\n{}\n\n---\n\n{}", prompt, message)
+        } else {
+            message.to_string()
+        };
+
         let request = serde_json::json!({
             "type": "prompt",
-            "message": message,
+            "message": final_message,
         });
 
         let request_str = serde_json::to_string(&request).unwrap_or_default();
@@ -759,10 +777,6 @@ impl AgentBackend for PiAgentBackend {
             .arg("--provider").arg(&self.config.provider)
             .arg("--model").arg(&self.config.model);
 
-        if let Some(system_prompt) = &self.config.system_prompt {
-            cmd.arg("--system-prompt").arg(system_prompt);
-        }
-
         cmd.stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
@@ -836,7 +850,23 @@ impl AgentBackend for PiAgentBackend {
     }
 }
 
-pub struct NullBackend;
+pub struct NullBackend {
+    config: ChatConfig,
+}
+
+impl NullBackend {
+    pub fn new() -> Self {
+        Self {
+            config: ChatConfig {
+                provider: String::new(),
+                model: String::new(),
+                api_key: String::new(),
+                pi_path: find_pi_path(),
+                thinking_level: None,
+            },
+        }
+    }
+}
 
 impl AgentBackend for NullBackend {
     fn spawn(&mut self) -> Result<(), String> {
@@ -857,6 +887,12 @@ impl AgentBackend for NullBackend {
             let _ = tx.blocking_send(SseEvent::Done);
         });
         Ok(rx)
+    }
+
+    fn set_agent_prompt(&mut self, _prompt: Option<String>) {}
+
+    fn config(&self) -> &ChatConfig {
+        &self.config
     }
 
     fn shutdown(&mut self) {}

@@ -258,8 +258,6 @@
       if (data.ok) {
         current_agent = data.data.agent;
         current_model = data.data.model;
-        // Clear conversation when switching agent
-        await newConversation();
       }
     } catch {
       // Si falla, no se actualiza

@@ -20,6 +20,16 @@ pub async fn handle_list() -> impl IntoResponse {
     ok_json(serde_json::json!({"ok": true, "data": data}))
 }
 
+fn resolve_resolved_model(entry: &config::sub_agents::SubAgentEntry) -> String {
+    let models = crate::config::models::list();
+    let agent_model = entry.model.trim();
+    if let Some(model_entry) = models.iter().find(|m| m.name.trim().eq_ignore_ascii_case(agent_model)) {
+        model_entry.model.clone()
+    } else {
+        entry.model.clone()
+    }
+}
+
 pub async fn handle_switch(
     Json(body): Json<serde_json::Value>,
 ) -> impl IntoResponse {
@@ -32,14 +42,24 @@ pub async fn handle_switch(
         let entry = config::sub_agents::get_by_name(&name)
             .ok_or_else(|| format!("Sub-agent '{}' not found", name))?;
 
-        let config = chat::ChatConfig::from_sub_agent(&entry);
-        let new_backend: Box<dyn chat::AgentBackend> =
-            Box::new(chat::PiAgentBackend::new(config));
-
         let mut service = crate::CHAT_SERVICE
             .lock()
             .map_err(|e| format!("Lock: {}", e))?;
-        service.switch_backend(new_backend)?;
+
+        let current_model = service.backend.config().model.clone();
+        let agent_model = resolve_resolved_model(&entry);
+
+        if current_model == agent_model {
+            // Mismo modelo → solo cambiar agente, no reiniciar Pi
+            service.switch_agent(&entry);
+        } else {
+            // Modelo diferente → switch_backend con el nuevo modelo
+            let config = chat::ChatConfig::from_sub_agent(&entry);
+            let new_backend: Box<dyn chat::AgentBackend> =
+                Box::new(chat::PiAgentBackend::new(config));
+            service.switch_backend(new_backend)?;
+        }
+
         Ok::<_, String>(serde_json::json!({
             "agent": entry.name,
             "model": entry.model,

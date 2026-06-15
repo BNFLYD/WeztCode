@@ -29,6 +29,15 @@ impl ChatService {
         Ok(())
     }
 
+    pub fn switch_agent(&mut self, entry: &crate::config::sub_agents::SubAgentEntry) {
+        let prompt = if entry.system_prompt.is_empty() {
+            None
+        } else {
+            Some(entry.system_prompt.clone())
+        };
+        self.backend.set_agent_prompt(prompt);
+    }
+
     pub fn get_session_stats(&self) -> Result<String, String> {
         self.backend.get_session_stats()
     }

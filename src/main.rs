@@ -20,12 +20,20 @@ use once_cell::sync::Lazy;
 use config::default_terms::DefaultTerm;
 
 static CHAT_SERVICE: Lazy<Mutex<chat::ChatService>> = Lazy::new(|| {
-    let config = if let Some(agent) = config::sub_agents::get_default() {
-        chat::ChatConfig::from_sub_agent(&agent)
+    let (config, default_agent) = if let Some(agent) = config::sub_agents::get_default() {
+        (chat::ChatConfig::from_sub_agent(&agent), Some(agent))
     } else {
-        chat::ChatConfig::from_default_model()
+        (chat::ChatConfig::from_default_model(), None)
     };
-    let backend: Box<dyn chat::AgentBackend> = Box::new(chat::PiAgentBackend::new(config));
+    let mut backend: Box<dyn chat::AgentBackend> = Box::new(chat::PiAgentBackend::new(config));
+    if let Some(agent) = default_agent {
+        let prompt = if agent.system_prompt.is_empty() {
+            None
+        } else {
+            Some(agent.system_prompt.clone())
+        };
+        backend.set_agent_prompt(prompt);
+    }
     Mutex::new(chat::ChatService::new(backend))
 });
 
