@@ -12,6 +12,7 @@ pub struct ChatConfig {
     pub api_key: String,
     pub pi_path: String,
     pub thinking_level: Option<String>,
+    pub system_prompt: Option<String>,
 }
 
 impl ChatConfig {
@@ -24,6 +25,7 @@ impl ChatConfig {
                 api_key: resolved_key,
                 pi_path: find_pi_path(),
                 thinking_level: model.thinking_level.clone(),
+                system_prompt: None,
             }
         } else {
             Self::from_props()
@@ -37,6 +39,7 @@ impl ChatConfig {
             api_key: crate::config::keys::KeysStore::resolve(&entry.api_key),
             pi_path: find_pi_path(),
             thinking_level: entry.thinking_level.clone(),
+            system_prompt: None,
         }
     }
 
@@ -52,6 +55,7 @@ impl ChatConfig {
                 api_key: resolved_key,
                 pi_path: find_pi_path(),
                 thinking_level: model_entry.thinking_level.clone(),
+                system_prompt: (!entry.system_prompt.is_empty()).then(|| entry.system_prompt.clone()),
             };
         }
 
@@ -65,6 +69,7 @@ impl ChatConfig {
             api_key,
             pi_path: find_pi_path(),
             thinking_level: None,
+            system_prompt: (!entry.system_prompt.is_empty()).then(|| entry.system_prompt.clone()),
         }
     }
 
@@ -76,6 +81,7 @@ impl ChatConfig {
             api_key: props.get_resolved("llm_api_key").unwrap_or_default(),
             pi_path: find_pi_path(),
             thinking_level: None,
+            system_prompt: None,
         }
     }
 }
@@ -752,6 +758,10 @@ impl AgentBackend for PiAgentBackend {
         cmd.args(["--mode", "rpc"])
             .arg("--provider").arg(&self.config.provider)
             .arg("--model").arg(&self.config.model);
+
+        if let Some(system_prompt) = &self.config.system_prompt {
+            cmd.arg("--system-prompt").arg(system_prompt);
+        }
 
         cmd.stdin(Stdio::piped())
             .stdout(Stdio::piped())
