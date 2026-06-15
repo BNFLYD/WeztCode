@@ -36,6 +36,7 @@
   }
 
   async function newConversation() {
+    return; // TEST: deshabilitado para ver si el problema persiste al cambiar de sub-agente
     try {
       await fetch("/api/chat/new-session", { method: "POST" });
     } catch {}
