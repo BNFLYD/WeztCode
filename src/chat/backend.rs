@@ -12,7 +12,6 @@ pub struct ChatConfig {
     pub api_key: String,
     pub pi_path: String,
     pub thinking_level: Option<String>,
-    pub tools: Option<String>,
 }
 
 impl ChatConfig {
@@ -25,7 +24,6 @@ impl ChatConfig {
                 api_key: resolved_key,
                 pi_path: find_pi_path(),
                 thinking_level: model.thinking_level.clone(),
-                tools: None,
             }
         } else {
             Self::from_props()
@@ -39,7 +37,6 @@ impl ChatConfig {
             api_key: crate::config::keys::KeysStore::resolve(&entry.api_key),
             pi_path: find_pi_path(),
             thinking_level: entry.thinking_level.clone(),
-            tools: None,
         }
     }
 
@@ -55,7 +52,6 @@ impl ChatConfig {
                 api_key: resolved_key,
                 pi_path: find_pi_path(),
                 thinking_level: model_entry.thinking_level.clone(),
-                tools: entry.tools.clone(),
             };
         }
 
@@ -69,7 +65,6 @@ impl ChatConfig {
             api_key,
             pi_path: find_pi_path(),
             thinking_level: None,
-            tools: entry.tools.clone(),
         }
     }
 
@@ -81,7 +76,6 @@ impl ChatConfig {
             api_key: props.get_resolved("llm_api_key").unwrap_or_default(),
             pi_path: find_pi_path(),
             thinking_level: None,
-            tools: None,
         }
     }
 }
@@ -759,16 +753,13 @@ impl AgentBackend for PiAgentBackend {
             .arg("--provider").arg(&self.config.provider)
             .arg("--model").arg(&self.config.model);
 
-        if let Some(tools) = &self.config.tools {
-            cmd.arg("--tools").arg(tools);
-        }
-
         cmd.stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
 
         let env_key = env_var_for_provider(&self.config.provider);
         cmd.env(env_key, &self.config.api_key);
+        cmd.env("PI_CACHE_RETENTION", "long");
 
         // eprintln!("[pi] spawn: path={}, provider={}, model={}", self.config.pi_path, self.config.provider, self.config.model);
 
