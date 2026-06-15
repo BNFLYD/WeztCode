@@ -36,16 +36,15 @@
   }
 
   async function newConversation() {
-    return; // TEST: deshabilitado
-    // try {
-    //   await fetch("/api/chat/new-session", { method: "POST" });
-    // } catch {}
-    // messages = [];
-    // warnings = [];
-    // show_warnings = false;
-    // real_context_percent = null;
-    // real_context_window = null;
-    // localStorage.removeItem(STORAGE_KEY);
+    try {
+      await fetch("/api/chat/new-session", { method: "POST" });
+    } catch {}
+    messages = [];
+    warnings = [];
+    show_warnings = false;
+    real_context_percent = null;
+    real_context_window = null;
+    localStorage.removeItem(STORAGE_KEY);
   }
 
   afterUpdate(() => {
@@ -127,7 +126,8 @@
                   const raw = JSON.parse(data.json);
                   const ctx = raw.data?.contextUsage;
                   if (ctx?.percent !== undefined) {
-                    real_context_percent = (real_context_percent ?? 0) + ctx.percent;
+                    real_context_percent =
+                      (real_context_percent ?? 0) + ctx.percent;
                   }
                   if (ctx?.contextWindow) {
                     real_context_window = ctx.contextWindow;
@@ -291,9 +291,14 @@
     return Math.ceil(text.length / 4);
   }
 
-  $: used_tokens = messages.reduce((sum, msg) => sum + estimateTokens(msg.content), 0);
-  $: context_limit = models.find(m => m.name === current_model)?.max_context ?? 4096;
-  $: context_percent = context_limit > 0 ? ((used_tokens / context_limit) * 100) : 0;
+  $: used_tokens = messages.reduce(
+    (sum, msg) => sum + estimateTokens(msg.content),
+    0,
+  );
+  $: context_limit =
+    models.find((m) => m.name === current_model)?.max_context ?? 4096;
+  $: context_percent =
+    context_limit > 0 ? (used_tokens / context_limit) * 100 : 0;
   $: indicator = Math.round(real_context_percent ?? context_percent);
 
   load_models();
@@ -325,16 +330,7 @@
           </span>
         </button>
       {/if}
-
-      {#if current_agent}
-        <span
-          class="px-1.5 py-0.5 text-[10px] font-mono text-accent-detail bg-accent-detail/10 rounded-full truncate max-w-[80px]"
-          title="Agent activo: {current_agent}"
-        >
-          {current_agent}
-        </span>
-      {/if}
-
+      
       {#if models.length > 0}
         <div class="relative" bind:this={dropdown_container}>
           <button
