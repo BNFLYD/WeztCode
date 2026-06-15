@@ -36,16 +36,16 @@
   }
 
   async function newConversation() {
-    return; // TEST: deshabilitado para ver si el problema persiste al cambiar de sub-agente
-    try {
-      await fetch("/api/chat/new-session", { method: "POST" });
-    } catch {}
-    messages = [];
-    warnings = [];
-    show_warnings = false;
-    real_context_percent = null;
-    real_context_window = null;
-    localStorage.removeItem(STORAGE_KEY);
+    return; // TEST: deshabilitado
+    // try {
+    //   await fetch("/api/chat/new-session", { method: "POST" });
+    // } catch {}
+    // messages = [];
+    // warnings = [];
+    // show_warnings = false;
+    // real_context_percent = null;
+    // real_context_window = null;
+    // localStorage.removeItem(STORAGE_KEY);
   }
 
   afterUpdate(() => {
