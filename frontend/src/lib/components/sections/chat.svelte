@@ -455,9 +455,8 @@
           class="flex items-center gap-1 px-2 py-0.5 text-[10px] font-mono text-print/40 hover:text-print/70 transition-colors rounded"
           on:click={toggle_agent_dropdown}
         >
-          <Icon icon="mdi:robot" class="w-3 h-3" />
+          <Icon icon="simple-icons:pi" class="w-3 h-3" />
           {current_agent || "Sin agente"}
-          <Icon icon="mdi:chevron-down" class="w-3 h-3" />
         </button>
 
         {#if show_agent_dropdown}
@@ -485,13 +484,6 @@
           </div>
         {/if}
       </div>
-      {#if builtins.length > 0 && !current_agent}
-        <div class="px-1 pb-1">
-          <span class="text-[9px] text-print-dim/30 font-mono">
-            Builtins: {builtins.join(", ")}
-          </span>
-        </div>
-      {/if}
     {/if}
   </div>
 </div>
