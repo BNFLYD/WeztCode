@@ -105,7 +105,8 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ path: primary })
       });
-      on_navigate_to_explorer(primary);
+      await fetch(`/api/projects/switch?path=${encodeURIComponent(primary)}`);
+      on_navigate_to_explorer("/");
     }
   }
 
