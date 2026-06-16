@@ -465,7 +465,10 @@
               {/each}
               <hr class="border-accent-detail/10 my-1" />
               <button
-                class="font-semibold block w-full text-left text-sm px-3 py-1.5 text-print hover:bg-accent-detail hover:text-print-dim transition-colors"
+                class="font-semibold block w-full text-left text-sm px-3 py-1.5 rounded
+                       {current_agent === null
+                  ? 'bg-accent-detail text-accent trasition-colors'
+                  : 'text-print hover:bg-accent-detail/10 hover:text-accent transition-colors'}"
                 on:click={() => select_agent(null)}
               >
                 default
