@@ -433,7 +433,7 @@
 
       {#if sub_agents.length > 0 || current_agent}
         <div
-          class="absolute left-0 bottom-2 z-50"
+          class="absolute left-1 bottom-2 z-50"
           bind:this={agent_dropdown_container}
         >
           <button
