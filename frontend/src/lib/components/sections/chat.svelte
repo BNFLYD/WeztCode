@@ -434,6 +434,12 @@
             class="w-full skew-x-[20deg] pl-4 pr-2 bg-transparent rounded-lg text-lg text-print-contrast placeholder:text-print-contrast/50 outline-none"
           />
         </div>
+
+        <div class="absolute right-0 bottom-1 z-50 skew-x-[20deg]">
+          <button class="text-print/50 hover:text-print">
+            <Icon icon="si:mic-detailed-fill" class="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {#if sub_agents.length > 0 || current_agent}
@@ -466,7 +472,7 @@
               <hr class="border-accent-detail/10 my-1" />
               <button
                 class="font-semibold block w-full text-left text-sm px-3 py-1.5 rounded
-                       {current_agent === null  
+                       {current_agent === null
                   ? 'bg-accent-detail text-back-deep trasition-colors'
                   : 'text-print hover:bg-accent-detail/10 hover:text-accent/70 transition-colors'}"
                 on:click={() => select_agent(null)}
@@ -477,12 +483,6 @@
           {/if}
         </div>
       {/if}
-      
-      <div class="absolute right-4 bottom-2 z-50">
-        <button>
-          <Icon icon="si:mic-detailed-fill" class="w-4 h-4" />
-        </button>
-      </div>
 
       <div
         class="relative pl-5 pr-3 -ml-2 bg-transparent rounded-r-lg flex items-center justify-center overflow-hidden group"
