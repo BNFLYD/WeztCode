@@ -435,7 +435,7 @@
           />
         </div>
 
-        <div class="absolute right-0 bottom-1 z-50 skew-x-[20deg]">
+        <div class="absolute right-4 bottom-2 z-50 skew-x-[20deg]">
           <button class="text-print/50 hover:text-print">
             <Icon icon="si:mic-detailed-fill" class="w-4 h-4" />
           </button>
