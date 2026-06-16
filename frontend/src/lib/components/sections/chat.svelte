@@ -20,6 +20,7 @@
   let sub_agents = [];
   let builtins = [];
   let current_agent = null;
+  let current_icon = null;
   let show_agent_dropdown = false;
   let agent_dropdown_container;
 
@@ -187,6 +188,7 @@
         const default_agent = sub_agents.find((a) => a.default);
         if (default_agent) {
           current_agent = default_agent.name;
+          current_icon = default_agent.icon || null;
         }
       }
     } catch {
@@ -223,6 +225,7 @@
         current_model = name;
         // Model override: clear agent indicator since user chose manually
         current_agent = null;
+        current_icon = null;
       }
     } catch {
       // Si falla, el nombre no se actualiza
@@ -243,6 +246,7 @@
     if (!name) {
       // "ninguno" — switch back to default model without agent
       current_agent = null;
+      current_icon = null;
       const default_model = models.find((m) => m.default);
       if (default_model) {
         await select_model(default_model.name);
@@ -259,6 +263,7 @@
       if (data.ok) {
         current_agent = data.data.agent;
         current_model = data.data.model;
+        current_icon = data.data.icon || null;
       }
     } catch {
       // Si falla, no se actualiza
@@ -433,14 +438,14 @@
 
       {#if sub_agents.length > 0 || current_agent}
         <div
-          class="absolute left-1 bottom-2 z-50"
+          class="absolute left-0 bottom-2 z-50"
           bind:this={agent_dropdown_container}
         >
           <button
             class="flex items-center gap-1 px-2 py-0.5 text-xs font-mono text-print/50 hover:text-print transition-colors rounded"
             on:click={toggle_agent_dropdown}
           >
-            <Icon icon="simple-icons:pi" class="w-3 h-3" />
+            <Icon icon={current_icon || "simple-icons:pi"} class="w-3 h-3" />
             {current_agent || "Pi agent"}
           </button>
           {#if show_agent_dropdown}

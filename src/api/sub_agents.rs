@@ -12,6 +12,7 @@ pub async fn handle_list() -> impl IntoResponse {
                 "name": a.name,
                 "description": a.description,
                 "model": a.model,
+                "icon": a.icon,
                 "default": a.default,
             })
         })
@@ -41,6 +42,7 @@ pub async fn handle_switch(
             "agent": entry.name,
             "model": entry.model,
             "description": entry.description,
+            "icon": entry.icon,
         }))
     })
     .await
