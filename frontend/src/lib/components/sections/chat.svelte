@@ -413,7 +413,7 @@
   </div>
 
   <div class="flex flex-col shrink-0">
-    <div class="flex mt-auto pt-2 pb-2 w-full items-stretch">
+    <div class="flex mt-auto pt-2 pb-2 w-full items-stretch relative">
       <div
         class="-mr-2 flex-1 relative px-5 py-6 bg-transparent rounded-l-lg flex items-center justify-center overflow-hidden group"
       >
@@ -428,47 +428,47 @@
             disabled={streaming}
             class="w-full skew-x-[20deg] pl-4 pr-2 bg-transparent rounded-lg text-lg text-print-contrast placeholder:text-print-contrast/50 outline-none"
           />
-          <!-- Sub-agent dropdown -->
-          {#if sub_agents.length > 0 || current_agent}
+        </div>
+      </div>
+
+      {#if sub_agents.length > 0 || current_agent}
+        <div
+          class="absolute left-4 bottom-2 z-50"
+          bind:this={agent_dropdown_container}
+        >
+          <button
+            class="flex items-center gap-1 px-2 py-0.5 text-xs font-mono text-print/50 hover:text-print transition-colors rounded"
+            on:click={toggle_agent_dropdown}
+          >
+            <Icon icon="simple-icons:pi" class="w-3 h-3" />
+            {current_agent || "Pi agent"}
+          </button>
+          {#if show_agent_dropdown}
             <div
-              class="relative px-1 pb-1"
-              bind:this={agent_dropdown_container}
+              class="absolute bottom-full left-0 mb-1 z-50 min-w-[140px] bg-back rounded-md shadow-lg py-1 border border-accent-detail/20"
             >
-              <button
-                class="flex items-center gap-1 px-2 py-0.5 text-xs font-mono text-print/50 hover:text-print transition-colors rounded"
-                on:click={toggle_agent_dropdown}
-              >
-                <Icon icon="simple-icons:pi" class="w-3 h-3" />
-                {current_agent || "Pi agent"}
-              </button>
-              {#if show_agent_dropdown}
-                <div
-                  class="absolute bottom-full left-1 mb-1 z-50 min-w-[140px] bg-back rounded-md shadow-lg py-1 border border-accent-detail/20"
+              {#each sub_agents as agent}
+                <button
+                  class="block w-full text-left text-xs px-3 py-1.5 whitespace-nowrap rounded-md
+                       {agent.name === current_agent
+                    ? 'bg-accent-detail/20 text-accent-detail'
+                    : 'text-print/50 hover:bg-accent-detail/10 hover:text-print transition-colors'}"
+                  on:click={() => select_agent(agent.name)}
                 >
-                  {#each sub_agents as agent}
-                    <button
-                      class="block w-full text-left text-xs px-3 py-1.5 whitespace-nowrap rounded-md
-                     {agent.name === current_agent
-                        ? 'bg-accent-detail/20 text-accent-detail'
-                        : 'text-print/50 hover:bg-accent-detail/10 hover:text-print transition-colors'}"
-                      on:click={() => select_agent(agent.name)}
-                    >
-                      {agent.name}
-                    </button>
-                  {/each}
-                  <hr class="border-accent-detail/10 my-1" />
-                  <button
-                    class="block w-full text-left text-xs px-3 py-1.5 text-print-dim hover:text-print/90 transition-colors"
-                    on:click={() => select_agent(null)}
-                  >
-                    default
-                  </button>
-                </div>
-              {/if}
+                  {agent.name}
+                </button>
+              {/each}
+              <hr class="border-accent-detail/10 my-1" />
+              <button
+                class="block w-full text-left text-xs px-3 py-1.5 text-print-dim hover:text-print/90 transition-colors"
+                on:click={() => select_agent(null)}
+              >
+                default
+              </button>
             </div>
           {/if}
         </div>
-      </div>
+      {/if}
 
       <div
         class="relative pl-5 pr-3 -ml-2 bg-transparent rounded-r-lg flex items-center justify-center overflow-hidden group"
