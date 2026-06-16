@@ -173,7 +173,6 @@ pub fn move_entry(rel_path: &str, dest: &str, root: &Path) -> Result<(), String>
 }
 
 pub fn sanitize_path(requested: &str, root: &Path) -> Result<PathBuf, String> {
-    let requested = requested.trim_start_matches('/');
     let path = PathBuf::from(requested);
 
     if path.is_absolute() {
@@ -181,6 +180,7 @@ pub fn sanitize_path(requested: &str, root: &Path) -> Result<PathBuf, String> {
             .map_err(|_| "Path not found".to_string());
     }
 
+    let requested = requested.trim_start_matches('/');
     let joined = root.join(requested);
 
     let canonical = joined.canonicalize()
