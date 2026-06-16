@@ -330,7 +330,7 @@
           </span>
         </button>
       {/if}
-      
+
       {#if models.length > 0}
         <div class="relative" bind:this={dropdown_container}>
           <button
@@ -473,9 +473,6 @@
                 on:click={() => select_agent(agent.name)}
               >
                 {agent.name}
-                {#if agent.default}
-                  <span class="text-[8px] text-print-dim ml-1">(default)</span>
-                {/if}
               </button>
             {/each}
             <hr class="border-accent-detail/10 my-1" />
@@ -483,7 +480,7 @@
               class="block w-full text-left text-xs px-3 py-1.5 text-print-dim hover:text-print/90 transition-colors"
               on:click={() => select_agent(null)}
             >
-              (ninguno)
+              (default)
             </button>
           </div>
         {/if}
