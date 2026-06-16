@@ -165,6 +165,22 @@
     }
   }
 
+  function handle_tab_keydown(e) {
+    if (e.key === "Tab" && sub_agents.length > 0) {
+      e.preventDefault();
+      if (!current_agent) {
+        select_agent(e.shiftKey ? sub_agents[sub_agents.length - 1].name : sub_agents[0].name);
+        return;
+      }
+      const idx = sub_agents.findIndex(a => a.name === current_agent);
+      if (e.shiftKey) {
+        select_agent(sub_agents[idx <= 0 ? sub_agents.length - 1 : idx - 1].name);
+      } else {
+        select_agent(sub_agents[idx >= sub_agents.length - 1 ? 0 : idx + 1].name);
+      }
+    }
+  }
+
   async function load_models() {
     try {
       const res = await fetch("/api/models/list");
@@ -289,7 +305,11 @@
 
   onMount(() => {
     document.addEventListener("click", handle_click_outside);
-    return () => document.removeEventListener("click", handle_click_outside);
+    document.addEventListener("keydown", handle_tab_keydown);
+    return () => {
+      document.removeEventListener("click", handle_click_outside);
+      document.removeEventListener("keydown", handle_tab_keydown);
+    };
   });
 
   function estimateTokens(text) {
@@ -435,7 +455,7 @@
           />
         </div>
 
-        <div class="absolute right-7 -bottom-1 z-50">
+        <div class="absolute right-[20px] -bottom-1 z-50">
           <button class="text-print/50 hover:text-print">
             <Icon icon="si:mic-detailed-fill" class="w-4 h-4" />
           </button>
@@ -451,8 +471,8 @@
             class="flex items-center gap-1 px-2 py-0.5 text-xs font-mono text-print/50 hover:text-print transition-colors rounded"
             on:click={toggle_agent_dropdown}
           >
-            <Icon icon={current_icon || "simple-icons:pi"} class="w-4 h-4" />
-            {current_agent || "Pi agent"}
+            <Icon icon={current_icon || "simple-icons:pi"} class="w-3 h-3" />
+            {current_agent || "Just Pi"}
           </button>
           {#if show_agent_dropdown}
             <div
