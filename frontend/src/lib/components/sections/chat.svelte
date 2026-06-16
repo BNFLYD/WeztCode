@@ -450,14 +450,14 @@
           </button>
           {#if show_agent_dropdown}
             <div
-              class="absolute bottom-full left-0 mb-1 z-50 min-w-[140px] bg-back rounded-md shadow-lg py-1 border border-accent-detail/20"
+              class="absolute bottom-full left-1 mb-4 z-50 min-w-[140px] bg-back rounded-md shadow-lg py-1"
             >
               {#each sub_agents as agent}
                 <button
-                  class="block w-full text-left text-xs px-3 py-1.5 whitespace-nowrap rounded-md
+                  class="font-semibold block w-full text-left text-sm px-3 py-1.5 whitespace-nowrap rounded-md
                        {agent.name === current_agent
-                    ? 'bg-accent-detail/20 text-accent-detail'
-                    : 'text-print/50 hover:bg-accent-detail/10 hover:text-print transition-colors'}"
+                    ? 'bg-accent-detail text-back trasition-colors'
+                    : 'text-print hover:bg-accent-detail/10 transition-colors'}"
                   on:click={() => select_agent(agent.name)}
                 >
                   {agent.name}
@@ -465,7 +465,7 @@
               {/each}
               <hr class="border-accent-detail/10 my-1" />
               <button
-                class="block w-full text-left text-xs px-3 py-1.5 text-print-dim hover:text-print/90 transition-colors"
+                class="font-semibold block w-full text-left text-sm px-3 py-1.5 text-print hover:bg-accent-detail hover:text-print-dim transition-colors"
                 on:click={() => select_agent(null)}
               >
                 default
