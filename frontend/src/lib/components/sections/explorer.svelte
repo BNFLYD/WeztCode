@@ -10,6 +10,7 @@
   export let active_section = "explorer";
   export let active_channel = null;
   export let is_distorting = false;
+  export let pending_explorer_path = null;
 
   let current_path = "/";
   let entries = [];
@@ -582,7 +583,11 @@
     }
   }
 
-  load_dir(saved_state.path, saved_state.entry_name);
+  if (pending_explorer_path) {
+    load_dir(pending_explorer_path);
+  } else {
+    load_dir(saved_state.path, saved_state.entry_name);
+  }
 </script>
 
 <svelte:window on:keydown={handle_keydown} />

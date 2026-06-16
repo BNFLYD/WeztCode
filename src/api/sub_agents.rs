@@ -141,6 +141,21 @@ pub async fn handle_edit() -> impl IntoResponse {
     }
 }
 
+pub async fn handle_dirs() -> impl IntoResponse {
+    let mut dirs = config::sub_agents::agent_dirs_list();
+    if dirs.is_empty() {
+        let home = std::env::var("HOME")
+            .or_else(|_| std::env::var("USERPROFILE"))
+            .unwrap_or_default();
+        let user_dir = std::path::PathBuf::from(&home).join(".pi/agent/agents");
+        let _ = std::fs::create_dir_all(&user_dir);
+        dirs.push(user_dir);
+    }
+    let primary = dirs[0].to_string_lossy().to_string();
+    let dirs_str: Vec<String> = dirs.iter().map(|d| d.to_string_lossy().to_string()).collect();
+    ok_json(serde_json::json!({"ok": true, "data": {"dirs": dirs_str, "primary": primary}}))
+}
+
 pub async fn handle_builtins() -> impl IntoResponse {
     let builtins = config::sub_agents::builtins();
     ok_json(serde_json::json!({"ok": true, "data": builtins}))

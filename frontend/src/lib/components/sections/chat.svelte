@@ -455,7 +455,7 @@
           />
         </div>
 
-        <div class="absolute right-[20px] -bottom-1 z-50">
+        <div class="absolute right-[30px] -bottom-1 z-50">
           <button class="text-print/50 hover:text-print">
             <Icon icon="si:mic-detailed-fill" class="w-4 h-4" />
           </button>
@@ -472,7 +472,7 @@
             on:click={toggle_agent_dropdown}
           >
             <Icon icon={current_icon || "simple-icons:pi"} class="w-3 h-3" />
-            {current_agent || "Just Pi"}
+            {current_agent || "Pi"}
           </button>
           {#if show_agent_dropdown}
             <div

@@ -1,4 +1,6 @@
 <script>
+  export let on_navigate_to_explorer;
+
   let theme = "Dinamico";
   let font_size = 14;
 
@@ -93,27 +95,18 @@
     await fetch("/api/models/edit-defaults");
   }
 
-  async function install_sub_agents() {
-    try {
-      const res = await fetch("/api/sub-agents/install", { method: "POST" });
-      const data = await res.json();
-      if (data.ok) {
-        alert("pi-subagents instalado correctamente");
-      } else {
-        alert("Error: " + (data.error || "desconocido"));
-      }
-    } catch (e) {
-      alert("Error de conexión: " + e.message);
-    }
-  }
-
   async function edit_agents() {
-    const res = await fetch('/api/terminal/active-pane');
+    const res = await fetch('/api/sub-agents/dirs');
     const json = await res.json();
-    if (json.ok && json.data.pane_id !== 0) {
-      await fetch('/api/terminal/ensure-main', { method: 'POST' });
+    if (json.ok) {
+      const primary = json.data.primary;
+      await fetch('/api/projects/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: primary })
+      });
+      on_navigate_to_explorer(primary);
     }
-    await fetch("/api/sub-agents/edit");
   }
 
   load_keys();
@@ -259,28 +252,24 @@
     </p>
     <button
       on:click={open_models_editor}
-      class="text-[10px] px-3 py-1.5 bg-accent rounded text-white self-start"
+      class="text-sm px-3 py-1.5 bg-accent rounded text-white self-start"
     >Editar modelos</button>
   </div>
 
   <hr class="border-accent-detail my-2" />
 
   <div class="flex flex-col gap-3">
-    <h3 class="text-xs font-bold text-print uppercase tracking-wide">
+    <h3 class="text-md font-bold text-print uppercase tracking-wide">
       Sub-Agentes
     </h3>
-    <p class="text-[10px] text-print-dim">
+    <p class="text-sm text-print">
       Los sub-agentes son roles de IA (coder, writer, reviewer) definidos en archivos .md
       con su propio system prompt y modelo. Editá los agentes en <code>~/.pi/agent/agents/</code>.
     </p>
     <div class="flex gap-2">
       <button
-        on:click={install_sub_agents}
-        class="text-[10px] px-3 py-1.5 bg-accent rounded text-white self-start"
-      >Instalar pi-subagents</button>
-      <button
         on:click={edit_agents}
-        class="text-[10px] px-3 py-1.5 bg-back border border-accent-detail rounded text-print self-start"
+        class="text-sm px-3 py-1.5 bg-back rounded text-print self-start hover:bg-accent/40 hover:text-back"
       >Editar agentes</button>
     </div>
   </div>
