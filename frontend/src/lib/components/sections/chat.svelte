@@ -445,12 +445,12 @@
             class="flex items-center gap-1 px-2 py-0.5 text-xs font-mono text-print/50 hover:text-print transition-colors rounded"
             on:click={toggle_agent_dropdown}
           >
-            <Icon icon={current_icon || "simple-icons:pi"} class="w-3 h-3" />
+            <Icon icon={current_icon || "simple-icons:pi"} class="w-4 h-4" />
             {current_agent || "Pi agent"}
           </button>
           {#if show_agent_dropdown}
             <div
-              class="absolute bottom-full left-1 mb-4 z-50 min-w-[140px] bg-back rounded-md shadow-lg py-1"
+              class="absolute bottom-full left-1 mb-5 z-50 min-w-[140px] bg-back rounded-md shadow-lg py-1"
             >
               {#each sub_agents as agent}
                 <button
@@ -466,9 +466,9 @@
               <hr class="border-accent-detail/10 my-1" />
               <button
                 class="font-semibold block w-full text-left text-sm px-3 py-1.5 rounded
-                       {current_agent === null
-                  ? 'bg-accent-detail text-accent trasition-colors'
-                  : 'text-print hover:bg-accent-detail/10 hover:text-accent transition-colors'}"
+                       {current_agent === null  
+                  ? 'bg-accent-detail text-back-deep trasition-colors'
+                  : 'text-print hover:bg-accent-detail/10 hover:text-accent/70 transition-colors'}"
                 on:click={() => select_agent(null)}
               >
                 default
@@ -477,6 +477,12 @@
           {/if}
         </div>
       {/if}
+      
+      <div class="absolute right-4 bottom-2 z-50">
+        <button>
+          <Icon icon="si:mic-detailed-fill" class="w-4 h-4" />
+        </button>
+      </div>
 
       <div
         class="relative pl-5 pr-3 -ml-2 bg-transparent rounded-r-lg flex items-center justify-center overflow-hidden group"
