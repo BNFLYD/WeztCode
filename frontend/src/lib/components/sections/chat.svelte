@@ -557,7 +557,7 @@
         class="relative pl-5 pr-3 -ml-2 bg-transparent rounded-r-lg flex items-center justify-center overflow-hidden group"
       >
         <button
-          class="rounded-lg absolute inset-0 {streaming ? 'bg-red-500' : 'bg-accent-detail'} translate-x-[14%] skew-x-[-20deg] origin-right"
+          class="rounded-lg absolute inset-0 bg-accent-detail translate-x-[14%] skew-x-[-20deg] origin-right"
           aria-label={streaming ? "Cancelar" : "Enviar"}
           onclick={streaming ? cancel : send}
         ></button>
