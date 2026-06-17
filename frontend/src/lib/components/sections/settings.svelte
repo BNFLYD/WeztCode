@@ -168,12 +168,18 @@
               type="password"
               bind:value={edit_value}
               placeholder="Nuevo valor"
-              class="w-full px-2 py-1 bg-back rounded text-sm text-print-contrast outline-none"
+              class="w-full py-1 bg-back rounded text-sm text-print-contrast outline-none"
             />
+            <div class="flex gap-2 justify-end">
+              <button
+              on:click={() => { start_edit = false; error_msg = ""; }}
+              class="font-semibold text-sm px-3 py-1.5 bg-back rounded text-print self-start hover:bg-accent-detail/50 hover:text-back"
+            >Cancelar</button>
             <button
               on:click={save_edit}
               class="font-semibold text-sm px-3 py-1.5 bg-back rounded text-print self-start hover:bg-accent/50 hover:text-back"
             >Guardar</button>
+            </div>
           </div>
         {/if}
       {/each}
