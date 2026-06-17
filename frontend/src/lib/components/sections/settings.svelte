@@ -163,17 +163,17 @@
           </div>
         </div>
         {#if edit_key === name}
-          <div class="flex gap-2 px-3 pb-2">
+          <div class="flex flex-col gap-2 px-3 py-2 bg-back rounded">
             <input
               type="password"
               bind:value={edit_value}
               placeholder="Nuevo valor"
-              class="w-full py-1 bg-back rounded text-sm text-print-contrast outline-none"
+              class="w-full py-1 bg-back-deep rounded text-sm text-print-contrast outline-none"
             />
             <div class="flex gap-2 justify-end">
               <button
-              on:click={() => { }}
-              class="font-semibold text-sm px-3 py-1.5 bg-back rounded text-print self-start hover:bg-accent-detail/50 hover:text-back"
+              on:click={() => {edit_key = null}}
+              class="font-semibold text-sm px-3 py-1.5 bg-back rounded text-print self-start hover:bg-accent-detail hover:text-back"
             >Cancelar</button>
             <button
               on:click={save_edit}
@@ -201,7 +201,7 @@
         <div class="flex gap-2 justify-end">
           <button
             on:click={() => { show_add_form = false; error_msg = ""; }}
-            class="font-semibold text-sm px-3 py-1.5 bg-back rounded text-print self-start hover:bg-accent-detail/50 hover:text-back"
+            class="font-semibold text-sm px-3 py-1.5 bg-back rounded text-print self-start hover:bg-accent-detail hover:text-back"
           >Cancelar</button>
           <button
             on:click={add_key}
