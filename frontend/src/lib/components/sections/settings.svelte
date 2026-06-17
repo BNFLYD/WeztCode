@@ -152,14 +152,14 @@
           <div class="flex gap-2">
             <button
               on:click={() => start_edit(name)}
-              class="text-sm text-print hover:text-accent-warn/50"
+              class="text-sm text-print hover:text-accent-warn"
               title="Reemplazar key"
-            >reemplazar</button>
+            >Reemplazar</button>
             <button
               on:click={() => delete_key(name)}
-              class="text-sm text-print hover:text-accent-dang/50"
+              class="text-sm text-print hover:text-accent-dang"
               title="Eliminar key"
-            >eliminar</button>
+            >Eliminar</button>
           </div>
         </div>
         {#if edit_key === name}
@@ -168,12 +168,12 @@
               type="password"
               bind:value={edit_value}
               placeholder="Nuevo valor"
-              class="flex-1 px-2 py-1 bg-back border border-accent-detail rounded text-xs text-print-contrast outline-none"
+              class="w-full px-2 py-1 bg-back-deep rounded text-sm text-print-contrast outline-none"
             />
             <button
               on:click={save_edit}
               class="font-semibold text-sm px-3 py-1.5 bg-back rounded text-print self-start hover:bg-accent/50 hover:text-back"
-            >guardar</button>
+            >Guardar</button>
           </div>
         {/if}
       {/each}
