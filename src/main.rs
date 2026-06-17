@@ -171,6 +171,14 @@ fn main() {
     // Wait for server to start
     thread::sleep(Duration::from_millis(100));
 
+    // Warm up CHAT_SERVICE: spawn Pi early so it's ready for first interaction
+    thread::spawn(|| {
+        thread::sleep(Duration::from_millis(500));
+        if let Ok(service) = crate::CHAT_SERVICE.lock() {
+            drop(service);
+        }
+    });
+
     let term = WeztermProtocol::new();
     let class = config::WINDOW_CLASS;
 
