@@ -163,12 +163,12 @@
           </div>
         </div>
         {#if edit_key === name}
-          <div class="flex flex-col gap-2 px-3 py-2 bg-back rounded">
+          <div class="flex flex-col gap-2 px-3 py-2">
             <input
               type="password"
               bind:value={edit_value}
               placeholder="Nuevo valor"
-              class="w-full py-1 bg-back-deep rounded text-sm text-print-contrast outline-none"
+              class="w-full px-2 py-1 bg-back rounded text-sm text-print-contrast outline-none"
             />
             <div class="flex gap-2 justify-end">
               <button
@@ -186,17 +186,17 @@
     </div>
 
     {#if show_add_form}
-      <div class="flex flex-col gap-2 px-3 py-2 bg-back rounded">
+      <div class="flex flex-col gap-2 px-3 py-2">
         <input
           bind:value={new_name}
           placeholder="Nombre (ej: OPENROUTER)"
-          class="w-full px-2 py-1 bg-back-deep rounded text-sm text-print-contrast outline-none"
+          class="w-full px-2 py-1 bg-back rounded text-sm text-print-contrast outline-none"
         />
         <input
           type="password"
           bind:value={new_value}
           placeholder="API key"
-          class="w-full px-2 py-1 bg-back-deep rounded text-sm text-print-contrast outline-none"
+          class="w-full px-2 py-1 bg-back rounded text-sm text-print-contrast outline-none"
         />
         <div class="flex gap-2 justify-end">
           <button
