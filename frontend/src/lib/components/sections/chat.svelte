@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from "svelte";
+  import { onMount, tick } from "svelte";
   import Icon from "@iconify/svelte";
 
   const STORAGE_KEY = "weztcode_chat_messages";
@@ -11,7 +11,7 @@
   let warnings = $state([]);
   let show_warnings = $state(false);
   let models = $state([]);
-  let current_model = $state.eager("");
+  let current_model = $state("");
   let switching = $state(false);
   let show_dropdown = $state(false);
   let dropdown_container = $state(null);
@@ -19,8 +19,8 @@
   let real_context_window = $state(null);
   let sub_agents = $state([]);
   let builtins = $state([]);
-  let current_agent = $state.eager(null);
-  let current_icon = $state.eager(null);
+  let current_agent = $state(null);
+  let current_icon = $state(null);
   let show_agent_dropdown = $state(false);
   let agent_dropdown_container = $state(null);
 
@@ -279,6 +279,7 @@
         current_agent = data.data.agent;
         current_model = data.data.model;
         current_icon = data.data.icon || null;
+        await tick();
       }
     } catch {
       // Si falla, no se actualiza
