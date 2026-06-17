@@ -23,6 +23,8 @@
   let current_icon = $state(null);
   let show_agent_dropdown = $state(false);
   let agent_dropdown_container = $state(null);
+  let pending_agent = $state(null);
+  let pending_model = $state(null);
 
   function save() {
     const raw = JSON.stringify(messages);
@@ -152,6 +154,16 @@
 
     streaming = false;
     save();
+
+    if (pending_agent !== null) {
+      const agent = pending_agent;
+      pending_agent = null;
+      await select_agent(agent);
+    } else if (pending_model !== null) {
+      const model = pending_model;
+      pending_model = null;
+      await select_model(model);
+    }
   }
 
   function handle_keydown(e) {
@@ -228,6 +240,12 @@
       return;
     }
     show_dropdown = false;
+
+    if (streaming) {
+      pending_model = name;
+      return;
+    }
+
     switching = true;
     try {
       const res = await fetch("/api/chat/switch-model", {
@@ -258,6 +276,12 @@
   async function select_agent(name) {
     show_agent_dropdown = false;
     if (name === current_agent) return;
+
+    if (streaming) {
+      pending_agent = name;
+      return;
+    }
+
     if (!name) {
       // "ninguno" — switch back to default model without agent
       current_agent = null;
@@ -364,11 +388,14 @@
       {#if models.length > 0}
         <div class="relative" bind:this={dropdown_container}>
           <button
-            class="px-1 font-mono text-xs text-print/50 rounded hover:text-print transition-colors max-w-[120px] truncate"
+            class="px-1 font-mono text-xs {pending_model !== null ? 'text-accent-detail' : 'text-print/50 hover:text-print'} rounded hover:text-print transition-colors max-w-[120px] truncate"
             onclick={toggle_dropdown}
             disabled={switching || streaming}
           >
             {current_model}
+            {#if pending_model !== null}
+              <span class="ml-1 w-1.5 h-1.5 rounded-full bg-accent-detail animate-pulse" />
+            {/if}
           </button>
           {#if show_dropdown}
             <div
@@ -473,11 +500,15 @@
           bind:this={agent_dropdown_container}
         >
           <button
-            class="flex items-center gap-1 px-2 py-0.5 text-xs font-semibold font-mono text-print/50 hover:text-print transition-colors rounded"
+            class="flex items-center gap-1 px-2 py-0.5 text-xs font-semibold font-mono {pending_agent !== null ? 'text-accent-detail' : 'text-print/50 hover:text-print'} transition-colors rounded"
             onclick={toggle_agent_dropdown}
+            disabled={streaming}
           >
             <Icon icon={current_icon || "simple-icons:pi"} class="w-4 h-4" />
             {current_agent || "default"}
+            {#if pending_agent !== null}
+              <span class="ml-1 w-2 h-2 rounded-full bg-accent-detail animate-pulse" />
+            {/if}
           </button>
           {#if show_agent_dropdown}
             <div
