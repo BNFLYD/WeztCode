@@ -172,7 +172,7 @@
             />
             <div class="flex gap-2 justify-end">
               <button
-              on:click={() => { start_edit = false; error_msg = ""; }}
+              on:click={() => { }}
               class="font-semibold text-sm px-3 py-1.5 bg-back rounded text-print self-start hover:bg-accent-detail/50 hover:text-back"
             >Cancelar</button>
             <button
