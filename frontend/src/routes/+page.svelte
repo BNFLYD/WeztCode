@@ -9,7 +9,7 @@
   } from "$lib/components/sections";
   import { Footer, Monitor } from "$lib/components/ui";
 
-  let active_section = "chat";
+  let active_section = "explorer";
   let active_channel = null;
   let is_distorting = false;
   let pending_explorer_path = null;
