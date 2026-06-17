@@ -565,7 +565,7 @@
 
         <Icon
           icon={streaming ? "mdi:circle" : "mingcute:navigation-fill"}
-          class="text-back-deep w-6 h-6 relative z-10 transition-transform group-active:scale-75"
+          class="pointer-events-none text-back-deep w-6 h-6 relative z-10 transition-transform group-active:scale-75"
         />
       </div>
     </div>
