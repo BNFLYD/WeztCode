@@ -473,7 +473,7 @@
           bind:this={agent_dropdown_container}
         >
           <button
-            class="flex items-center gap-1 px-2 py-0.5 text-sm font-semibold font-mono text-print/50 hover:text-print transition-colors rounded"
+            class="flex items-center gap-1 px-2 py-0.5 text-xs font-semibold font-mono text-print/50 hover:text-print transition-colors rounded"
             on:click={toggle_agent_dropdown}
           >
             <Icon icon={current_icon || "simple-icons:pi"} class="w-4 h-4" />
