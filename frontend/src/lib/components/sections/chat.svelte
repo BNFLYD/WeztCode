@@ -49,7 +49,9 @@
   }
 
   $effect(() => {
-    messages;
+    messages.length;
+    const last = messages[messages.length - 1];
+    last?.content;
     if (list_ref) {
       list_ref.scrollTop = list_ref.scrollHeight;
     }
@@ -64,8 +66,7 @@
     input_value = "";
     streaming = true;
 
-    const assistant_msg = { role: "assistant", content: "" };
-    messages = [...messages, assistant_msg];
+    messages = [...messages, { role: "assistant", content: "" }];
     save();
 
     try {
@@ -80,8 +81,7 @@
         !res.headers.get("Content-Type")?.includes("text/event-stream")
       ) {
         const err_text = await res.text();
-        assistant_msg.content = `Error del servidor:\n${err_text}`;
-        messages = messages;
+        messages[messages.length - 1].content = `Error del servidor:\n${err_text}`;
         save();
         streaming = false;
         return;
@@ -106,21 +106,18 @@
             const data = JSON.parse(line.slice(6));
             switch (data.type) {
               case "token":
-                assistant_msg.content += data.content;
-                messages = messages;
+                messages[messages.length - 1].content += data.content;
                 save();
                 break;
               case "tool_call":
-                assistant_msg.content += `\n\n[${data.name}]`;
-                messages = messages;
+                messages[messages.length - 1].content += `\n\n[${data.name}]`;
                 save();
                 break;
               case "warning":
                 warnings = [...warnings, data.message];
                 break;
               case "error":
-                assistant_msg.content += `\n\nError: ${data.message}`;
-                messages = messages;
+                messages[messages.length - 1].content += `\n\nError: ${data.message}`;
                 save();
                 break;
               case "session_stats":
@@ -145,17 +142,15 @@
         }
       }
     } catch (e) {
-      assistant_msg.content += `\n\nConnection error: ${e.message}`;
-      messages = messages;
+      messages[messages.length - 1].content += `\n\nConnection error: ${e.message}`;
       save();
     }
 
-    if (!assistant_msg.content.trim()) {
-      assistant_msg.content = "(empty response)";
+    if (!messages[messages.length - 1].content.trim()) {
+      messages[messages.length - 1].content = "(empty response)";
     }
 
     streaming = false;
-    messages = messages;
     save();
   }
 
