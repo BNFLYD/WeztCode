@@ -115,7 +115,7 @@
 
 <div class="space-y-4 py-4">
   <div class="flex flex-col gap-2">
-    <label class="text-xs font-bold text-print uppercase tracking-wide">
+    <label class="text-lg font-bold text-print uppercase tracking-wide">
       Tema
       <select
         bind:value={theme}
@@ -129,7 +129,7 @@
   </div>
 
   <div class="flex flex-col gap-2">
-    <label for="font-size" class="text-xs font-bold text-print uppercase tracking-wide"
+    <label for="font-size" class="text-lg font-bold text-print uppercase tracking-wide"
       >Tamano de fuente</label
     >
     <input
@@ -142,11 +142,11 @@
     />
   </div>
 
-  <hr class="border-accent-detail my-2" />
+  <hr class="border-accent my-2" />
 
   <div class="flex flex-col gap-3">
-    <h3 class="text-xs font-bold text-print uppercase tracking-wide">API Keys</h3>
-    <p class="text-[10px] text-print-dim">
+    <h3 class="text-lg font-bold text-print uppercase tracking-wide">API Keys</h3>
+    <p class="text-md text-print">
       Las keys se almacenan en ~/.config/weztcode/preferences/models/KEYS.env fuera del proyecto.
       Los valores no se muestran por seguridad.
     </p>
@@ -156,7 +156,7 @@
     {/if}
 
     {#if keys.length === 0 && !show_add_form}
-      <p class="text-[10px] text-print-dim italic">No hay keys configuradas</p>
+      <p class="text-md text-print italic">No hay keys configuradas</p>
     {/if}
 
     <div class="flex flex-col gap-1">
@@ -209,7 +209,7 @@
         <div class="flex gap-2 justify-end">
           <button
             on:click={() => { show_add_form = false; error_msg = ""; }}
-            class="text-[10px] text-print-dim"
+            class="text-md text-print"
           >cancelar</button>
           <button
             on:click={add_key}
@@ -225,13 +225,13 @@
     {/if}
   </div>
 
-  <hr class="border-accent-detail my-2" />
+  <hr class="border-accent my-2" />
 
   <div class="flex flex-col gap-3">
-    <h3 class="text-xs font-bold text-print uppercase tracking-wide">
+    <h3 class="text-lg font-bold text-print uppercase tracking-wide">
       Terminales por defecto
     </h3>
-    <p class="text-[10px] text-print-dim">
+    <p class="text-md text-print">
       Editá el archivo JSON para definir terminales que se abren al inicio.
       Se spawnearán automáticamente al reiniciar WeztCode.
     </p>
@@ -241,13 +241,13 @@
     >Editar terminales</button>
   </div>
 
-  <hr class="border-accent-detail my-2" />
+  <hr class="border-accent my-2" />
 
   <div class="flex flex-col gap-3">
-    <h3 class="text-xs font-bold text-print uppercase tracking-wide">
+    <h3 class="text-lg font-bold text-print uppercase tracking-wide">
       Modelos de IA
     </h3>
-    <p class="text-[10px] text-print-dim">
+    <p class="text-md text-print">
       Editá el archivo JSON para definir los modelos disponibles en el chat.
       El modelo con "default": true se usa al iniciar la app.
     </p>
@@ -257,13 +257,13 @@
     >Editar modelos</button>
   </div>
 
-  <hr class="border-accent-detail my-2" />
+  <hr class="border-accent my-2" />
 
   <div class="flex flex-col gap-3">
-    <h3 class="text-md font-bold text-print uppercase tracking-wide">
+    <h3 class="text-lg font-bold text-print uppercase tracking-wide">
       Sub-Agentes
     </h3>
-    <p class="text-sm text-print">
+    <p class="text-md text-print">
       Los sub-agentes son roles de IA (coder, writer, reviewer) definidos en archivos .md
       con su propio system prompt y modelo. Editá los agentes en <code>~/.pi/agent/agents/</code>.
     </p>
