@@ -205,6 +205,9 @@
         if (default_agent) {
           current_agent = default_agent.name;
           current_icon = default_agent.icon || null;
+          if (default_agent.model) {
+            current_model = default_agent.model;
+          }
         }
       }
     } catch {
@@ -326,8 +329,12 @@
     context_limit > 0 ? (used_tokens / context_limit) * 100 : 0;
   $: indicator = Math.round(real_context_percent ?? context_percent);
 
-  load_models();
-  load_sub_agents();
+  async function init() {
+    await load_models();
+    await load_sub_agents();
+  }
+
+  init();
 </script>
 
 <div class="flex flex-col gap-1 py-2 h-full relative">
@@ -335,9 +342,7 @@
     class="flex items-center gap-2 px-3 py-2 text-sm text-accent-detail/50 border-b border-accent-detail/20 mb-2 flex-shrink-0"
   >
     <Icon icon="ri:search-line" class="w-4 h-4 hover:text-accent-detail" />
-    <span class="font-mono truncate flex items-center gap-1 text-print/50">
-      Chat
-    </span>
+    <span class="font-mono truncate flex items-center gap-1 text-print/50"></span>
     <div class="ml-auto flex items-center gap-2">
       {#if warnings.length > 0}
         <button
@@ -468,11 +473,11 @@
           bind:this={agent_dropdown_container}
         >
           <button
-            class="flex items-center gap-1 px-2 py-0.5 text-xs font-mono text-print/50 hover:text-print transition-colors rounded"
+            class="flex items-center gap-1 px-2 py-0.5 text-sm font-semibold font-mono text-print/50 hover:text-print transition-colors rounded"
             on:click={toggle_agent_dropdown}
           >
-            <Icon icon={current_icon || "simple-icons:pi"} class="w-3 h-3" />
-            {current_agent || "Pi"}
+            <Icon icon={current_icon || "simple-icons:pi"} class="w-4 h-4" />
+            {current_agent || "default"}
           </button>
           {#if show_agent_dropdown}
             <div
