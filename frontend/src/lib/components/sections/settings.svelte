@@ -115,7 +115,7 @@
 
 <div class="space-y-4 py-4">
   <div class="flex flex-col gap-2">
-    <label class="text-lg font-bold text-print uppercase tracking-wide">
+    <label class="text-md font-bold text-print uppercase tracking-wide">
       Tema
       <select
         bind:value={theme}
@@ -129,7 +129,7 @@
   </div>
 
   <div class="flex flex-col gap-2">
-    <label for="font-size" class="text-lg font-bold text-print uppercase tracking-wide"
+    <label for="font-size" class="text-md font-bold text-print uppercase tracking-wide"
       >Tamano de fuente</label
     >
     <input
@@ -142,10 +142,10 @@
     />
   </div>
 
-  <hr class="border-accent my-2" />
+  <hr class="border-accent/50 my-2" />
 
   <div class="flex flex-col gap-3">
-    <h3 class="text-lg font-bold text-print uppercase tracking-wide">API Keys</h3>
+    <h3 class="text-md font-bold text-print uppercase tracking-wide">API Keys</h3>
     <p class="text-md text-print">
       Las keys se almacenan en ~/.config/weztcode/preferences/models/KEYS.env fuera del proyecto.
       Los valores no se muestran por seguridad.
@@ -225,10 +225,10 @@
     {/if}
   </div>
 
-  <hr class="border-accent my-2" />
+  <hr class="border-accent/50 my-2" />
 
   <div class="flex flex-col gap-3">
-    <h3 class="text-lg font-bold text-print uppercase tracking-wide">
+    <h3 class="text-md font-bold text-print uppercase tracking-wide">
       Terminales por defecto
     </h3>
     <p class="text-md text-print">
@@ -241,10 +241,10 @@
     >Editar terminales</button>
   </div>
 
-  <hr class="border-accent my-2" />
+  <hr class="border-accent/50 my-2" />
 
   <div class="flex flex-col gap-3">
-    <h3 class="text-lg font-bold text-print uppercase tracking-wide">
+    <h3 class="text-md font-bold text-print uppercase tracking-wide">
       Modelos de IA
     </h3>
     <p class="text-md text-print">
@@ -257,10 +257,10 @@
     >Editar modelos</button>
   </div>
 
-  <hr class="border-accent my-2" />
+  <hr class="border-accent/50 my-2" />
 
   <div class="flex flex-col gap-3">
-    <h3 class="text-lg font-bold text-print uppercase tracking-wide">
+    <h3 class="text-md font-bold text-print uppercase tracking-wide">
       Sub-Agentes
     </h3>
     <p class="text-md text-print">
