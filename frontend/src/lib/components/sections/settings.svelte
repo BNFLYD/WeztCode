@@ -45,7 +45,9 @@
     if (!confirm(`Eliminar ${name}?`)) return;
     error_msg = "";
     try {
-      const res = await fetch(`/api/keys/delete?name=${encodeURIComponent(name)}`);
+      const res = await fetch(
+        `/api/keys/delete?name=${encodeURIComponent(name)}`,
+      );
       const data = await res.json();
       if (!data.ok) {
         error_msg = data.error || "Error al eliminar";
@@ -78,32 +80,32 @@
   }
 
   async function open_default_terms() {
-    const res = await fetch('/api/terminal/active-pane');
+    const res = await fetch("/api/terminal/active-pane");
     const json = await res.json();
     if (json.ok && json.data.pane_id !== 0) {
-      await fetch('/api/terminal/ensure-main', { method: 'POST' });
+      await fetch("/api/terminal/ensure-main", { method: "POST" });
     }
     await fetch("/api/terminal/edit-defaults");
   }
 
   async function open_models_editor() {
-    const res = await fetch('/api/terminal/active-pane');
+    const res = await fetch("/api/terminal/active-pane");
     const json = await res.json();
     if (json.ok && json.data.pane_id !== 0) {
-      await fetch('/api/terminal/ensure-main', { method: 'POST' });
+      await fetch("/api/terminal/ensure-main", { method: "POST" });
     }
     await fetch("/api/models/edit-defaults");
   }
 
   async function edit_agents() {
-    const res = await fetch('/api/sub-agents/dirs');
+    const res = await fetch("/api/sub-agents/dirs");
     const json = await res.json();
     if (json.ok) {
       const primary = json.data.primary;
-      await fetch('/api/projects/add', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: primary })
+      await fetch("/api/projects/add", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: primary }),
       });
       await fetch(`/api/projects/switch?path=${encodeURIComponent(primary)}`);
       on_navigate_to_explorer("/");
@@ -131,10 +133,12 @@
   <hr class="border-accent/50 my-2" />
 
   <div class="flex flex-col gap-3">
-    <h3 class="text-md font-bold text-print uppercase tracking-wide">API Keys</h3>
+    <h3 class="text-md font-bold text-print uppercase tracking-wide">
+      API Keys
+    </h3>
     <p class="text-md text-print">
-      Las keys se almacenan en ~/.config/weztcode/preferences/models/KEYS.env fuera del proyecto.
-      Los valores no se muestran por seguridad.
+      Las keys se almacenan en ~/.config/weztcode/preferences/models/KEYS.env
+      fuera del proyecto. Los valores no se muestran por seguridad.
     </p>
 
     {#if error_msg}
@@ -145,48 +149,11 @@
       <p class="text-md text-print italic">No hay keys configuradas</p>
     {/if}
 
-    <div class="flex flex-col gap-1">
-      {#each keys as name}
-        <div class="flex items-center justify-between px-3 py-2 bg-back rounded">
-          <span class="text-xs text-print-contrast font-mono">{name}</span>
-          <div class="flex gap-2">
-            <button
-              on:click={() => start_edit(name)}
-              class="text-sm text-print hover:text-accent-warn"
-              title="Reemplazar key"
-            >Reemplazar</button>
-            <button
-              on:click={() => delete_key(name)}
-              class="text-sm text-print hover:text-accent-dang"
-              title="Eliminar key"
-            >Eliminar</button>
-          </div>
-        </div>
-        {#if edit_key === name}
-          <div class="flex flex-col gap-2 px-3 py-2">
-            <input
-              type="password"
-              bind:value={edit_value}
-              placeholder="Nuevo valor"
-              class="w-full px-2 py-1 bg-back rounded text-sm text-print-contrast outline-none"
-            />
-            <div class="flex gap-2 justify-end">
-              <button
-              on:click={() => {edit_key = null}}
-              class="font-semibold text-sm px-3 py-1.5 bg-back rounded text-print self-start hover:bg-accent-detail hover:text-back"
-            >Cancelar</button>
-            <button
-              on:click={save_edit}
-              class="font-semibold text-sm px-3 py-1.5 bg-back rounded text-print self-start hover:bg-accent/50 hover:text-back"
-            >Guardar</button>
-            </div>
-          </div>
-        {/if}
-      {/each}
-    </div>
-
     {#if show_add_form}
-      <div class="flex flex-col gap-2 px-3 py-2">
+      <div class="flex flex-col gap-2 py-2">
+       <h3 class="text-sm font-semibold text-print uppercase tracking-wide">
+        Nueva Key
+       </h3>
         <input
           bind:value={new_name}
           placeholder="Nombre (ej: OPENROUTER)"
@@ -200,21 +167,76 @@
         />
         <div class="flex gap-2 justify-end">
           <button
-            on:click={() => { show_add_form = false; error_msg = ""; }}
+            on:click={() => {
+              show_add_form = false;
+              error_msg = "";
+            }}
             class="font-semibold text-sm px-3 py-1.5 bg-back rounded text-print self-start hover:bg-accent-detail hover:text-back"
-          >Cancelar</button>
+            >Cancelar</button
+          >
           <button
             on:click={add_key}
             class="font-semibold text-sm px-3 py-1.5 bg-back rounded text-print self-start hover:bg-accent/50 hover:text-back"
-          >Guardar</button>
+            >Guardar</button
+          >
         </div>
       </div>
     {:else}
       <button
-        on:click={() => { show_add_form = true; error_msg = ""; }}
+        on:click={() => {
+          show_add_form = true;
+          error_msg = "";
+        }}
         class="font-semibold text-sm px-3 py-1.5 bg-back rounded text-print self-start hover:bg-accent/50 hover:text-back"
-      >+ agregar key</button>
+        >Agregar key</button
+      >
     {/if}
+
+    <div class="flex flex-col gap-1">
+      {#each keys as name}
+        <div
+          class="flex items-center justify-between px-3 py-2 bg-back rounded"
+        >
+          <span class="text-xs text-print-contrast font-mono">{name}</span>
+          <div class="flex gap-2">
+            <button
+              on:click={() => start_edit(name)}
+              class="text-sm text-print hover:text-accent-warn"
+              title="Reemplazar key">Reemplazar</button
+            >
+            <button
+              on:click={() => delete_key(name)}
+              class="text-sm text-print hover:text-accent-dang"
+              title="Eliminar key">Eliminar</button
+            >
+          </div>
+        </div>
+        {#if edit_key === name}
+          <div class="flex flex-col gap-2 py-2">
+            <input
+              type="password"
+              bind:value={edit_value}
+              placeholder="Nuevo valor"
+              class="w-full px-2 py-1 bg-back rounded text-sm text-print-contrast outline-none"
+            />
+            <div class="flex gap-2 justify-end">
+              <button
+                on:click={() => {
+                  edit_key = null;
+                }}
+                class="font-semibold text-sm px-3 py-1.5 bg-back rounded text-print self-start hover:bg-accent-detail hover:text-back"
+                >Cancelar</button
+              >
+              <button
+                on:click={save_edit}
+                class="font-semibold text-sm px-3 py-1.5 bg-back rounded text-print self-start hover:bg-accent/50 hover:text-back"
+                >Guardar</button
+              >
+            </div>
+          </div>
+        {/if}
+      {/each}
+    </div>
   </div>
 
   <hr class="border-accent/50 my-2" />
@@ -224,13 +246,14 @@
       Terminales por defecto
     </h3>
     <p class="text-md text-print">
-      Editá el archivo JSON para definir terminales que se abren al inicio.
-      Se spawnearán automáticamente al reiniciar WeztCode.
+      Editá el archivo JSON para definir terminales que se abren al inicio. Se
+      spawnearán automáticamente al reiniciar WeztCode.
     </p>
     <button
       on:click={open_default_terms}
       class="font-semibold text-sm px-3 py-1.5 bg-back rounded text-print self-start hover:bg-accent/50 hover:text-back"
-    >Editar terminales</button>
+      >Editar terminales</button
+    >
   </div>
 
   <hr class="border-accent/50 my-2" />
@@ -240,13 +263,14 @@
       Modelos de IA
     </h3>
     <p class="text-md text-print">
-      Editá el archivo JSON para definir los modelos disponibles en el chat.
-      El modelo con "default": true se usa al iniciar la app.
+      Editá el archivo JSON para definir los modelos disponibles en el chat. El
+      modelo con "default": true se usa al iniciar la app.
     </p>
     <button
       on:click={open_models_editor}
       class="font-semibold text-sm px-3 py-1.5 bg-back rounded text-print self-start hover:bg-accent/50 hover:text-back"
-    >Editar modelos</button>
+      >Editar modelos</button
+    >
   </div>
 
   <hr class="border-accent/50 my-2" />
@@ -256,14 +280,17 @@
       Sub-Agentes
     </h3>
     <p class="text-md text-print">
-      Los sub-agentes son roles de IA (coder, writer, reviewer) definidos en archivos .md
-      con su propio system prompt y modelo. Editá los agentes en <code>~/.pi/agent/agents/</code>.
+      Los sub-agentes son roles de IA (coder, writer, reviewer) definidos en
+      archivos .md con su propio system prompt y modelo. Editá los agentes en <code
+        >~/.pi/agent/agents/</code
+      >.
     </p>
     <div class="flex gap-2">
       <button
         on:click={edit_agents}
         class="font-semibold text-sm px-3 py-1.5 bg-back rounded text-print self-start hover:bg-accent/50 hover:text-back"
-      >Editar agentes</button>
+        >Editar agentes</button
+      >
     </div>
   </div>
 </div>
