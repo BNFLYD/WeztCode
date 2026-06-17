@@ -25,6 +25,7 @@
   let agent_dropdown_container = $state(null);
   let pending_agent = $state(null);
   let pending_model = $state(null);
+  let abort_controller = $state(null);
 
   function save() {
     const raw = JSON.stringify(messages);
@@ -71,11 +72,14 @@
     messages = [...messages, { role: "assistant", content: "" }];
     save();
 
+    abort_controller = new AbortController();
+
     try {
       const res = await fetch("/api/chat/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: text }),
+        signal: abort_controller.signal,
       });
 
       if (
@@ -144,14 +148,17 @@
         }
       }
     } catch (e) {
-      messages[messages.length - 1].content += `\n\nConnection error: ${e.message}`;
-      save();
+      if (e?.name !== 'AbortError') {
+        messages[messages.length - 1].content += `\n\nConnection error: ${e.message}`;
+        save();
+      }
     }
 
     if (!messages[messages.length - 1].content.trim()) {
       messages[messages.length - 1].content = "(empty response)";
     }
 
+    abort_controller = null;
     streaming = false;
     save();
 
@@ -164,6 +171,12 @@
       pending_model = null;
       await select_model(model);
     }
+  }
+
+  function cancel() {
+    abort_controller?.abort();
+    abort_controller = null;
+    streaming = false;
   }
 
   function handle_keydown(e) {
@@ -544,14 +557,13 @@
         class="relative pl-5 pr-3 -ml-2 bg-transparent rounded-r-lg flex items-center justify-center overflow-hidden group"
       >
         <button
-          class="rounded-lg absolute inset-0 bg-accent-detail translate-x-[14%] skew-x-[-20deg] origin-right"
-          aria-label="Enviar"
-          onclick={send}
-          disabled={streaming}
+          class="rounded-lg absolute inset-0 {streaming ? 'bg-red-500' : 'bg-accent-detail'} translate-x-[14%] skew-x-[-20deg] origin-right"
+          aria-label={streaming ? "Cancelar" : "Enviar"}
+          onclick={streaming ? cancel : send}
         ></button>
 
         <Icon
-          icon="mingcute:navigation-fill"
+          icon={streaming ? "mdi:circle" : "mingcute:navigation-fill"}
           class="text-back-deep w-6 h-6 relative z-10 transition-transform group-active:scale-75"
         />
       </div>
