@@ -500,7 +500,7 @@
           />
         </div>
 
-        <div class="absolute right-[30px] -bottom-1 z-50">
+        <div class="absolute right-[25px] -bottom-1 z-50">
           <button class="text-print/50 hover:text-print">
             <Icon icon="si:mic-detailed-fill" class="w-4 h-4" />
           </button>
@@ -520,7 +520,8 @@
             <Icon icon={streaming ? "svg-spinners:bars-scale-fade" : current_icon || "simple-icons:pi"} class="w-4 h-4" />
             {current_agent || "default"}
             {#if pending_agent !== null}
-              <span class="ml-1 w-2 h-2 rounded-full bg-accent-detail animate-pulse" />
+              <!-- svelte-ignore element_invalid_self_closing_tag -->
+              <span class="ml-1 w-2 h-2 rounded-full bg-accent-detail animate-pulse"></span>
             {/if}
           </button>
           {#if show_agent_dropdown}
