@@ -128,20 +128,6 @@
     </label>
   </div>
 
-  <div class="flex flex-col gap-2">
-    <label for="font-size" class="text-md font-bold text-print uppercase tracking-wide"
-      >Tamano de fuente</label
-    >
-    <input
-      id="font-size"
-      type="range"
-      min="12"
-      max="18"
-      bind:value={font_size}
-      class="w-full h-1.5 bg-back rounded-lg appearance-none cursor-pointer"
-    />
-  </div>
-
   <hr class="border-accent/50 my-2" />
 
   <div class="flex flex-col gap-3">
@@ -166,12 +152,12 @@
           <div class="flex gap-2">
             <button
               on:click={() => start_edit(name)}
-              class="text-[10px] text-accent hover:text-accent-hover"
+              class="text-sm text-print hover:text-accent/50"
               title="Reemplazar key"
             >reemplazar</button>
             <button
               on:click={() => delete_key(name)}
-              class="text-[10px] text-red-400 hover:text-red-300"
+              class="text-sm text-print hover:text-accent-dng/50"
               title="Eliminar key"
             >eliminar</button>
           </div>
@@ -198,23 +184,23 @@
         <input
           bind:value={new_name}
           placeholder="Nombre (ej: OPENROUTER)"
-          class="w-full px-2 py-1 bg-back-deep border border-accent-detail rounded text-xs text-print-contrast outline-none"
+          class="w-full px-2 py-1 bg-back-deep rounded text-sm text-print-contrast outline-none"
         />
         <input
           type="password"
           bind:value={new_value}
           placeholder="API key"
-          class="w-full px-2 py-1 bg-back-deep border border-accent-detail rounded text-xs text-print-contrast outline-none"
+          class="w-full px-2 py-1 bg-back-deep rounded text-sm text-print-contrast outline-none"
         />
         <div class="flex gap-2 justify-end">
           <button
             on:click={() => { show_add_form = false; error_msg = ""; }}
             class="text-md text-print"
-          >cancelar</button>
+          >Cancelar</button>
           <button
             on:click={add_key}
             class="font-semibold text-sm px-3 py-1.5 bg-back rounded text-print self-start hover:bg-accent/50 hover:text-back"
-          >guardar</button>
+          >Guardar</button>
         </div>
       </div>
     {:else}
