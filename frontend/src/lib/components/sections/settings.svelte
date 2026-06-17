@@ -186,7 +186,7 @@
             />
             <button
               on:click={save_edit}
-              class="text-[10px] px-2 py-1 bg-accent rounded text-white"
+              class="font-semibold text-sm px-3 py-1.5 bg-back rounded text-print self-start hover:bg-accent/50 hover:text-back"
             >guardar</button>
           </div>
         {/if}
@@ -213,14 +213,14 @@
           >cancelar</button>
           <button
             on:click={add_key}
-            class="text-[10px] px-2 py-1 bg-accent rounded text-white"
+            class="font-semibold text-sm px-3 py-1.5 bg-back rounded text-print self-start hover:bg-accent/50 hover:text-back"
           >guardar</button>
         </div>
       </div>
     {:else}
       <button
         on:click={() => { show_add_form = true; error_msg = ""; }}
-        class="text-[10px] text-accent hover:text-accent-hover self-start"
+        class="font-semibold text-sm px-3 py-1.5 bg-back rounded text-print self-start hover:bg-accent/50 hover:text-back"
       >+ agregar key</button>
     {/if}
   </div>
@@ -237,7 +237,7 @@
     </p>
     <button
       on:click={open_default_terms}
-      class="text-[10px] px-3 py-1.5 bg-accent rounded text-white self-start"
+      class="font-semibold text-sm px-3 py-1.5 bg-back rounded text-print self-start hover:bg-accent/50 hover:text-back"
     >Editar terminales</button>
   </div>
 
@@ -253,7 +253,7 @@
     </p>
     <button
       on:click={open_models_editor}
-      class="text-sm px-3 py-1.5 bg-accent rounded text-white self-start"
+      class="font-semibold text-sm px-3 py-1.5 bg-back rounded text-print self-start hover:bg-accent/50 hover:text-back"
     >Editar modelos</button>
   </div>
 
@@ -270,7 +270,7 @@
     <div class="flex gap-2">
       <button
         on:click={edit_agents}
-        class="text-sm px-3 py-1.5 bg-back rounded text-print self-start hover:bg-accent/40 hover:text-back"
+        class="font-semibold text-sm px-3 py-1.5 bg-back rounded text-print self-start hover:bg-accent/50 hover:text-back"
       >Editar agentes</button>
     </div>
   </div>
