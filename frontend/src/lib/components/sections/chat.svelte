@@ -1,28 +1,28 @@
 <script>
-  import { afterUpdate, onMount } from "svelte";
+  import { onMount } from "svelte";
   import Icon from "@iconify/svelte";
 
   const STORAGE_KEY = "weztcode_chat_messages";
 
-  let messages = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-  let input_value = "";
-  let streaming = false;
-  let list_ref;
-  let warnings = [];
-  let show_warnings = false;
-  let models = [];
-  let current_model = "";
-  let switching = false;
-  let show_dropdown = false;
-  let dropdown_container;
-  let real_context_percent = null;
-  let real_context_window = null;
-  let sub_agents = [];
-  let builtins = [];
-  let current_agent = null;
-  let current_icon = null;
-  let show_agent_dropdown = false;
-  let agent_dropdown_container;
+  let messages = $state(JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"));
+  let input_value = $state("");
+  let streaming = $state(false);
+  let list_ref = $state(null);
+  let warnings = $state([]);
+  let show_warnings = $state(false);
+  let models = $state([]);
+  let current_model = $state("");
+  let switching = $state(false);
+  let show_dropdown = $state(false);
+  let dropdown_container = $state(null);
+  let real_context_percent = $state(null);
+  let real_context_window = $state(null);
+  let sub_agents = $state([]);
+  let builtins = $state([]);
+  let current_agent = $state(null);
+  let current_icon = $state(null);
+  let show_agent_dropdown = $state(false);
+  let agent_dropdown_container = $state(null);
 
   function save() {
     const raw = JSON.stringify(messages);
@@ -48,7 +48,8 @@
     localStorage.removeItem(STORAGE_KEY);
   }
 
-  afterUpdate(() => {
+  $effect(() => {
+    messages;
     if (list_ref) {
       list_ref.scrollTop = list_ref.scrollHeight;
     }
@@ -319,15 +320,18 @@
     return Math.ceil(text.length / 4);
   }
 
-  $: used_tokens = messages.reduce(
-    (sum, msg) => sum + estimateTokens(msg.content),
-    0,
+  let used_tokens = $derived(
+    messages.reduce((sum, msg) => sum + estimateTokens(msg.content), 0),
   );
-  $: context_limit =
-    models.find((m) => m.name === current_model)?.max_context ?? 4096;
-  $: context_percent =
-    context_limit > 0 ? (used_tokens / context_limit) * 100 : 0;
-  $: indicator = Math.round(real_context_percent ?? context_percent);
+  let context_limit = $derived(
+    models.find((m) => m.name === current_model)?.max_context ?? 4096,
+  );
+  let context_percent = $derived(
+    context_limit > 0 ? (used_tokens / context_limit) * 100 : 0,
+  );
+  let indicator = $derived(
+    Math.round(real_context_percent ?? context_percent),
+  );
 
   async function init() {
     await load_models();
@@ -347,7 +351,7 @@
       {#if warnings.length > 0}
         <button
           class="relative text-sm px-2 text-print/50 hover:text-print transition-colors group"
-          on:click={() => (show_warnings = !show_warnings)}
+          onclick={() => (show_warnings = !show_warnings)}
         >
           <Icon
             icon="mdi:alert-outline"
@@ -365,7 +369,7 @@
         <div class="relative" bind:this={dropdown_container}>
           <button
             class="px-1 font-mono text-xs text-print/50 rounded hover:text-print transition-colors max-w-[120px] truncate"
-            on:click={toggle_dropdown}
+            onclick={toggle_dropdown}
             disabled={switching || streaming}
           >
             {current_model}
@@ -380,7 +384,7 @@
                        {m.name === current_model
                     ? 'bg-accent-detail text-back transition-colors'
                     : 'text-print hover:bg-accent-detail/10 transition-colors'}"
-                  on:click={() => select_model(m.name)}
+                  onclick={() => select_model(m.name)}
                 >
                   {m.name}
                 </button>
@@ -392,7 +396,7 @@
 
       <button
         class="font-mono text-xs text-print/50 hover:text-print transition-colors"
-        on:click={newConversation}
+        onclick={newConversation}
       >
         {indicator}%
       </button>
@@ -454,7 +458,7 @@
             type="text"
             placeholder="Decime lo que pensás..."
             bind:value={input_value}
-            on:keydown={handle_keydown}
+            onkeydown={handle_keydown}
             disabled={streaming}
             class="w-full skew-x-[20deg] pl-4 pr-2 bg-transparent rounded-lg text-lg text-print-contrast placeholder:text-print-contrast/50 outline-none"
           />
@@ -474,7 +478,7 @@
         >
           <button
             class="flex items-center gap-1 px-2 py-0.5 text-xs font-semibold font-mono text-print/50 hover:text-print transition-colors rounded"
-            on:click={toggle_agent_dropdown}
+            onclick={toggle_agent_dropdown}
           >
             <Icon icon={current_icon || "simple-icons:pi"} class="w-4 h-4" />
             {current_agent || "default"}
@@ -489,7 +493,7 @@
                        {agent.name === current_agent
                     ? 'bg-accent-detail text-back trasition-colors'
                     : 'text-print hover:bg-accent-detail/10 transition-colors'}"
-                  on:click={() => select_agent(agent.name)}
+                  onclick={() => select_agent(agent.name)}
                 >
                   {agent.name}
                 </button>
@@ -500,7 +504,7 @@
                        {current_agent === null
                   ? 'bg-accent-detail text-back-deep trasition-colors'
                   : 'text-print hover:bg-accent-detail/10 hover:text-accent/70 transition-colors'}"
-                on:click={() => select_agent(null)}
+                onclick={() => select_agent(null)}
               >
                 default
               </button>
@@ -515,7 +519,7 @@
         <button
           class="rounded-lg absolute inset-0 bg-accent-detail translate-x-[14%] skew-x-[-20deg] origin-right"
           aria-label="Enviar"
-          on:click={send}
+          onclick={send}
           disabled={streaming}
         ></button>
 
