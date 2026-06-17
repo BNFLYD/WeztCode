@@ -168,7 +168,7 @@
               type="password"
               bind:value={edit_value}
               placeholder="Nuevo valor"
-              class="w-full px-2 py-1 bg-back-deep rounded text-sm text-print-contrast outline-none"
+              class="w-full px-2 py-1 bg-back rounded text-sm text-print-contrast outline-none"
             />
             <button
               on:click={save_edit}
