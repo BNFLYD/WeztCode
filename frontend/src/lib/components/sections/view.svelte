@@ -16,3 +16,9 @@
     </div>
   {/each}
 </div>
+
+<style>
+  button:focus-visible {
+    outline: none;
+  }
+</style>
