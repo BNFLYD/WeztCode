@@ -504,7 +504,7 @@
             onclick={toggle_agent_dropdown}
             disabled={streaming}
           >
-            <Icon icon={current_icon || "simple-icons:pi"} class="w-4 h-4" />
+            <Icon icon={streaming ? "svg-spinners:bars-scale-fade" : current_icon || "simple-icons:pi"} class="w-4 h-4" />
             {current_agent || "default"}
             {#if pending_agent !== null}
               <span class="ml-1 w-2 h-2 rounded-full bg-accent-detail animate-pulse" />
