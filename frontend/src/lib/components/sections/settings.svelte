@@ -152,12 +152,12 @@
           <div class="flex gap-2">
             <button
               on:click={() => start_edit(name)}
-              class="text-sm text-print hover:text-accent/50"
+              class="text-sm text-print hover:text-accent-warn/50"
               title="Reemplazar key"
             >reemplazar</button>
             <button
               on:click={() => delete_key(name)}
-              class="text-sm text-print hover:text-accent-dng/50"
+              class="text-sm text-print hover:text-accent-dang/50"
               title="Eliminar key"
             >eliminar</button>
           </div>
@@ -195,7 +195,7 @@
         <div class="flex gap-2 justify-end">
           <button
             on:click={() => { show_add_form = false; error_msg = ""; }}
-            class="text-md text-print"
+            class="font-semibold text-sm px-3 py-1.5 bg-back rounded text-print self-start hover:bg-accent-detail/50 hover:text-back"
           >Cancelar</button>
           <button
             on:click={add_key}
