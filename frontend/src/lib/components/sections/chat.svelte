@@ -26,6 +26,8 @@
   let pending_agent = $state(null);
   let pending_model = $state(null);
   let abort_controller = $state(null);
+  let models_error = $state(null);
+  let agents_error = $state(null);
 
   function save() {
     const raw = JSON.stringify(messages);
@@ -207,12 +209,13 @@
       const res = await fetch("/api/models/list");
       const data = await res.json();
       models = data.data || [];
+      models_error = null;
       if (models.length > 0) {
         const default_model = models.find((m) => m.default);
         current_model = default_model ? default_model.name : models[0].name;
       }
-    } catch {
-      // no-op: models mantiene su valor anterior
+    } catch (e) {
+      models_error = e?.message ?? "Error desconocido al cargar modelos";
     }
   }
 
@@ -221,6 +224,7 @@
       const res = await fetch("/api/sub-agents/list");
       const data = await res.json();
       sub_agents = data.data || [];
+      agents_error = null;
       if (sub_agents.length > 0) {
         const default_agent = sub_agents.find((a) => a.default);
         if (default_agent) {
@@ -231,14 +235,17 @@
           }
         }
       }
-    } catch {
+    } catch (e) {
+      agents_error = e?.message ?? "Error desconocido al cargar subagentes";
       sub_agents = [];
     }
     try {
       const res = await fetch("/api/sub-agents/builtins");
       const data = await res.json();
       builtins = data.data || [];
-    } catch {
+      agents_error = null;
+    } catch (e) {
+      agents_error = e?.message ?? "Error desconocido al cargar builtins";
       builtins = [];
     }
   }
@@ -398,22 +405,26 @@
         </button>
       {/if}
 
-      {#if models.length > 0}
-        <div class="relative" bind:this={dropdown_container}>
-          <button
-            class="px-1 font-mono text-xs {pending_model !== null ? 'text-accent-detail' : 'text-print/50 hover:text-print'} rounded hover:text-print transition-colors max-w-[120px] truncate"
-            onclick={toggle_dropdown}
-            disabled={switching || streaming}
+      <div class="relative" bind:this={dropdown_container}>
+        <button
+          class="px-1 font-mono text-xs {models_error ? 'text-red-400' : pending_model !== null ? 'text-accent-detail' : 'text-print/50 hover:text-print'} rounded hover:text-print transition-colors max-w-[120px] truncate"
+          onclick={toggle_dropdown}
+          disabled={switching || streaming}
+        >
+          {models_error ? `⚠ ${models_error}` : (current_model || "sin modelos")}
+          {#if pending_model !== null}
+            <span class="ml-1 w-1.5 h-1.5 rounded-full bg-accent-detail animate-pulse" />
+          {/if}
+        </button>
+        {#if show_dropdown}
+          <div
+            class="absolute top-full right-1 mt-4 z-50 min-w-full bg-back rounded-md shadow-lg py-1"
           >
-            {current_model}
-            {#if pending_model !== null}
-              <span class="ml-1 w-1.5 h-1.5 rounded-full bg-accent-detail animate-pulse" />
-            {/if}
-          </button>
-          {#if show_dropdown}
-            <div
-              class="absolute top-full right-1 mt-4 z-50 min-w-full bg-back rounded-md shadow-lg py-1"
-            >
+            {#if models_error}
+              <div class="px-3 py-1.5 text-xs text-red-500">{models_error}</div>
+            {:else if models.length === 0}
+              <div class="px-3 py-1.5 text-xs text-print/50">No hay modelos disponibles</div>
+            {:else}
               {#each models as m}
                 <button
                   class="font-semibold block w-full text-left text-sm px-3 py-1.5 whitespace-nowrap rounded-md
@@ -425,10 +436,10 @@
                   {m.name}
                 </button>
               {/each}
-            </div>
-          {/if}
-        </div>
-      {/if}
+            {/if}
+          </div>
+        {/if}
+      </div>
 
       <button
         class="font-mono text-xs text-print/50 hover:text-print transition-colors"
@@ -507,27 +518,29 @@
         </div>
       </div>
 
-      {#if sub_agents.length > 0 || current_agent}
-        <div
-          class="absolute left-0 bottom-2 z-50"
-          bind:this={agent_dropdown_container}
+      <div
+        class="absolute left-0 bottom-2 z-50"
+        bind:this={agent_dropdown_container}
+      >
+        <button
+          class="flex items-center gap-1 px-2 py-0.5 text-xs font-semibold font-mono {agents_error ? 'text-red-400' : pending_agent !== null ? 'text-accent-detail' : 'text-print/50 hover:text-print'} transition-colors rounded"
+          onclick={toggle_agent_dropdown}
+          disabled={streaming}
         >
-          <button
-            class="flex items-center gap-1 px-2 py-0.5 text-xs font-semibold font-mono {pending_agent !== null ? 'text-accent-detail' : 'text-print/50 hover:text-print'} transition-colors rounded"
-            onclick={toggle_agent_dropdown}
-            disabled={streaming}
+          <Icon icon={streaming ? "svg-spinners:bars-scale-fade" : current_icon || "simple-icons:pi"} class="w-4 h-4" />
+          {agents_error ? `⚠ ${agents_error}` : (current_agent || "default")}
+          {#if pending_agent !== null}
+            <!-- svelte-ignore element_invalid_self_closing_tag -->
+            <span class="ml-1 w-2 h-2 rounded-full bg-accent-detail animate-pulse"></span>
+          {/if}
+        </button>
+        {#if show_agent_dropdown}
+          <div
+            class="absolute bottom-full left-1 mb-5 z-50 min-w-[140px] bg-back rounded-md shadow-lg py-1"
           >
-            <Icon icon={streaming ? "svg-spinners:bars-scale-fade" : current_icon || "simple-icons:pi"} class="w-4 h-4" />
-            {current_agent || "default"}
-            {#if pending_agent !== null}
-              <!-- svelte-ignore element_invalid_self_closing_tag -->
-              <span class="ml-1 w-2 h-2 rounded-full bg-accent-detail animate-pulse"></span>
-            {/if}
-          </button>
-          {#if show_agent_dropdown}
-            <div
-              class="absolute bottom-full left-1 mb-5 z-50 min-w-[140px] bg-back rounded-md shadow-lg py-1"
-            >
+            {#if agents_error}
+              <div class="px-3 py-1.5 text-xs text-red-500">{agents_error}</div>
+            {:else}
               {#each sub_agents as agent}
                 <button
                   class="font-semibold block w-full text-left text-sm px-3 py-1.5 whitespace-nowrap rounded-md
@@ -549,10 +562,10 @@
               >
                 default
               </button>
-            </div>
-          {/if}
-        </div>
-      {/if}
+            {/if}
+          </div>
+        {/if}
+      </div>
 
       <div
         class="relative pl-5 pr-3 -ml-2 bg-transparent rounded-r-lg flex items-center justify-center overflow-hidden group"
