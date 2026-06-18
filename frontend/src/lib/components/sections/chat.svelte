@@ -501,7 +501,7 @@
         </div>
 
         <div class="absolute right-[25px] -bottom-1 z-50">
-          <button class="text-print/50 hover:text-print active:scale-75">
+          <button class="text-print/50 hover:text-print active:scale-5">
             <Icon icon="si:mic-detailed-fill" class="w-4 h-4" />
           </button>
         </div>
