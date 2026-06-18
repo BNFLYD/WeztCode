@@ -28,6 +28,7 @@
   let abort_controller = $state(null);
   let models_error = $state(null);
   let agents_error = $state(null);
+  let user_interacted = $state(false);
 
   function save() {
     const raw = JSON.stringify(messages);
@@ -51,6 +52,7 @@
     real_context_percent = null;
     real_context_window = null;
     localStorage.removeItem(STORAGE_KEY);
+    user_interacted = false;
   }
 
   $effect(() => {
@@ -225,16 +227,6 @@
       const data = await res.json();
       sub_agents = data.data || [];
       agents_error = null;
-      if (sub_agents.length > 0) {
-        const default_agent = sub_agents.find((a) => a.default);
-        if (default_agent) {
-          current_agent = default_agent.name;
-          current_icon = default_agent.icon || null;
-          if (default_agent.model) {
-            current_model = default_agent.model;
-          }
-        }
-      }
     } catch (e) {
       agents_error = e?.message ?? "Error desconocido al cargar subagentes";
       sub_agents = [];
@@ -255,6 +247,7 @@
   }
 
   async function select_model(name) {
+    user_interacted = true;
     if (!name || name === current_model) {
       show_dropdown = false;
       return;
@@ -294,6 +287,7 @@
   }
 
   async function select_agent(name) {
+    user_interacted = true;
     show_agent_dropdown = false;
     if (name === current_agent) return;
 
@@ -374,8 +368,17 @@
   );
 
   async function init() {
-    await load_models();
-    await load_sub_agents();
+    await Promise.all([load_models(), load_sub_agents()]);
+    if (!user_interacted && current_agent === null && sub_agents.length > 0) {
+      const default_agent = sub_agents.find((a) => a.default);
+      if (default_agent) {
+        current_agent = default_agent.name;
+        current_icon = default_agent.icon || null;
+        if (default_agent.model) {
+          current_model = default_agent.model;
+        }
+      }
+    }
   }
 
   init();
