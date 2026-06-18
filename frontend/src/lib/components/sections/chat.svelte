@@ -214,7 +214,9 @@
       models_error = null;
       if (models.length > 0) {
         const default_model = models.find((m) => m.default);
-        current_model = default_model ? default_model.name : models[0].name;
+        if (!user_interacted) {
+          current_model = default_model ? default_model.name : models[0].name;
+        }
       }
     } catch (e) {
       models_error = e?.message ?? "Error desconocido al cargar modelos";
