@@ -32,6 +32,12 @@ pub async fn handle_switch(
         let entry = config::sub_agents::get_by_name(&name)
             .ok_or_else(|| format!("Sub-agent '{}' not found", name))?;
 
+        tracing::info!(
+            agent = %entry.name,
+            model_raw = %entry.model,
+            "sub-agent switch requested"
+        );
+
         let mut service = crate::CHAT_SERVICE
             .lock()
             .map_err(|e| format!("Lock: {}", e))?;

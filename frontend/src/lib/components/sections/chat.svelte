@@ -29,6 +29,8 @@
   let models_error = $state(null);
   let agents_error = $state(null);
   let user_interacted = $state(false);
+  let show_debug = $state(false);
+  let last_switch_response = $state(null);
 
   function save() {
     const raw = JSON.stringify(messages);
@@ -317,12 +319,24 @@
       const data = await res.json();
       if (data.ok) {
         current_agent = data.data.agent;
-        current_model = data.data.model;
+        const agentModel = data.data.model;
+        const resolved = models.find(m =>
+          m.name.localeCompare(agentModel, undefined, { sensitivity: 'base' }) === 0
+        );
+        current_model = resolved ? resolved.name : agentModel;
+        last_switch_response = data.data;
         current_icon = data.data.icon || null;
         await tick();
       }
     } catch {
       // Si falla, no se actualiza
+    }
+  }
+
+  function handle_debug_keydown(e) {
+    if (e.ctrlKey && e.shiftKey && e.key === 'D') {
+      e.preventDefault();
+      show_debug = !show_debug;
     }
   }
 
@@ -346,9 +360,11 @@
   onMount(() => {
     document.addEventListener("click", handle_click_outside);
     document.addEventListener("keydown", handle_tab_keydown);
+    document.addEventListener("keydown", handle_debug_keydown);
     return () => {
       document.removeEventListener("click", handle_click_outside);
       document.removeEventListener("keydown", handle_tab_keydown);
+      document.removeEventListener("keydown", handle_debug_keydown);
     };
   });
 
@@ -377,7 +393,10 @@
         current_agent = default_agent.name;
         current_icon = default_agent.icon || null;
         if (default_agent.model) {
-          current_model = default_agent.model;
+          const resolved = models.find(m =>
+            m.name.localeCompare(default_agent.model, undefined, { sensitivity: 'base' }) === 0
+          );
+          current_model = resolved ? resolved.name : default_agent.model;
         }
       }
     }
@@ -416,9 +435,9 @@
           onclick={toggle_dropdown}
           disabled={switching || streaming}
         >
-          {models_error ? `⚠ ${models_error}` : (current_model || "sin modelos")}
+          {models_error ? `⚠ ${models_error}` : ($state.eager(current_model) || "sin modelos")}
           {#if pending_model !== null}
-            <span class="ml-1 w-1.5 h-1.5 rounded-full bg-accent-detail animate-pulse" />
+            <span class="ml-1 w-1.5 h-1.5 rounded-full bg-accent-detail animate-pulse"></span>
           {/if}
         </button>
         {#if show_dropdown}
@@ -433,7 +452,7 @@
               {#each models as m}
                 <button
                   class="font-semibold block w-full text-left text-sm px-3 py-1.5 whitespace-nowrap rounded-md
-                       {m.name === current_model
+                       {m.name === $state.eager(current_model)
                     ? 'bg-accent-detail text-back transition-colors'
                     : 'text-print hover:bg-accent-detail/10 transition-colors'}"
                   onclick={() => select_model(m.name)}
@@ -533,10 +552,9 @@
           disabled={streaming}
         >
           <Icon icon={streaming ? "svg-spinners:bars-scale-fade" : current_icon || "simple-icons:pi"} class="w-4 h-4" />
-          {agents_error ? `⚠ ${agents_error}` : (current_agent || "default")}
+          {agents_error ? `⚠ ${agents_error}` : ($state.eager(current_agent) || "default")}
           {#if pending_agent !== null}
-            <!-- svelte-ignore element_invalid_self_closing_tag -->
-            <span class="ml-1 w-2 h-2 rounded-full bg-accent-detail animate-pulse"></span>
+            <span class="ml-1 w-2 h-2 rounded-full bg-accent-detail animate-pulse"></span>  
           {/if}
         </button>
         {#if show_agent_dropdown}
@@ -549,7 +567,7 @@
               {#each sub_agents as agent}
                 <button
                   class="font-semibold block w-full text-left text-sm px-3 py-1.5 whitespace-nowrap rounded-md
-                       {agent.name === current_agent
+                       {agent.name === $state.eager(current_agent)
                     ? 'bg-accent-detail text-back trasition-colors'
                     : 'text-print hover:bg-accent-detail/10 transition-colors'}"
                   onclick={() => select_agent(agent.name)}
@@ -589,6 +607,22 @@
     </div>
   </div>
 </div>
+
+{#if show_debug}
+  <div
+    class="fixed bottom-2 right-2 z-[999] bg-back/95 border border-accent-detail/30 rounded-md p-3 text-[10px] font-mono text-print shadow-lg max-w-xs max-h-60 overflow-y-auto"
+  >
+    <div class="font-bold text-xs mb-1 text-accent-detail">Debug</div>
+    <div class="space-y-0.5">
+      <div>agent: <span class="text-accent-detail">{JSON.stringify($state.eager(current_agent))}</span></div>
+      <div>model: <span class="text-accent-detail">{JSON.stringify($state.eager(current_model))}</span></div>
+      <div>model_match: <span class="text-accent-detail">{models.find(m => m.name === $state.eager(current_model))?.name ?? "NO MATCH"}</span></div>
+      <div>last_switch_resp: <span class="text-accent-detail">{JSON.stringify($state.eager(last_switch_response))}</span></div>
+      <div>user_interacted: <span class="text-accent-detail">{JSON.stringify($state.eager(user_interacted))}</span></div>
+      <div>models: {$state.eager(models).length} | agents: {$state.eager(sub_agents).length}</div>
+    </div>
+  </div>
+{/if}
 
 <style>
   button:focus-visible {
