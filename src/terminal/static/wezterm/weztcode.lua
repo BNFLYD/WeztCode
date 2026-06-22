@@ -44,86 +44,69 @@ if pad_applied then
   wezterm.log_info("Padding applied via config reload")
 end
 
--- 4. update-status: reintentar si aún no se pudo aplicar
-wezterm.on("update-status", function(window, pane)
-  if pad_applied then return end
-
-  local is_weztcode = os.getenv("WEZTCODE_SESSION") == "true"
-  if not is_weztcode then return end
-
-  local retry_pad = 0
-  if pad_file then
-    local f = io.open(pad_file, "r")
-    if f then
-      retry_pad = tonumber(f:read("*a")) or 0
-      f:close()
-    end
-  end
-
-  if retry_pad > 0 then
-    pad_applied = true
-    wezterm.log_info("GUI_PADDING from side_pad (retry) = " .. retry_pad)
-
-    local base = user_config.window_padding or {}
-    local padding = {
-      left   = base.left,
-      right  = (base.right or 0) + retry_pad,
-      top    = base.top,
-      bottom = base.bottom,
-    }
-    local overrides = window:get_config_overrides() or {}
-    overrides.window_padding = padding
-    window:set_config_overrides(overrides)
-    wezterm.log_info("Padding applied via update-status")
-  end
-end)
-
--- Track the last non-zero pane for toggling to nvim
+-- Track the last non-zero pane for toggling to nvim (fuera del guard para visibilidad en keybindings)
 local last_non_zero_pane = nil
 local last_written_pane = nil
 
-wezterm.on("update-status", function(window, pane)
-    if pane then
-        local id = pane:pane_id()
+-- 4. update-status handlers (guardados para evitar stacking en reload-config)
+if not weztcode_handlers_loaded then
+    weztcode_handlers_loaded = true
 
-        if id ~= 0 then
-            last_non_zero_pane = id
+    wezterm.on("update-status", function(window, pane)
+      if pad_applied then return end
+
+      local is_weztcode = os.getenv("WEZTCODE_SESSION") == "true"
+      if not is_weztcode then return end
+
+      local retry_pad = 0
+      if pad_file then
+        local f = io.open(pad_file, "r")
+        if f then
+          retry_pad = tonumber(f:read("*a")) or 0
+          f:close()
         end
+      end
 
-        if id ~= last_written_pane then
-            last_written_pane = id
-            local active_pane_file = os.getenv("WEZTCODE_ACTIVE_PANE_FILE")
-            if active_pane_file then
-                local f = io.open(active_pane_file, "w")
-                if f then
-                    f:write(tostring(id))
-                    f:close()
+      if retry_pad > 0 then
+        pad_applied = true
+        wezterm.log_info("GUI_PADDING from side_pad (retry) = " .. retry_pad)
+
+        local base = user_config.window_padding or {}
+        local padding = {
+          left   = base.left,
+          right  = (base.right or 0) + retry_pad,
+          top    = base.top,
+          bottom = base.bottom,
+        }
+        local overrides = window:get_config_overrides() or {}
+        overrides.window_padding = padding
+        window:set_config_overrides(overrides)
+        wezterm.log_info("Padding applied via update-status")
+      end
+    end)
+
+    wezterm.on("update-status", function(window, pane)
+        if pane then
+            local id = pane:pane_id()
+
+            if id ~= 0 then
+                last_non_zero_pane = id
+            end
+
+            if id ~= last_written_pane then
+                last_written_pane = id
+                local active_pane_file = os.getenv("WEZTCODE_ACTIVE_PANE_FILE")
+                if active_pane_file then
+                    local f = io.open(active_pane_file, "w")
+                    if f then
+                        f:write(tostring(id))
+                        f:close()
+                    end
                 end
             end
         end
-    end
-end)
-
--- Signal readiness via FIFO for faster GTK init (no polling)
-local weztcode_signaled = false
-wezterm.on("window-resized", function(window, pane)
-    if not weztcode_signaled then
-        weztcode_signaled = true
-        local fifo = os.getenv("WEZTCODE_READY_FIFO")
-        if fifo then
-            local ok, err = pcall(function()
-                local f = io.open(fifo, "w")
-                if f then
-                    f:write("1")
-                    f:close()
-                end
-            end)
-            if not ok then
-                wezterm.log_warn("failed to write ready fifo: " .. tostring(err))
-            end
-        end
-    end
-end)
+    end)
+end
 
 -- Ocultar completamente la barra de tabs (WeztCode maneja su propia UI)
 user_config.enable_tab_bar = false
