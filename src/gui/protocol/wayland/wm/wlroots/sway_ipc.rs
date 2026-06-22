@@ -374,9 +374,7 @@ impl SwayIpcClient {
                     }
                 }
                 "move" | "resize" => {
-                    if event.container.focused {
-                        Self::geometry_trigger(event, target_app_id, sender);
-                    }
+                    Self::geometry_trigger(event, target_app_id, sender);
                 }
                 "fullscreen" => {
                     if event.container.focused {

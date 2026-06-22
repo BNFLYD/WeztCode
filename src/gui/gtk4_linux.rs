@@ -10,14 +10,15 @@ use webkit6::{UserContentInjectedFrames, UserStyleLevel, UserStyleSheet};
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 pub struct Gtk4Platform {
     app: Application,
     window: Rc<RefCell<Option<ApplicationWindow>>>,
     webview: Rc<RefCell<Option<WebView>>>,
     monitor_geo: Rc<RefCell<Option<WindowGeometry>>>,
-    last_overlay_width: Rc<RefCell<Option<i32>>>,
+    pending_width: Rc<RefCell<Option<u32>>>,
+    debounce_until: Rc<RefCell<Option<Instant>>>,
 }
 
 impl Gtk4Platform {
@@ -31,7 +32,8 @@ impl Gtk4Platform {
             window: Rc::new(RefCell::new(None)),
             webview: Rc::new(RefCell::new(None)),
             monitor_geo: Rc::new(RefCell::new(None)),
-            last_overlay_width: Rc::new(RefCell::new(None)),
+            pending_width: Rc::new(RefCell::new(None)),
+            debounce_until: Rc::new(RefCell::new(None)),
         }
     }
 
@@ -108,10 +110,10 @@ impl Gtk4Platform {
         (margin_top, margin_bottom, margin_left, margin_right)
     }
 
-    fn set_right_padding_and_reload(width: u32) {
-        let term = crate::terminal::wezterm::WeztermProtocol::new();
-        let _ = term.set_right_padding(width);
-        thread::spawn(|| {
+    fn set_padding_and_reload(width: u32) {
+        thread::spawn(move || {
+            let term = crate::terminal::wezterm::WeztermProtocol::new();
+            let _ = term.set_right_padding(width);
             let mut cmd = std::process::Command::new("wezterm");
             cmd.args(["cli", "reload-config"]);
             let _ = crate::terminal::wezterm::run_cmd_with_timeout(&mut cmd, Duration::from_secs(3));
@@ -184,7 +186,7 @@ impl GuiPlatform for Gtk4Platform {
                 window.set_margin(Edge::Right, margin_right);
 
                 // Sync terminal padding with overlay width (non-blocking)
-                Self::set_right_padding_and_reload(overlay_width as u32);
+                Self::set_padding_and_reload(overlay_width as u32);
 
                 // Store monitor geometry for dynamic recalculation in GeometryChanged
                 *monitor_geo_ref.borrow_mut() = Some(monitor.clone());
@@ -291,112 +293,81 @@ impl Gtk4Platform {
 
         let window_weak = self.window.clone();
         let monitor_geo_weak = self.monitor_geo.clone();
-        let last_overlay = self.last_overlay_width.clone();
+        let pending_width = self.pending_width.clone();
+        let debounce_until = self.debounce_until.clone();
 
         glib::idle_add_local(move || {
-            match receiver.try_recv() {
-                Ok(WmEvent::WindowFocused { app_id }) => {
-                    // Terminal gained focus - SHOW overlay
-//                     println!("[GTK] WindowFocused event received for {}", app_id);
-                    if let Ok(window_ref) = window_weak.try_borrow() {
-                        if let Some(ref window) = *window_ref {
-//                             println!("[GTK] Setting visible=true and presenting");
-                            window.set_visible(true);
-                            window.present();
-//                             println!("[GTK] Overlay should be visible now");
-                        } else {
-//                             println!("[GTK] ERROR: Window is None");
+            // Drain all pending events in one cycle for better reactivity
+            loop {
+                match receiver.try_recv() {
+                    Ok(WmEvent::WindowFocused { app_id }) => {
+                        if let Ok(window_ref) = window_weak.try_borrow() {
+                            if let Some(ref window) = *window_ref {
+                                window.set_visible(true);
+                                window.present();
+                            }
                         }
-                    } else {
-//                         println!("[GTK] ERROR: Failed to borrow window");
                     }
-                }
-                Ok(WmEvent::WindowUnfocused { app_id }) => {
-                    // Terminal lost focus - HIDE overlay
-//                     println!("[GTK] WindowUnfocused event received for {}", app_id);
-                    if let Ok(window_ref) = window_weak.try_borrow() {
-                        if let Some(ref window) = *window_ref {
-//                             println!("[GTK] Setting visible=false");
-                            window.set_visible(false);
-//                             println!("[GTK] Overlay should be hidden now");
-                        } else {
-//                             println!("[GTK] ERROR: Window is None");
+                    Ok(WmEvent::WindowUnfocused { app_id }) => {
+                        if let Ok(window_ref) = window_weak.try_borrow() {
+                            if let Some(ref window) = *window_ref {
+                                window.set_visible(false);
+                            }
                         }
-                    } else {
-//                         println!("[GTK] ERROR: Failed to borrow window");
                     }
-                }
-                Ok(WmEvent::GeometryChanged { app_id, geometry }) => {
-//                     println!("[GTK] GeometryChanged for {}: {:?}", app_id, geometry);
-                    if let Ok(window_ref) = window_weak.try_borrow() {
-                        if let Some(ref window) = *window_ref {
-                            // Calculate proportional width: 20% of terminal width, min 350px
-                            let overlay_width = ((geometry.width as f32) * 0.20).max(350.0) as i32;
-                            let overlay_height = geometry.height;
+                    Ok(WmEvent::GeometryChanged { app_id, geometry }) => {
+                        if let Ok(window_ref) = window_weak.try_borrow() {
+                            if let Some(ref window) = *window_ref {
+                                let overlay_width = ((geometry.width as f32) * 0.20).max(350.0) as i32;
 
-//                             println!("[GTK] Resizing overlay to {}x{} (terminal: {}x{} at x={}, y={})",
-//                                      overlay_width, overlay_height, geometry.width, geometry.height, geometry.x, geometry.y);
+                                window.set_default_size(overlay_width, geometry.height);
 
-                            window.set_default_size(overlay_width, overlay_height);
+                                if let Some(monitor) = monitor_geo_weak.borrow().clone() {
+                                    let (margin_top, margin_bottom, _margin_left, margin_right) =
+                                        Self::calculate_canvas_margins(&monitor, &geometry, overlay_width);
 
-                            // Phase 3: Recalculate margins based on new geometry
-                            // Use stored monitor geometry for consistent calculations
-                            if let Some(monitor) = monitor_geo_weak.borrow().clone() {
-                                let (margin_top, margin_bottom, _margin_left, margin_right) =
-                                    Self::calculate_canvas_margins(&monitor, &geometry, overlay_width);
-
-//                                 println!("[GTK] Recalculating margins: top={}, bottom={}, right={}",
-//                                          margin_top, margin_bottom, margin_right);
-
-                                window.set_margin(Edge::Top, margin_top);
-                                window.set_margin(Edge::Bottom, margin_bottom);
-                                window.set_margin(Edge::Right, margin_right);
-
-                                // Sync terminal padding with updated overlay width (deduplicated + non-blocking)
-                                let mut last_width = last_overlay.borrow_mut();
-                                if *last_width != Some(overlay_width) {
-                                    *last_width = Some(overlay_width);
-                                    Self::set_right_padding_and_reload(overlay_width as u32);
+                                    window.set_margin(Edge::Top, margin_top);
+                                    window.set_margin(Edge::Bottom, margin_bottom);
+                                    window.set_margin(Edge::Right, margin_right);
                                 }
+
+                                // Schedule debounced padding + reload
+                                *pending_width.borrow_mut() = Some(overlay_width as u32);
+                                *debounce_until.borrow_mut() = Some(Instant::now() + Duration::from_millis(50));
                             }
                         }
                     }
-                }
-                Ok(WmEvent::FullscreenChanged { app_id, geometry, is_fullscreen }) => {
-//                     println!("[GTK] FullscreenChanged for {}: fullscreen={}", app_id, is_fullscreen);
-                    if let Ok(window_ref) = window_weak.try_borrow() {
-                        if let Some(ref window) = *window_ref {
-                            let overlay_width = ((geometry.width as f32) * 0.20).max(350.0) as i32;
-                            let overlay_height = geometry.height;
+                    Ok(WmEvent::FullscreenChanged { app_id, geometry, is_fullscreen }) => {
+                        if let Ok(window_ref) = window_weak.try_borrow() {
+                            if let Some(ref window) = *window_ref {
+                                let overlay_width = ((geometry.width as f32) * 0.20).max(350.0) as i32;
 
-//                             println!("[GTK] Fullscreen mode: {}, resizing to {}x{}",
-//                                      is_fullscreen, overlay_width, overlay_height);
+                                window.set_default_size(overlay_width, geometry.height);
 
-                            window.set_default_size(overlay_width, overlay_height);
-
-                            // Sync terminal padding with overlay width (non-blocking)
-                            let mut last_width = last_overlay.borrow_mut();
-                            if *last_width != Some(overlay_width) {
-                                *last_width = Some(overlay_width);
-                                Self::set_right_padding_and_reload(overlay_width as u32);
+                                // Schedule debounced padding + reload
+                                *pending_width.borrow_mut() = Some(overlay_width as u32);
+                                *debounce_until.borrow_mut() = Some(Instant::now() + Duration::from_millis(50));
                             }
-
-                            // TODO: Layer shell switching to be implemented later
-                            // TODO: Positioning to be implemented later
                         }
                     }
-                }
-                Err(std::sync::mpsc::TryRecvError::Empty) => {
-                    // No events, this is normal
-                }
-                Err(std::sync::mpsc::TryRecvError::Disconnected) => {
-//                     println!("[GTK] ERROR: Channel disconnected!");
-                    return glib::ControlFlow::Break;
-                }
-                _ => {
-                    // Ignore other events (WindowCreated, WindowDestroyed, etc.)
+                    Ok(_) => {} // WindowCreated, WindowDestroyed - ignore
+                    Err(std::sync::mpsc::TryRecvError::Empty) => break,
+                    Err(std::sync::mpsc::TryRecvError::Disconnected) => return glib::ControlFlow::Break,
                 }
             }
+
+            // Apply debounced padding + reload if deadline passed
+            let should_apply = debounce_until.borrow()
+                .map(|d| Instant::now() >= d)
+                .unwrap_or(false);
+            if should_apply {
+                let width = pending_width.borrow_mut().take();
+                if let Some(w) = width {
+                    Self::set_padding_and_reload(w);
+                }
+                *debounce_until.borrow_mut() = None;
+            }
+
             glib::ControlFlow::Continue
         });
     }
