@@ -256,14 +256,6 @@ impl GuiPlatform for Gtk4Platform {
         Ok(())
     }
 
-    fn set_geometry(&self, x: i32, y: i32, width: u32, height: u32) {
-        if let Some(ref window) = *self.window.borrow() {
-            window.set_default_size(width as i32, height as i32);
-            window.set_margin(Edge::Top, y);
-            window.set_margin(Edge::Right, x);
-        }
-    }
-
     fn show(&self) {
         if let Some(ref window) = *self.window.borrow() {
             window.present();
