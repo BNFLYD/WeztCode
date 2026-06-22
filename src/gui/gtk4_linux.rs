@@ -9,12 +9,15 @@ use webkit6::WebView;
 use webkit6::{UserContentInjectedFrames, UserStyleLevel, UserStyleSheet};
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::thread;
+use std::time::Duration;
 
 pub struct Gtk4Platform {
     app: Application,
     window: Rc<RefCell<Option<ApplicationWindow>>>,
     webview: Rc<RefCell<Option<WebView>>>,
     monitor_geo: Rc<RefCell<Option<WindowGeometry>>>,
+    last_overlay_width: Rc<RefCell<Option<i32>>>,
 }
 
 impl Gtk4Platform {
@@ -28,6 +31,7 @@ impl Gtk4Platform {
             window: Rc::new(RefCell::new(None)),
             webview: Rc::new(RefCell::new(None)),
             monitor_geo: Rc::new(RefCell::new(None)),
+            last_overlay_width: Rc::new(RefCell::new(None)),
         }
     }
 
@@ -103,6 +107,16 @@ impl Gtk4Platform {
 
         (margin_top, margin_bottom, margin_left, margin_right)
     }
+
+    fn set_right_padding_and_reload(width: u32) {
+        let term = crate::terminal::wezterm::WeztermProtocol::new();
+        let _ = term.set_right_padding(width);
+        thread::spawn(|| {
+            let mut cmd = std::process::Command::new("wezterm");
+            cmd.args(["cli", "reload-config"]);
+            let _ = crate::terminal::wezterm::run_cmd_with_timeout(&mut cmd, Duration::from_secs(3));
+        });
+    }
 }
 
 impl GuiPlatform for Gtk4Platform {
@@ -169,12 +183,8 @@ impl GuiPlatform for Gtk4Platform {
                 window.set_margin(Edge::Bottom, margin_bottom);
                 window.set_margin(Edge::Right, margin_right);
 
-                // Sync terminal padding with overlay width
-                let term = crate::terminal::wezterm::WeztermProtocol::new();
-                let _ = term.set_right_padding(overlay_width as u32);
-                let _ = std::process::Command::new("wezterm")
-                    .args(["cli", "reload-config"])
-                    .output();
+                // Sync terminal padding with overlay width (non-blocking)
+                Self::set_right_padding_and_reload(overlay_width as u32);
 
                 // Store monitor geometry for dynamic recalculation in GeometryChanged
                 *monitor_geo_ref.borrow_mut() = Some(monitor.clone());
@@ -281,6 +291,7 @@ impl Gtk4Platform {
 
         let window_weak = self.window.clone();
         let monitor_geo_weak = self.monitor_geo.clone();
+        let last_overlay = self.last_overlay_width.clone();
 
         glib::idle_add_local(move || {
             match receiver.try_recv() {
@@ -341,12 +352,12 @@ impl Gtk4Platform {
                                 window.set_margin(Edge::Bottom, margin_bottom);
                                 window.set_margin(Edge::Right, margin_right);
 
-                                // Sync terminal padding with updated overlay width
-                                let term = crate::terminal::wezterm::WeztermProtocol::new();
-                                let _ = term.set_right_padding(overlay_width as u32);
-                                let _ = std::process::Command::new("wezterm")
-                                    .args(["cli", "reload-config"])
-                                    .output();
+                                // Sync terminal padding with updated overlay width (deduplicated + non-blocking)
+                                let mut last_width = last_overlay.borrow_mut();
+                                if *last_width != Some(overlay_width) {
+                                    *last_width = Some(overlay_width);
+                                    Self::set_right_padding_and_reload(overlay_width as u32);
+                                }
                             }
                         }
                     }
@@ -363,12 +374,12 @@ impl Gtk4Platform {
 
                             window.set_default_size(overlay_width, overlay_height);
 
-                            // Sync terminal padding with overlay width
-                            let term = crate::terminal::wezterm::WeztermProtocol::new();
-                            let _ = term.set_right_padding(overlay_width as u32);
-                            let _ = std::process::Command::new("wezterm")
-                                .args(["cli", "reload-config"])
-                                .output();
+                            // Sync terminal padding with overlay width (non-blocking)
+                            let mut last_width = last_overlay.borrow_mut();
+                            if *last_width != Some(overlay_width) {
+                                *last_width = Some(overlay_width);
+                                Self::set_right_padding_and_reload(overlay_width as u32);
+                            }
 
                             // TODO: Layer shell switching to be implemented later
                             // TODO: Positioning to be implemented later

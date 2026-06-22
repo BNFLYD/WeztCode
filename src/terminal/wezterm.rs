@@ -1,15 +1,38 @@
 use crate::terminal::TerminalProtocol;
 use std::io::Read;
 use std::process::{Child, Command, Stdio};
+use std::thread;
 use std::time::Duration;
 
 pub struct WeztermProtocol;
 
 pub fn run_cmd_with_timeout(cmd: &mut Command, timeout: Duration) -> Result<std::process::Output, String> {
-    cmd.stdout(Stdio::piped());
-    cmd.stderr(Stdio::piped());
+    let mut child = cmd
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("Failed to spawn: {}", e))?;
 
-    let mut child = cmd.spawn().map_err(|e| format!("Failed to spawn: {}", e))?;
+    // Take ownership of pipes before the polling loop to read concurrently
+    // and avoid pipe-buffer deadlock (child blocks on write if nobody reads)
+    let stdout_pipe = child.stdout.take();
+    let stderr_pipe = child.stderr.take();
+
+    let stdout_handle = stdout_pipe.map(|mut pipe| {
+        thread::spawn(move || {
+            let mut buf = Vec::new();
+            let _ = pipe.read_to_end(&mut buf);
+            buf
+        })
+    });
+
+    let stderr_handle = stderr_pipe.map(|mut pipe| {
+        thread::spawn(move || {
+            let mut buf = Vec::new();
+            let _ = pipe.read_to_end(&mut buf);
+            buf
+        })
+    });
 
     let deadline = std::time::Instant::now() + timeout;
     let status = loop {
@@ -30,14 +53,12 @@ pub fn run_cmd_with_timeout(cmd: &mut Command, timeout: Duration) -> Result<std:
         }
     };
 
-    let mut stdout = Vec::new();
-    let mut stderr = Vec::new();
-    if let Some(ref mut out) = child.stdout {
-        let _ = out.read_to_end(&mut stdout);
-    }
-    if let Some(ref mut err) = child.stderr {
-        let _ = err.read_to_end(&mut stderr);
-    }
+    let stdout = stdout_handle
+        .map(|h| h.join().unwrap_or_default())
+        .unwrap_or_default();
+    let stderr = stderr_handle
+        .map(|h| h.join().unwrap_or_default())
+        .unwrap_or_default();
 
     Ok(std::process::Output { status, stdout, stderr })
 }
@@ -107,12 +128,17 @@ impl TerminalProtocol for WeztermProtocol {
             }
         };
 
-        let result = try_list(true)?;
-        if result.trim().is_empty() {
-            eprintln!("[list_panes] empty with --class, retrying without");
-            try_list(false)
-        } else {
-            Ok(result)
+        let result = try_list(true);
+        match result {
+            Ok(s) if !s.trim().is_empty() => Ok(s),
+            Ok(_) => {
+                eprintln!("[list_panes] empty with --class, retrying without");
+                try_list(false)
+            }
+            Err(e) => {
+                eprintln!("[list_panes] error with --class ({}), retrying without", e.trim());
+                try_list(false)
+            }
         }
     }
 
