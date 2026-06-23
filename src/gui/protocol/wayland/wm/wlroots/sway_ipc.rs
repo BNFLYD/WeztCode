@@ -244,35 +244,8 @@ impl SwayIpcClient {
                             // Process all events - fainting_trigger will filter by toplevel_id
                             Self::fainting_trigger(event, &target_app_id, target_toplevel_id_opt.as_deref(), &sender);
                         } else {
-                            // Not a window event - likely workspace event
-                            // Verify visibility of our window
-//                             println!("[SwayIPC] Workspace event detected - checking visibility");
-                            if let Some(ref toplevel_id) = target_toplevel_id_opt {
-                                match Self::new() {
-                                    Ok(client) => {
-                                        match client.get_window_visibility_by_toplevel_id(toplevel_id) {
-                                            Some(false) => {
-                                                // Window not visible - hide overlay
-//                                                 println!("[SwayIPC] Window not visible after workspace change - hiding overlay");
-                                                let _ = sender.send(WmEvent::WindowUnfocused {
-                                                    app_id: target_app_id.to_string()
-                                                });
-                                            }
-                                            Some(true) => {
-//                                                 println!("[SwayIPC] Window still visible after workspace change");
-                                            }
-                                            None => {
-//                                                 println!("[SwayIPC] ERROR: Could not query visibility after workspace change");
-                                            }
-                                        }
-                                    }
-                                    Err(e) => {
-//                                         println!("[SwayIPC] ERROR: Failed to create SwayIpcClient: {}", e);
-                                    }
-                                }
-                            } else {
-//                                 println!("[SwayIPC] WARNING: target_toplevel_id is None, cannot query visibility");
-                            }
+                            // Workspace event — layout may have changed, refresh geometry and visibility
+                            Self::layout_trigger(&target_app_id, target_toplevel_id_opt.as_deref(), &sender);
                         }
                     }
                     Err(e) => {
@@ -466,6 +439,24 @@ impl SwayIpcClient {
         None
     }
 
+    /// Get window geometry by foreign_toplevel_identifier using tree JSON parsing
+    fn get_window_geometry_by_toplevel_id(&self, toplevel_id: &str) -> Option<WindowGeometry> {
+        let tree = self.get_tree().ok()?;
+        for node in flatten_nodes(&tree) {
+            if node.foreign_toplevel_identifier.as_deref() == Some(toplevel_id) {
+                let r = node.rect?;
+                let wr = node.window_rect?;
+                return Some(WindowGeometry {
+                    x: r.x + wr.x,
+                    y: r.y + wr.y,
+                    width: wr.width,
+                    height: wr.height,
+                });
+            }
+        }
+        None
+    }
+
     /// Trigger for move and resize events - updates overlay position and size
     fn geometry_trigger(
         event: WindowEvent,
@@ -520,6 +511,44 @@ impl SwayIpcClient {
             geometry,
             is_fullscreen,
         });
+    }
+
+    /// Trigger for workspace layout changes — queries current geometry and visibility
+    fn layout_trigger(
+        target_app_id: &str,
+        target_toplevel_id: Option<&str>,
+        sender: &mpsc::Sender<WmEvent>,
+    ) {
+        let client = match Self::new() {
+            Ok(c) => c,
+            Err(_) => return,
+        };
+
+        if let Some(toplevel_id) = target_toplevel_id {
+            match client.get_window_visibility_by_toplevel_id(toplevel_id) {
+                Some(true) => {
+                    // Window is visible — also update geometry
+                    if let Some(geo) = client.get_window_geometry_by_toplevel_id(toplevel_id) {
+                        let _ = sender.send(WmEvent::GeometryChanged {
+                            app_id: target_app_id.to_string(),
+                            geometry: geo,
+                        });
+                    }
+                }
+                Some(false) => {
+                    // Window not visible — hide overlay
+                    let _ = sender.send(WmEvent::WindowUnfocused {
+                        app_id: target_app_id.to_string(),
+                    });
+                }
+                None => {
+                    // Window not found in tree — hide overlay
+                    let _ = sender.send(WmEvent::WindowUnfocused {
+                        app_id: target_app_id.to_string(),
+                    });
+                }
+            }
+        }
     }
 
     fn send_message(stream: &mut UnixStream, msg_type: u32, payload: &str) -> Result<(), String> {
@@ -625,6 +654,7 @@ struct Node {
     pid: Option<i64>,
     foreign_toplevel_identifier: Option<String>,
     rect: Option<Rect>,
+    window_rect: Option<Rect>,
     nodes: Vec<Node>,
     focused: bool,
     visible: bool,
