@@ -261,53 +261,6 @@ impl SwayIpcClient {
         Ok(initial_geometry)
     }
 
-    fn process_window_event(event: WindowEvent, target_app_id: &str, sender: &mpsc::Sender<WmEvent>) {
-        let app_id = event.container.app_id.as_deref().unwrap_or("");
-
-        // Only process events for our target window
-        if app_id != target_app_id {
-            return;
-        }
-
-        // Calculate overlay geometry: rect (global position) + window_rect (internal offset and size)
-        let global_rect = &event.container.rect;
-        let window_rect = &event.container.window_rect;
-
-        let geometry = WindowGeometry {
-            x: global_rect.x + window_rect.x,
-            y: global_rect.y + window_rect.y,
-            width: window_rect.width,
-            height: window_rect.height,
-        };
-
-        // Get app_id for event
-        let event_app_id = event.container.app_id.clone().unwrap_or_default();
-
-        // Determine event type based on change field and focused status
-        match event.change.as_str() {
-            "focus" => {
-                if event.container.focused {
-//                     println!("[SwayIPC] Target window FOCUSED at {:?}", geometry);
-                    let _ = sender.send(WmEvent::WindowFocused { app_id: event_app_id });
-                    let _ = sender.send(WmEvent::GeometryChanged { app_id: target_app_id.to_string(), geometry });
-                }
-            }
-            "unfocus" => {
-//                 println!("[SwayIPC] Target window UNFOCUSED");
-                let _ = sender.send(WmEvent::WindowUnfocused { app_id: event_app_id });
-            }
-            "move" | "resize" | "fullscreen" => {
-                if event.container.focused {
-//                     println!("[SwayIPC] Target window GEOMETRY CHANGED: {:?}", geometry);
-                    let _ = sender.send(WmEvent::GeometryChanged { app_id: target_app_id.to_string(), geometry });
-                }
-            }
-            _ => {
-                // Ignore other changes (title, urgent, etc.)
-            }
-        }
-    }
-
     /// Process window events using foreign_toplevel_identifier for precise tracking
     fn fainting_trigger(
         event: WindowEvent,
