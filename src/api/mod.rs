@@ -1,3 +1,4 @@
+pub mod analyze;
 pub mod chat;
 pub mod editor;
 pub mod fs;
@@ -47,6 +48,8 @@ pub fn router() -> Router {
         .route("/sub-agents/edit", get(sub_agents::handle_edit))
         .route("/sub-agents/dirs", get(sub_agents::handle_dirs))
         .route("/sub-agents/builtins", get(sub_agents::handle_builtins))
+        .route("/analyze/tools", get(analyze::handle_tools))
+        .route("/analyze/run", post(analyze::handle_run))
         .route("/editor/open", get(editor::handle_editor_open))
         .route("/fs/ls", get(fs::handle_ls))
         .route("/fs/read", get(fs::handle_read))
