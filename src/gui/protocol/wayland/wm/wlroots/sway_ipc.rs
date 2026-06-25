@@ -125,6 +125,19 @@ impl SwayIpcClient {
             }
         }
 
+        // Also capture container id from tree for reliable event matching
+        let mut target_id: Option<i64> = None;
+        if let Some(ref toplevel_id) = target_toplevel_id_opt {
+            if let Ok(tree) = self.get_tree() {
+                for node in flatten_nodes(&tree) {
+                    if node.foreign_toplevel_identifier.as_deref() == Some(toplevel_id.as_str()) {
+                        target_id = Some(node.id);
+                        break;
+                    }
+                }
+            }
+        }
+
         // If we have toplevel_id, query for initial geometry
         if let Some(ref toplevel_id) = target_toplevel_id_opt {
 //             println!("[SwayIPC] Querying initial geometry for toplevel_id: {}", toplevel_id);
@@ -242,10 +255,10 @@ impl SwayIpcClient {
                         // Parse and process the event
                         if let Ok(event) = serde_json::from_str::<WindowEvent>(&json_str) {
                             // Process all events - fainting_trigger will filter by toplevel_id
-                            Self::fainting_trigger(event, &target_app_id, target_toplevel_id_opt.as_deref(), &sender);
+                            Self::fainting_trigger(event, &target_app_id, target_toplevel_id_opt.as_deref(), target_id, &sender);
                         } else {
                             // Workspace event — layout may have changed, refresh geometry and visibility
-                            Self::layout_trigger(&target_app_id, target_toplevel_id_opt.as_deref(), &sender);
+                            Self::layout_trigger(&target_app_id, target_toplevel_id_opt.as_deref(), target_id, &sender);
                         }
                     }
                     Err(e) => {
@@ -261,11 +274,13 @@ impl SwayIpcClient {
         Ok(initial_geometry)
     }
 
-    /// Process window events using foreign_toplevel_identifier for precise tracking
+    /// Process window events using foreign_toplevel_identifier for precise tracking.
+    /// Falls back to container id when foreign_toplevel_identifier is not available in the event.
     fn fainting_trigger(
         event: WindowEvent,
         target_app_id: &str,
         target_toplevel_id: Option<&str>,
+        target_id: Option<i64>,
         sender: &mpsc::Sender<WmEvent>,
     ) {
         let event_toplevel_id = event.container.foreign_toplevel_identifier.as_deref();
@@ -280,9 +295,14 @@ impl SwayIpcClient {
             height: window_rect.height,
         };
 
-        // Check if this event is from our target window (using toplevel_id if available)
-        let is_our_window = target_toplevel_id.is_some()
-            && event_toplevel_id == target_toplevel_id;
+        // Check if this event is from our target window:
+        // 1. Match by foreign_toplevel_identifier (works for focus events)
+        // 2. Fallback: match by container id (always present in all events)
+        let is_our_window = (target_toplevel_id.is_some()
+            && event_toplevel_id == target_toplevel_id)
+            || (event_toplevel_id.is_none()
+                && target_id.is_some()
+                && event.container.id == target_id.unwrap());
 
         if is_our_window {
             // Our window event - process normally
@@ -470,6 +490,7 @@ impl SwayIpcClient {
     fn layout_trigger(
         target_app_id: &str,
         target_toplevel_id: Option<&str>,
+        target_id: Option<i64>,
         sender: &mpsc::Sender<WmEvent>,
     ) {
         let client = match Self::new() {
