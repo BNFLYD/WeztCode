@@ -314,7 +314,15 @@ impl Gtk4Platform {
 
                                 window.set_default_size(overlay_width, geometry.height);
 
-                                if let Some(monitor) = monitor_geo_weak.borrow().clone() {
+                                // Re-detect monitor geometry (handles hotplug)
+                                let fresh_monitor = Self::detect_monitor_geometry(window);
+                                if fresh_monitor.is_some() {
+                                    *monitor_geo_weak.borrow_mut() = fresh_monitor.clone();
+                                }
+                                let monitor = fresh_monitor
+                                    .or_else(|| monitor_geo_weak.borrow().clone());
+
+                                if let Some(monitor) = monitor {
                                     let (margin_top, margin_bottom, _margin_left, margin_right) =
                                         Self::calculate_canvas_margins(&monitor, &geometry, overlay_width);
 
@@ -335,6 +343,23 @@ impl Gtk4Platform {
                                 let overlay_width = ((geometry.width as f32) * 0.20).max(350.0) as i32;
 
                                 window.set_default_size(overlay_width, geometry.height);
+
+                                // Re-detect monitor geometry (handles hotplug)
+                                let fresh_monitor = Self::detect_monitor_geometry(window);
+                                if fresh_monitor.is_some() {
+                                    *monitor_geo_weak.borrow_mut() = fresh_monitor.clone();
+                                }
+                                let monitor = fresh_monitor
+                                    .or_else(|| monitor_geo_weak.borrow().clone());
+
+                                if let Some(monitor) = monitor {
+                                    let (margin_top, margin_bottom, _margin_left, margin_right) =
+                                        Self::calculate_canvas_margins(&monitor, &geometry, overlay_width);
+
+                                    window.set_margin(Edge::Top, margin_top);
+                                    window.set_margin(Edge::Bottom, margin_bottom);
+                                    window.set_margin(Edge::Right, margin_right);
+                                }
 
                                 // Schedule debounced padding + reload
                                 *pending_width.borrow_mut() = Some(overlay_width as u32);
