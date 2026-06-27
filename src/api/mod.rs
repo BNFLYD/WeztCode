@@ -2,6 +2,7 @@ pub mod analyze;
 pub mod chat;
 pub mod editor;
 pub mod fs;
+pub mod git;
 pub mod keys;
 pub mod models;
 pub mod projects;
@@ -50,6 +51,7 @@ pub fn router() -> Router {
         .route("/sub-agents/builtins", get(sub_agents::handle_builtins))
         .route("/analyze/tools", get(analyze::handle_tools))
         .route("/analyze/run", post(analyze::handle_run))
+        .route("/git/log", get(git::handle_git_log))
         .route("/editor/open", get(editor::handle_editor_open))
         .route("/fs/ls", get(fs::handle_ls))
         .route("/fs/read", get(fs::handle_read))

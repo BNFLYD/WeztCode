@@ -37,6 +37,13 @@
       if (json.ok) {
         tools = json.data.tools || [];
 
+        tools.push({
+          id: "git_log",
+          name: "Git Log",
+          icon: "tabler:git-commit",
+          description: "Historial de commits Git"
+        });
+
         if (saved_state.tool_index !== null && saved_state.tool_index < tools.length) {
           active_tool_index = saved_state.tool_index;
         }
@@ -73,18 +80,29 @@
     cursor_index = 0;
 
     try {
-      const res = await fetch("/api/analyze/run", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tool_id }),
-        signal,
-      });
-      const json = await res.json();
-      if (json.ok) {
-        items = json.data.items || [];
-        summary = json.data.summary || null;
+      if (tool_id === "git_log") {
+        const res = await fetch("/api/git/log", { signal });
+        const json = await res.json();
+        if (json.ok) {
+          const commits = json.data.commits || [];
+          items = commits.map(c => ({ ...c, type: "commit", expanded: false }));
+        } else {
+          error = json.error;
+        }
       } else {
-        error = json.error;
+        const res = await fetch("/api/analyze/run", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tool_id }),
+          signal,
+        });
+        const json = await res.json();
+        if (json.ok) {
+          items = json.data.items || [];
+          summary = json.data.summary || null;
+        } else {
+          error = json.error;
+        }
       }
     } catch (e) {
       if (e.name !== "AbortError") error = e.message;
@@ -136,6 +154,12 @@
     const item = items[index];
     if (!item) return;
 
+    if (item.type === "commit") {
+      item.expanded = !item.expanded;
+      items = items;
+      return;
+    }
+
     if (item.type === "test" && item.status === "fail" && item.file) {
       const line = item.line || 1;
       fetch(`/api/editor/open?path=${encodeURIComponent(item.file)}`);
@@ -163,6 +187,9 @@
       if (item.severity === "warning") return "alert-triangle";
       return "info";
     }
+    if (item.type === "commit") {
+      return item.is_merge ? "tabler:git-merge" : "tabler:git-commit";
+    }
     return "circle";
   }
 
@@ -176,6 +203,9 @@
       if (item.severity === "error") return "text-accent-err";
       if (item.severity === "warning") return "text-accent-warn";
       return "text-accent-detail";
+    }
+    if (item.type === "commit") {
+      return item.is_merge ? "text-accent-detail" : "text-print/70";
     }
     return "text-print";
   }
@@ -197,6 +227,9 @@
       }
       return (item.code || "");
     }
+    if (item.type === "commit") {
+      return item.message || "";
+    }
     return "";
   }
 
@@ -214,6 +247,14 @@
 
   function diagnostic_items() {
     return items.filter(i => i.type === "diagnostic");
+  }
+
+  function has_commits() {
+    return items.some(i => i.type === "commit");
+  }
+
+  function commit_items() {
+    return items.filter(i => i.type === "commit");
   }
 
   function original_index(filtered_index, filtered_array) {
@@ -274,6 +315,9 @@
         break;
       case "3":
         if (tools.length >= 3) { e.preventDefault(); switch_tool(2); }
+        break;
+      case "4":
+        if (tools.length >= 4) { e.preventDefault(); switch_tool(3); }
         break;
     }
   }
@@ -411,6 +455,53 @@
             {#if item.message}
               <div class="ml-7 mt-0.5 text-xs text-print/60 whitespace-pre-wrap line-clamp-3">
                 {item.message}
+              </div>
+            {/if}
+          </div>
+        {/each}
+      {/if}
+
+      {#if has_commits()}
+        {#if has_tests() || has_diagnostics()}
+          <div class="border-t border-accent-detail/10 my-1"></div>
+        {/if}
+
+        <div class="px-3 py-1 text-xs font-bold text-print/30 uppercase tracking-wide">
+          Commits
+        </div>
+        {#each commit_items() as item, ci (item.hash)}
+          <!-- svelte-ignore a11y-click-events-have-key-events -->
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
+          <div
+            class="flex flex-col px-3 py-1.5 rounded-lg transition-colors cursor-pointer {item_class(original_index(ci, commit_items()))}"
+            data-index={original_index(ci, commit_items())}
+            on:click={() => {
+              cursor_index = original_index(ci, commit_items());
+              open_item(cursor_index);
+            }}
+          >
+            <div class="flex items-center gap-2">
+              <span class="{item_status_color(item)} shrink-0">
+                <Icon icon={item_status_icon(item)} class="w-4 h-4" />
+              </span>
+              <span class="text-accent-detail text-xs font-mono shrink-0">{item.short_hash}</span>
+              <span class="text-print text-sm truncate">{item.message}</span>
+              <span class="text-print/40 text-xs shrink-0 ml-auto">{item.date}</span>
+            </div>
+            <div class="ml-7 text-xs text-print/40 truncate">{item.author}</div>
+            {#if item.expanded && item.files?.length > 0}
+              <div class="ml-7 mt-1 border-l border-accent-detail/20 pl-3 space-y-0.5">
+                {#each item.files as file}
+                  <div class="flex items-center gap-2 text-xs text-print/60">
+                    <span class="text-accent text-xs w-8 text-right shrink-0">
+                      {#if file.additions !== null}+{file.additions}{:else}-{/if}
+                    </span>
+                    <span class="text-accent-err text-xs w-8 text-right shrink-0">
+                      {#if file.deletions !== null}-{file.deletions}{:else}-{/if}
+                    </span>
+                    <span class="truncate">{file.path}</span>
+                  </div>
+                {/each}
               </div>
             {/if}
           </div>
