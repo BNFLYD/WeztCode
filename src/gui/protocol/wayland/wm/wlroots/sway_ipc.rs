@@ -137,6 +137,7 @@ impl SwayIpcClient {
                 }
             }
         }
+        println!("[SwayIPC] target_id: {:?} (toplevel_id_opt: {:?})", target_id, target_toplevel_id_opt);
 
         // If we have toplevel_id, query for initial geometry
         if let Some(ref toplevel_id) = target_toplevel_id_opt {
@@ -284,6 +285,7 @@ impl SwayIpcClient {
         sender: &mpsc::Sender<WmEvent>,
     ) {
         let event_toplevel_id = event.container.foreign_toplevel_identifier.as_deref();
+        println!("[SwayIPC] event: change={}, app_id={:?}, focused={}, toplevel_id={:?}", event.change, event.container.app_id, event.container.focused, event_toplevel_id);
 
         // Calculate geometry for our window (in case we need it)
         let global_rect = &event.container.rect;
@@ -304,12 +306,18 @@ impl SwayIpcClient {
                 && target_id.is_some()
                 && event.container.id == target_id.unwrap());
 
+        println!("[SwayIPC] is_our_window={} (toplevel_match={}, container_match={}, event_id={}, target_id={:?})",
+            is_our_window,
+            target_toplevel_id.is_some() && event_toplevel_id == target_toplevel_id,
+            event_toplevel_id.is_none() && target_id.is_some() && event.container.id == target_id.unwrap(),
+            event.container.id, target_id);
+
         if is_our_window {
             // Our window event - process normally
             match event.change.as_str() {
                 "focus" => {
                     if event.container.focused {
-//                         println!("[SwayIPC] Target window FOCUSED (toplevel match)");
+                        println!("[SwayIPC] -> focus: WindowFocused + GeometryChanged");
                         let _ = sender.send(WmEvent::WindowFocused {
                             app_id: target_app_id.to_string()
                         });
@@ -320,6 +328,7 @@ impl SwayIpcClient {
                     }
                 }
                 "move" | "resize" => {
+                    println!("[SwayIPC] -> geometry_trigger: change={}, x={}, y={}, w={}, h={}", event.change, geometry.x, geometry.y, geometry.width, geometry.height);
                     Self::geometry_trigger(event, target_app_id, sender);
                 }
                 "fullscreen" => {
@@ -493,6 +502,7 @@ impl SwayIpcClient {
         target_id: Option<i64>,
         sender: &mpsc::Sender<WmEvent>,
     ) {
+        println!("[SwayIPC] layout_trigger: app_id={}, toplevel_id={:?}", target_app_id, target_toplevel_id);
         let client = match Self::new() {
             Ok(c) => c,
             Err(_) => return,
