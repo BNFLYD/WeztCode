@@ -31,6 +31,8 @@
   let user_interacted = $state(false);
   let show_debug = $state(false);
   let last_switch_response = $state(null);
+  let backend_flavor = $state("pi");
+  let switching_backend = $state(false);
 
   function save() {
     const raw = JSON.stringify(messages);
@@ -246,6 +248,33 @@
     }
   }
 
+  async function load_backend_flavor() {
+    try {
+      const res = await fetch("/api/chat/backend");
+      const data = await res.json();
+      if (data.ok && data.data?.backend) {
+        backend_flavor = data.data.backend;
+      }
+    } catch {}
+  }
+
+  async function select_backend(name) {
+    if (!name || name === backend_flavor || switching_backend || streaming) return;
+    switching_backend = true;
+    try {
+      const res = await fetch("/api/chat/switch-backend", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        backend_flavor = data.data.backend;
+      }
+    } catch {}
+    switching_backend = false;
+  }
+
   function toggle_dropdown() {
     show_dropdown = !show_dropdown;
   }
@@ -386,7 +415,7 @@
   );
 
   async function init() {
-    await Promise.all([load_models(), load_sub_agents()]);
+    await Promise.all([load_models(), load_sub_agents(), load_backend_flavor()]);
     if (!user_interacted && current_agent === null && sub_agents.length > 0) {
       const default_agent = sub_agents.find((a) => a.default);
       if (default_agent) {
@@ -428,6 +457,19 @@
           </span>
         </button>
       {/if}
+
+      <button
+        class="flex items-center gap-1 font-mono text-xs {switching_backend ? 'text-accent-detail animate-pulse' : 'text-print/50 hover:text-print'} transition-colors rounded"
+        onclick={() => select_backend(backend_flavor === "little-coder" ? "pi" : "little-coder")}
+        disabled={streaming || switching_backend}
+        title="Cambiar backend del agente (pi / little-coder)"
+      >
+        <Icon
+          icon={backend_flavor === "little-coder" ? "mdi:chip" : "simple-icons:pi"}
+          class="w-4 h-4"
+        />
+        {$state.eager(backend_flavor)}
+      </button>
 
       <div class="relative" bind:this={dropdown_container}>
         <button

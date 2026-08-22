@@ -5,6 +5,33 @@ use std::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
+#[cfg(unix)]
+use std::os::unix::process::CommandExt;
+
+/// Sabor del agente: pi vanilla o little-coder (wrapper optimizado para modelos chicos).
+/// Ambos hablan el mismo protocolo RPC JSONL; cambia el binario y los flags de lanzamiento.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BackendFlavor {
+    Pi,
+    LittleCoder,
+}
+
+impl BackendFlavor {
+    pub fn from_str(s: &str) -> Self {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "little-coder" | "littlecoder" | "lc" => Self::LittleCoder,
+            _ => Self::Pi,
+        }
+    }
+
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Pi => "pi",
+            Self::LittleCoder => "little-coder",
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct ChatConfig {
     pub provider: String,
@@ -12,6 +39,8 @@ pub struct ChatConfig {
     pub api_key: String,
     pub pi_path: String,
     pub thinking_level: Option<String>,
+    pub flavor: BackendFlavor,
+    pub lc_path: String,
 }
 
 impl ChatConfig {
@@ -24,6 +53,8 @@ impl ChatConfig {
                 api_key: resolved_key,
                 pi_path: find_pi_path(),
                 thinking_level: model.thinking_level.clone(),
+                flavor: default_flavor(),
+                lc_path: find_little_coder_path(),
             }
         } else {
             Self::from_props()
@@ -37,6 +68,8 @@ impl ChatConfig {
             api_key: crate::config::keys::KeysStore::resolve(&entry.api_key),
             pi_path: find_pi_path(),
             thinking_level: entry.thinking_level.clone(),
+            flavor: default_flavor(),
+            lc_path: find_little_coder_path(),
         }
     }
 
@@ -52,6 +85,8 @@ impl ChatConfig {
                 api_key: resolved_key,
                 pi_path: find_pi_path(),
                 thinking_level: model_entry.thinking_level.clone(),
+                flavor: default_flavor(),
+                lc_path: find_little_coder_path(),
             };
         }
 
@@ -65,6 +100,8 @@ impl ChatConfig {
             api_key,
             pi_path: find_pi_path(),
             thinking_level: None,
+            flavor: default_flavor(),
+            lc_path: find_little_coder_path(),
         }
     }
 
@@ -76,11 +113,13 @@ impl ChatConfig {
             api_key: props.get_resolved("llm_api_key").unwrap_or_default(),
             pi_path: find_pi_path(),
             thinking_level: None,
+            flavor: default_flavor(),
+            lc_path: find_little_coder_path(),
         }
     }
 }
 
-fn find_pi_path() -> String {
+pub fn find_pi_path() -> String {
     let props = crate::config::props::UserProps::load();
     if let Some(path) = props.get("pi_path").filter(|s| !s.is_empty()) {
         let resolved = path.to_string();
@@ -113,6 +152,67 @@ fn find_pi_path() -> String {
 
     // eprintln!("[pi] find_pi_path: fallback to 'pi' (PATH lookup)");
     "pi".to_string()
+}
+
+/// Detecta el binario little-coder. Devuelve None si no está instalado.
+/// Orden: prop lc_path → candidatos fijos (mismo layout que pi) → escaneo de PATH.
+pub fn find_little_coder_binary() -> Option<String> {
+    let props = crate::config::props::UserProps::load();
+    if let Some(path) = props.get("lc_path").map(str::trim).filter(|s| !s.is_empty()) {
+        return Some(path.to_string());
+    }
+
+    let home = std::env::var("HOME").unwrap_or_default();
+    let candidates = [
+        format!("{}/.local/share/pnpm/little-coder", home),
+        format!("{}/.npm-global/bin/little-coder", home),
+        "/usr/local/bin/little-coder".to_string(),
+        "/usr/bin/little-coder".to_string(),
+    ];
+
+    for candidate in &candidates {
+        if std::path::Path::new(candidate).exists() {
+            return Some(candidate.clone());
+        }
+    }
+
+    let cwd = std::env::current_dir().unwrap_or_default();
+    let local_lc = cwd.join("node_modules/.bin/little-coder");
+    if local_lc.exists() {
+        return Some(local_lc.to_string_lossy().to_string());
+    }
+
+    if let Ok(paths) = std::env::var("PATH") {
+        for dir in paths.split(':') {
+            let p = PathBuf::from(dir).join("little-coder");
+            if p.is_file() {
+                return Some(p.to_string_lossy().to_string());
+            }
+        }
+    }
+
+    None
+}
+
+pub fn find_little_coder_path() -> String {
+    find_little_coder_binary().unwrap_or_else(|| "little-coder".to_string())
+}
+
+/// Sabor por defecto del backend:
+/// 1. Prop explícita agent_backend ("pi" | "little-coder") en user_props.lua
+/// 2. Auto: little-coder si el binario está instalado, si no pi
+pub fn default_flavor() -> BackendFlavor {
+    let props = crate::config::props::UserProps::load();
+    match props.get("agent_backend").map(str::trim).filter(|s| !s.is_empty()) {
+        Some(v) => BackendFlavor::from_str(v),
+        None => {
+            if find_little_coder_binary().is_some() {
+                BackendFlavor::LittleCoder
+            } else {
+                BackendFlavor::Pi
+            }
+        }
+    }
 }
 
 pub fn sync_pi_model_overrides() -> Result<(), String> {
@@ -243,6 +343,11 @@ pub trait AgentBackend: Send {
     }
 
     fn set_agent_prompt(&mut self, _prompt: Option<String>) {}
+
+    /// Devuelve el prompt pendiente sin consumirlo (para preservarlo al cambiar de backend).
+    fn peek_agent_prompt(&self) -> Option<String> {
+        None
+    }
 
     fn set_model_rpc(&mut self, _provider: &str, _model_id: &str) -> Result<(), String> {
         Err("set_model_rpc not supported by this backend".to_string())
@@ -483,6 +588,10 @@ impl AgentBackend for PiAgentBackend {
 
     fn set_agent_prompt(&mut self, prompt: Option<String>) {
         PiAgentBackend::set_agent_prompt(self, prompt);
+    }
+
+    fn peek_agent_prompt(&self) -> Option<String> {
+        self.current_agent_prompt.clone()
     }
 
     fn set_model_rpc(&mut self, provider: &str, model_id: &str) -> Result<(), String> {
@@ -833,24 +942,43 @@ impl AgentBackend for PiAgentBackend {
     }
 
     fn spawn(&mut self) -> Result<(), String> {
-        let mut cmd = Command::new(&self.config.pi_path);
+        let binary = match self.config.flavor {
+            BackendFlavor::Pi => self.config.pi_path.clone(),
+            BackendFlavor::LittleCoder => self.config.lc_path.clone(),
+        };
+
+        let mut cmd = Command::new(&binary);
         cmd.args(["--mode", "rpc"])
             .arg("--provider").arg(&self.config.provider)
             .arg("--model").arg(&self.config.model);
+
+        if matches!(self.config.flavor, BackendFlavor::LittleCoder) {
+            // little-coder lanza pi con --no-extensions; este flag restaura la
+            // discovery del ecosistema pi instalado en ~/.pi/agent (pi-opencode-provider,
+            // pi-subagents, ...). --no-update-check evita que el launcher consulte el
+            // registro npm y bloquee el arranque. Ambos flags los filtra el launcher
+            // antes de pasárselos a pi.
+            cmd.arg("--with-pi-extensions").arg("--no-update-check");
+        }
 
         cmd.stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
 
+        // Grupo de procesos propio: little-coder es un wrapper Node que spawnea a pi
+        // como nieto; sin esto, un kill al wrapper huérfanaría a pi.
+        #[cfg(unix)]
+        cmd.process_group(0);
+
         let env_key = env_var_for_provider(&self.config.provider);
         cmd.env(env_key, &self.config.api_key);
         cmd.env("PI_CACHE_RETENTION", "long");
 
-        // eprintln!("[pi] spawn: path={}, provider={}, model={}", self.config.pi_path, self.config.provider, self.config.model);
+        // eprintln!("[pi] spawn: flavor={}, path={}, provider={}, model={}", self.config.flavor.as_str(), binary, self.config.provider, self.config.model);
 
         cmd.current_dir(crate::config::current_root::get());
         let mut child = cmd.spawn().map_err(|e| {
-            let msg = format!("Failed to spawn pi: {}", e);
+            let msg = format!("Failed to spawn {} agent: {}", self.config.flavor.as_str(), e);
             eprintln!("[pi] {}", msg);
             msg
         })?;
@@ -905,6 +1033,26 @@ impl AgentBackend for PiAgentBackend {
         self.stderr = None;
         self.thinking_configured = false;
         if let Some(mut child) = self.child.take() {
+            #[cfg(unix)]
+            {
+                // Con process_group(0), el pgid == pid del wrapper. SIGTERM al grupo
+                // permite al launcher de little-coder reenviar la señal a pi y salir
+                // limpio; SIGKILL directo dejaría a pi corriendo como huérfano.
+                let pgid = child.id() as i32;
+                use nix::sys::signal::{kill, Signal};
+                use nix::unistd::Pid;
+
+                let _ = kill(Pid::from_raw(-pgid), Signal::SIGTERM);
+                let deadline = std::time::Instant::now() + std::time::Duration::from_millis(1500);
+                while std::time::Instant::now() < deadline {
+                    match child.try_wait() {
+                        Ok(Some(_)) => return,
+                        Ok(None) => thread::sleep(std::time::Duration::from_millis(50)),
+                        Err(_) => break,
+                    }
+                }
+                let _ = kill(Pid::from_raw(-pgid), Signal::SIGKILL);
+            }
             let _ = child.kill();
             let _ = child.wait();
         }
@@ -924,6 +1072,8 @@ impl NullBackend {
                 api_key: String::new(),
                 pi_path: find_pi_path(),
                 thinking_level: None,
+                flavor: default_flavor(),
+                lc_path: find_little_coder_path(),
             },
         }
     }

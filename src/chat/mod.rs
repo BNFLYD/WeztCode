@@ -29,6 +29,33 @@ impl ChatService {
         Ok(())
     }
 
+    pub fn current_flavor(&self) -> BackendFlavor {
+        self.backend.config().flavor
+    }
+
+    /// Cambia entre pi y little-coder en caliente: re-spawnea el proceso con el
+    /// otro binario preservando modelo, proveedor, thinking level y agente activo.
+    pub fn switch_backend_flavor(&mut self, flavor: BackendFlavor) -> Result<(), String> {
+        if self.backend.config().flavor == flavor {
+            return Ok(());
+        }
+
+        let mut new_config = self.backend.config().clone();
+        new_config.flavor = flavor;
+        new_config.pi_path = find_pi_path();
+        new_config.lc_path = find_little_coder_path();
+
+        // Preservar un prompt de agente aún no consumido por send_message
+        let pending_prompt = self.backend.peek_agent_prompt();
+
+        let mut new_backend: Box<dyn AgentBackend> = Box::new(PiAgentBackend::new(new_config));
+        if pending_prompt.is_some() {
+            new_backend.set_agent_prompt(pending_prompt);
+        }
+
+        self.switch_backend(new_backend)
+    }
+
     pub fn switch_agent(&mut self, entry: &crate::config::sub_agents::SubAgentEntry) -> Result<(), String> {
         let prompt = if entry.system_prompt.is_empty() {
             None

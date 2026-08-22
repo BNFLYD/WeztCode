@@ -23,6 +23,8 @@ pub fn router() -> Router {
         .route("/chat/send", post(chat::handle_chat_send))
         .route("/chat/new-session", post(chat::handle_chat_new_session))
         .route("/chat/switch-model", post(chat::handle_chat_switch_model))
+        .route("/chat/backend", get(chat::handle_chat_backend_status))
+        .route("/chat/switch-backend", post(chat::handle_chat_switch_backend))
         .route("/keys/set", post(keys::handle_keys_set))
         .route("/keys/delete", get(keys::handle_keys_delete))
         .route("/keys/list", get(keys::handle_keys_list))

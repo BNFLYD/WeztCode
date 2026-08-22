@@ -8,7 +8,7 @@ use tokio_stream::StreamExt;
 use std::convert::Infallible;
 
 use crate::api::{err_json, ok_json, ApiResponse};
-use crate::chat;
+use crate::chat::BackendFlavor;
 use crate::config;
 
 pub async fn handle_chat_send(
@@ -64,6 +64,46 @@ pub async fn handle_chat_switch_model(
 
     match result {
         Ok(model_name) => ok_json(serde_json::json!({"ok": true, "model": model_name})),
+        Err(e) => err_json(&config::keys::redact_keys(&e)),
+    }
+}
+
+pub async fn handle_chat_backend_status() -> impl IntoResponse {
+    let result = tokio::task::spawn_blocking(|| {
+        let service = crate::CHAT_SERVICE.lock()
+            .map_err(|e| format!("Lock: {}", e))?;
+        Ok::<_, String>(service.current_flavor().as_str().to_string())
+    }).await.unwrap();
+
+    match result {
+        Ok(backend) => ok_json(serde_json::json!({"ok": true, "data": {"backend": backend}})),
+        Err(e) => err_json(&config::keys::redact_keys(&e)),
+    }
+}
+
+pub async fn handle_chat_switch_backend(
+    Json(body): Json<serde_json::Value>,
+) -> impl IntoResponse {
+    let raw = match body.get("backend").and_then(|v| v.as_str()) {
+        Some(s) => s.trim().to_string(),
+        None => return err_json("Missing 'backend' field"),
+    };
+
+    let normalized = raw.to_ascii_lowercase();
+    if !matches!(normalized.as_str(), "pi" | "little-coder" | "littlecoder") {
+        return err_json("Invalid backend (use 'pi' or 'little-coder')");
+    }
+    let flavor = BackendFlavor::from_str(&raw);
+
+    let result = tokio::task::spawn_blocking(move || {
+        let mut service = crate::CHAT_SERVICE.lock()
+            .map_err(|e| format!("Lock: {}", e))?;
+        service.switch_backend_flavor(flavor)?;
+        Ok::<_, String>(())
+    }).await.unwrap();
+
+    match result {
+        Ok(_) => ok_json(serde_json::json!({"ok": true, "data": {"backend": flavor.as_str()}})),
         Err(e) => err_json(&config::keys::redact_keys(&e)),
     }
 }
