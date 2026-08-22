@@ -7,5 +7,7 @@ pnpm-lock.yaml
 
 frontend/dist/
 
+/target
+
 # API keys (user-level, en ~/.config/weztcode/KEYS.env)
 KEYS.env
