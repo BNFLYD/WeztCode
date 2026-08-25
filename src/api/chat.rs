@@ -99,6 +99,13 @@ pub async fn handle_chat_switch_backend(
         let mut service = crate::CHAT_SERVICE.lock()
             .map_err(|e| format!("Lock: {}", e))?;
         service.switch_backend_flavor(flavor)?;
+
+        // Persistir la elección para las próximas sesiones (default_flavor la lee
+        // como prioridad 1 al arrancar). Un fallo de escritura no invalida el switch.
+        if let Err(e) = crate::config::props::UserProps::set("agent_backend", flavor.as_str()) {
+            eprintln!("[chat] Failed to persist agent_backend prop: {}", e);
+        }
+
         Ok::<_, String>(())
     }).await.unwrap();
 

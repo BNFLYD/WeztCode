@@ -2,7 +2,7 @@
 -- Editá este archivo para personalizar el comportamiento de la app.
 
 user_editor = "nvim"
-current_dir = "/home/mori/Projects/HOD-software/ecommerce-server-fastify"
+current_dir = "/home/mori/.pi/agent/agents"
 
 -- Ctrl+J: toggle entre nvim (pane 0) y la última terminal usada (opcional)
 -- Descomentar para overridear el default

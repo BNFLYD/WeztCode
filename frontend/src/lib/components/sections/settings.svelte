@@ -4,6 +4,9 @@
   let theme = "Dinamico";
   let font_size = 14;
 
+  let agent_backend = "pi";
+  let switching_agent = false;
+
   let keys = [];
   let show_add_form = false;
   let new_name = "";
@@ -79,6 +82,37 @@
     show_add_form = false;
   }
 
+  async function load_agent_backend() {
+    try {
+      const res = await fetch("/api/chat/backend");
+      const json = await res.json();
+      if (json.ok && json.data?.backend) {
+        agent_backend = json.data.backend;
+      }
+    } catch {
+      // mantener el default "pi" si falla
+    }
+  }
+
+  async function select_agent_backend() {
+    if (switching_agent) return;
+    switching_agent = true;
+    try {
+      const res = await fetch("/api/chat/switch-backend", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ backend: agent_backend }),
+      });
+      const json = await res.json();
+      if (json.ok && json.data?.backend) {
+        agent_backend = json.data.backend;
+      }
+    } catch {
+      // si falla, el select conserva el último valor confirmado al recargar
+    }
+    switching_agent = false;
+  }
+
   async function open_default_terms() {
     const res = await fetch("/api/terminal/active-pane");
     const json = await res.json();
@@ -113,6 +147,7 @@
   }
 
   load_keys();
+  load_agent_backend();
 </script>
 
 <div class="space-y-4 py-4">
@@ -271,6 +306,28 @@
       class="font-semibold text-sm px-3 py-1.5 bg-back rounded text-print self-start hover:bg-accent/50 hover:text-back"
       >Editar modelos</button
     >
+  </div>
+
+  <hr class="border-accent/50 my-2" />
+
+  <div class="flex flex-col gap-3">
+    <h3 class="text-md font-bold text-print uppercase tracking-wide">
+      Seleccionar Agente
+    </h3>
+    <p class="text-md text-print">
+      Backend del chat IA. little-coder es un wrapper de pi optimizado para
+      modelos chicos y requiere estar instalado. La elección se aplica al
+      instante y se guarda para próximas sesiones.
+    </p>
+    <select
+      bind:value={agent_backend}
+      on:change={select_agent_backend}
+      disabled={switching_agent}
+      class="w-full px-3 py-2 bg-back border border-accent-detail rounded text-xs text-print-contrast outline-none"
+    >
+      <option value="pi">pi</option>
+      <option value="little-coder">little-coder</option>
+    </select>
   </div>
 
   <hr class="border-accent/50 my-2" />
