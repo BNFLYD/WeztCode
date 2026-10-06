@@ -7,6 +7,10 @@ pub struct SubAgentEntry {
     pub description: Option<String>,
     pub model: String,
     pub icon: Option<String>,
+    /// Backend a usar con este agente: "pi" o "little-coder".
+    /// None = no forzar cambio (se respeta el backend activo).
+    #[serde(default)]
+    pub engine: Option<String>,
     #[serde(default)]
     pub system_prompt: String,
     pub tools: Option<String>,

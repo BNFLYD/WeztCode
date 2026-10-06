@@ -13,6 +13,7 @@ pub async fn handle_list() -> impl IntoResponse {
                 "description": a.description,
                 "model": a.model,
                 "icon": a.icon,
+                "engine": a.engine,
                 "default": a.default,
             })
         })
@@ -36,13 +37,18 @@ pub async fn handle_switch(
             .lock()
             .map_err(|e| format!("Lock: {}", e))?;
 
-        service.switch_agent(&entry)?;
+        let outcome = service.switch_agent(&entry)?;
+        let backend = outcome.backend.as_str();
+        let warning = outcome.warning;
 
         Ok::<_, String>(serde_json::json!({
             "agent": entry.name,
             "model": entry.model,
             "description": entry.description,
             "icon": entry.icon,
+            "engine": entry.engine,
+            "backend": backend,
+            "warning": warning,
         }))
     })
     .await

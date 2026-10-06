@@ -24,6 +24,16 @@ impl BackendFlavor {
         }
     }
 
+    /// Parse estricto para el campo `engine` de agentes: a diferencia de
+    /// `from_str`, un valor desconocido devuelve None en lugar de caer en Pi.
+    pub fn parse_strict(s: &str) -> Option<Self> {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "pi" => Some(Self::Pi),
+            "little-coder" | "littlecoder" | "lc" => Some(Self::LittleCoder),
+            _ => None,
+        }
+    }
+
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Pi => "pi",
@@ -283,6 +293,101 @@ pub fn sync_pi_model_overrides() -> Result<(), String> {
     Ok(())
 }
 
+static RPC_COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+
+/// Envía un comando RPC con `id` único y lee líneas hasta encontrar la respuesta
+/// con ese id. pi procesa comandos de forma asíncrona y puede emitir respuestas
+/// fuera de orden, además de eventos (`extension_ui_request`, notificaciones)
+/// en cualquier momento: sin correlación por id, el primer línea disponible se
+/// interpretaba como la respuesta y el protocolo se desincronizaba.
+fn rpc_exchange(
+    stdin: &Arc<Mutex<ChildStdin>>,
+    stdout: &Arc<Mutex<ChildStdout>>,
+    command: &str,
+    mut payload: serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    let id = format!(
+        "weztcode-{}",
+        RPC_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+    );
+    payload["id"] = serde_json::Value::String(id.clone());
+    let msg_str =
+        serde_json::to_string(&payload).map_err(|e| format!("JSON serialize: {}", e))?;
+
+    {
+        let mut stdin_lock = stdin.lock().map_err(|e| format!("stdin lock: {}", e))?;
+        writeln!(stdin_lock, "{}", msg_str)
+            .map_err(|e| format!("Failed to write {}: {}", command, e))?;
+        stdin_lock
+            .flush()
+            .map_err(|e| format!("Failed to flush {}: {}", command, e))?;
+    }
+
+    let mut stdout_lock = stdout.lock().map_err(|e| format!("stdout lock: {}", e))?;
+    let mut discarded = 0u32;
+    // Techo de seguridad: si nunca llega la respuesta, cortar en vez de colgar.
+    const MAX_DISCARDED: u32 = 4096;
+
+    loop {
+        let mut bytes = Vec::new();
+        let mut buf = [0u8; 1];
+        loop {
+            match stdout_lock.read(&mut buf) {
+                Ok(0) => {
+                    return Err(format!(
+                        "RPC {}: stdout EOF antes de la respuesta ({} líneas descartadas)",
+                        command, discarded
+                    ))
+                }
+                Ok(_) => {
+                    if buf[0] == b'\n' {
+                        break;
+                    }
+                    bytes.push(buf[0]);
+                }
+                Err(e) => return Err(format!("stdout read error in {}: {}", command, e)),
+            }
+        }
+        if bytes.is_empty() {
+            continue;
+        }
+        let line = String::from_utf8_lossy(&bytes);
+        let parsed = serde_json::from_str::<serde_json::Value>(line.trim());
+        let Ok(json) = parsed else {
+            discarded += 1;
+            eprintln!(
+                "[rpc] {} descartando línea no-JSON (#{}): {}",
+                command,
+                discarded,
+                &line[..line.len().min(200)]
+            );
+            continue;
+        };
+        let is_ours = json.get("type").and_then(|v| v.as_str()) == Some("response")
+            && json.get("id").and_then(|v| v.as_str()) == Some(id.as_str());
+        if is_ours {
+            return Ok(json);
+        }
+        discarded += 1;
+        let kind = json
+            .get("type")
+            .and_then(|v| v.as_str())
+            .unwrap_or("<sin type>");
+        if discarded <= 20 || discarded % 100 == 0 {
+            eprintln!(
+                "[rpc] {} descartando evento async type={} (#{} en total)",
+                command, kind, discarded
+            );
+        }
+        if discarded >= MAX_DISCARDED {
+            return Err(format!(
+                "RPC {}: respuesta nunca llegó ({} líneas descartadas)",
+                command, discarded
+            ));
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum SseEvent {
     Token { content: String },
@@ -406,107 +511,29 @@ impl PiAgentBackend {
         let stdin = self.stdin.as_ref()
             .ok_or_else(|| "Pi not spawned (stdin is None)".to_string())?;
         let stdout_arc = self.stdout.as_ref()
-            .ok_or_else(|| "Pi not spawned (stdout is None)".to_string())?
-            .clone();
+            .ok_or_else(|| "Pi not spawned (stdout is None)".to_string())?;
 
-        let msg = serde_json::json!({"type": "get_state"});
-        let msg_str = serde_json::to_string(&msg).map_err(|e| format!("JSON serialize: {}", e))?;
-
-        {
-            let mut stdin_lock = stdin.lock().map_err(|e| format!("stdin lock: {}", e))?;
-            writeln!(stdin_lock, "{}", msg_str)
-                .map_err(|e| format!("Failed to write get_state: {}", e))?;
-            stdin_lock.flush()
-                .map_err(|e| format!("Failed to flush get_state: {}", e))?;
-        }
-
-        let mut stdout_lock = stdout_arc.lock().map_err(|e| format!("stdout lock: {}", e))?;
-        let mut bytes = Vec::new();
-        let mut buf = [0u8; 1];
-        loop {
-            match stdout_lock.read(&mut buf) {
-                Ok(0) => break,
-                Ok(_) => {
-                    if buf[0] == b'\n' { break; }
-                    bytes.push(buf[0]);
-                }
-                Err(e) => return Err(format!("stdout read error: {}", e)),
-            }
-        }
-
-        String::from_utf8(bytes).map_err(|e| format!("Invalid UTF-8: {}", e))
+        let resp = rpc_exchange(stdin, stdout_arc, "get_state", serde_json::json!({"type": "get_state"}))?;
+        serde_json::to_string(&resp).map_err(|e| format!("JSON serialize: {}", e))
     }
 
     pub fn get_session_stats(&self) -> Result<String, String> {
         let stdin = self.stdin.as_ref()
             .ok_or_else(|| "Pi not spawned (stdin is None)".to_string())?;
         let stdout_arc = self.stdout.as_ref()
-            .ok_or_else(|| "Pi not spawned (stdout is None)".to_string())?
-            .clone();
+            .ok_or_else(|| "Pi not spawned (stdout is None)".to_string())?;
 
-        let msg = serde_json::json!({"type": "get_session_stats"});
-        let msg_str = serde_json::to_string(&msg).map_err(|e| format!("JSON serialize: {}", e))?;
-
-        {
-            let mut stdin_lock = stdin.lock().map_err(|e| format!("stdin lock: {}", e))?;
-            writeln!(stdin_lock, "{}", msg_str)
-                .map_err(|e| format!("Failed to write get_session_stats: {}", e))?;
-            stdin_lock.flush()
-                .map_err(|e| format!("Failed to flush get_session_stats: {}", e))?;
-        }
-
-        let mut stdout_lock = stdout_arc.lock().map_err(|e| format!("stdout lock: {}", e))?;
-        let mut bytes = Vec::new();
-        let mut buf = [0u8; 1];
-        loop {
-            match stdout_lock.read(&mut buf) {
-                Ok(0) => break,
-                Ok(_) => {
-                    if buf[0] == b'\n' { break; }
-                    bytes.push(buf[0]);
-                }
-                Err(e) => return Err(format!("stdout read error: {}", e)),
-            }
-        }
-
-        String::from_utf8(bytes).map_err(|e| format!("Invalid UTF-8: {}", e))
+        let resp = rpc_exchange(stdin, stdout_arc, "get_session_stats", serde_json::json!({"type": "get_session_stats"}))?;
+        serde_json::to_string(&resp).map_err(|e| format!("JSON serialize: {}", e))
     }
 
     pub fn new_session(&mut self) -> Result<(), String> {
         let stdin = self.stdin.as_ref()
             .ok_or_else(|| "Pi not spawned (stdin is None)".to_string())?;
         let stdout_arc = self.stdout.as_ref()
-            .ok_or_else(|| "Pi not spawned (stdout is None)".to_string())?
-            .clone();
+            .ok_or_else(|| "Pi not spawned (stdout is None)".to_string())?;
 
-        let msg = serde_json::json!({"type": "new_session"});
-        let msg_str = serde_json::to_string(&msg).map_err(|e| format!("JSON serialize: {}", e))?;
-
-        {
-            let mut stdin_lock = stdin.lock().map_err(|e| format!("stdin lock: {}", e))?;
-            writeln!(stdin_lock, "{}", msg_str)
-                .map_err(|e| format!("Failed to write new_session: {}", e))?;
-            stdin_lock.flush()
-                .map_err(|e| format!("Failed to flush new_session: {}", e))?;
-        }
-
-        let mut stdout_lock = stdout_arc.lock().map_err(|e| format!("stdout lock: {}", e))?;
-        let mut bytes = Vec::new();
-        let mut buf = [0u8; 1];
-        loop {
-            match stdout_lock.read(&mut buf) {
-                Ok(0) => break,
-                Ok(_) => {
-                    if buf[0] == b'\n' { break; }
-                    bytes.push(buf[0]);
-                }
-                Err(e) => return Err(format!("stdout read error: {}", e)),
-            }
-        }
-
-        let response = String::from_utf8(bytes).map_err(|e| format!("Invalid UTF-8: {}", e))?;
-        let json: serde_json::Value = serde_json::from_str(&response)
-            .map_err(|e| format!("JSON parse error: {}", e))?;
+        let json = rpc_exchange(stdin, stdout_arc, "new_session", serde_json::json!({"type": "new_session"}))?;
 
         let success = json.get("success").and_then(|v| v.as_bool()).unwrap_or(false);
         if success {
@@ -523,41 +550,13 @@ impl PiAgentBackend {
         let stdin = self.stdin.as_ref()
             .ok_or_else(|| "Pi not spawned (stdin is None)".to_string())?;
         let stdout_arc = self.stdout.as_ref()
-            .ok_or_else(|| "Pi not spawned (stdout is None)".to_string())?
-            .clone();
+            .ok_or_else(|| "Pi not spawned (stdout is None)".to_string())?;
 
-        let msg = serde_json::json!({
+        let json = rpc_exchange(stdin, stdout_arc, "set_model", serde_json::json!({
             "type": "set_model",
             "provider": provider,
             "modelId": model_id,
-        });
-        let msg_str = serde_json::to_string(&msg).map_err(|e| format!("JSON serialize: {}", e))?;
-
-        {
-            let mut stdin_lock = stdin.lock().map_err(|e| format!("stdin lock: {}", e))?;
-            writeln!(stdin_lock, "{}", msg_str)
-                .map_err(|e| format!("Failed to write set_model: {}", e))?;
-            stdin_lock.flush()
-                .map_err(|e| format!("Failed to flush set_model: {}", e))?;
-        }
-
-        let mut stdout_lock = stdout_arc.lock().map_err(|e| format!("stdout lock: {}", e))?;
-        let mut bytes = Vec::new();
-        let mut buf = [0u8; 1];
-        loop {
-            match stdout_lock.read(&mut buf) {
-                Ok(0) => break,
-                Ok(_) => {
-                    if buf[0] == b'\n' { break; }
-                    bytes.push(buf[0]);
-                }
-                Err(e) => return Err(format!("stdout read error: {}", e)),
-            }
-        }
-
-        let response = String::from_utf8(bytes).map_err(|e| format!("Invalid UTF-8: {}", e))?;
-        let json: serde_json::Value = serde_json::from_str(&response)
-            .map_err(|e| format!("JSON parse error: {}", e))?;
+        }))?;
 
         let success = json.get("success").and_then(|v| v.as_bool()).unwrap_or(false);
         if success {
@@ -627,92 +626,28 @@ impl AgentBackend for PiAgentBackend {
                     other => other,
                 };
 
-                // --- Send set_thinking_level RPC ---
-                let set_msg = serde_json::json!({
+                // set_thinking_level (respuesta correlacionada por id; los eventos
+                // async de pi/little-coder se descartan dentro de rpc_exchange)
+                match rpc_exchange(stdin, &stdout_arc, "set_thinking_level", serde_json::json!({
                     "type": "set_thinking_level",
                     "level": pi_level,
-                });
-                let set_str = serde_json::to_string(&set_msg).unwrap_or_default();
-
-                {
-                    let mut stdin_lock = stdin.lock().map_err(|e| format!("stdin lock: {}", e))?;
-                    writeln!(stdin_lock, "{}", set_str)
-                        .map_err(|e| format!("Failed to write set_thinking_level: {}", e))?;
-                    stdin_lock.flush()
-                        .map_err(|e| format!("Failed to flush set_thinking_level: {}", e))?;
-                }
-
-                // --- Read set_thinking_level response synchronously ---
-                {
-                    let mut stdout_lock = stdout_arc.lock().map_err(|e| format!("stdout lock: {}", e))?;
-                    let mut bytes = Vec::new();
-                    let mut buf = [0u8; 1];
-                    loop {
-                        match stdout_lock.read(&mut buf) {
-                            Ok(0) => break,
-                            Ok(_) => {
-                                if buf[0] == b'\n' { break; }
-                                bytes.push(buf[0]);
-                            }
-                            Err(e) => {
-                                // eprintln!("[pi] error reading set_thinking_level response: {}", e);
-                                break;
-                            }
+                })) {
+                    Ok(json) => {
+                        let success = json.get("success").and_then(|v| v.as_bool()).unwrap_or(false);
+                        if !success {
+                            let err = json.get("error").and_then(|v| v.as_str()).unwrap_or("unknown");
+                            eprintln!("[pi] set_thinking_level FAILED: {} (level: {})", err, pi_level);
                         }
                     }
-                    if !bytes.is_empty() {
-                        let response = String::from_utf8_lossy(&bytes);
-                        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&response) {
-                            let success = json.get("success").and_then(|v| v.as_bool()).unwrap_or(false);
-                            if success {
-                                // eprintln!("[pi] set_thinking_level confirmed: {} ✓", pi_level);
-                            } else {
-                                let err = json.get("error").and_then(|v| v.as_str()).unwrap_or("unknown");
-                                // eprintln!("[pi] set_thinking_level FAILED: {} (level: {})", err, pi_level);
-                            }
-                        } else {
-                            // eprintln!("[pi] set_thinking_level response (unparsed): {}", response);
-                        }
-                    }
+                    Err(e) => eprintln!("[pi] set_thinking_level RPC error: {}", e),
                 }
 
-                // --- Send get_state RPC to verify actual level post-clamping ---
-                let get_state_msg = serde_json::json!({"type": "get_state"});
-                let get_state_str = serde_json::to_string(&get_state_msg).unwrap_or_default();
-
-                {
-                    let mut stdin_lock = stdin.lock().map_err(|e| format!("stdin lock: {}", e))?;
-                    writeln!(stdin_lock, "{}", get_state_str)
-                        .map_err(|e| format!("Failed to write get_state: {}", e))?;
-                    stdin_lock.flush()
-                        .map_err(|e| format!("Failed to flush get_state: {}", e))?;
-                }
-
-                // --- Read get_state response ---
-                {
-                    let mut stdout_lock = stdout_arc.lock().map_err(|e| format!("stdout lock: {}", e))?;
-                    let mut bytes = Vec::new();
-                    let mut buf = [0u8; 1];
-                    loop {
-                        match stdout_lock.read(&mut buf) {
-                            Ok(0) => break,
-                            Ok(_) => {
-                                if buf[0] == b'\n' { break; }
-                                bytes.push(buf[0]);
-                            }
-                            Err(e) => {
-                                // eprintln!("[pi] error reading get_state response: {}", e);
-                                break;
-                            }
-                        }
-                    }
-                    if !bytes.is_empty() {
-                        // get_state verification (logged via main.rs after each message)
-                    }
+                // get_state post-clamping (verificación; el resultado se loguea desde main.rs)
+                if let Err(e) = rpc_exchange(stdin, &stdout_arc, "get_state", serde_json::json!({"type": "get_state"})) {
+                    eprintln!("[pi] get_state (verificación thinking) error: {}", e);
                 }
 
                 self.thinking_configured = true;
-                // eprintln!("[pi] thinking_level configured successfully");
             }
         }
 
@@ -904,34 +839,18 @@ impl AgentBackend for PiAgentBackend {
             drop(reader);
             drop(stdout_lock);
 
-            // After stream ends, fetch and send real session stats
+            // After stream ends, fetch and send real session stats.
+            // Correlación por id: si pi emite algún evento async antes de la
+            // respuesta (extension_ui_request, widgets), se descarta dentro de
+            // rpc_exchange en lugar de parsearse como stats.
             if agent_ended {
-                let msg = serde_json::json!({"type": "get_session_stats"});
-                if let Ok(s) = serde_json::to_string(&msg) {
-                    if let Ok(lock) = stdin_arc.lock() {
-                        let _ = writeln!(&*lock, "{}", s);
-                        let _ = (&*lock).flush();
-                    }
-                }
-
-                if let Ok(mut stdout_lock) = stdout_arc.lock() {
-                    let mut bytes = Vec::new();
-                    let mut buf = [0u8; 1];
-                    loop {
-                        match stdout_lock.read(&mut buf) {
-                            Ok(0) => break,
-                            Ok(_) => {
-                                if buf[0] == b'\n' { break; }
-                                bytes.push(buf[0]);
-                            }
-                            Err(_) => break,
-                        }
-                    }
-                    if !bytes.is_empty() {
-                        if let Ok(s) = String::from_utf8(bytes) {
+                match rpc_exchange(&stdin_arc, &stdout_arc, "get_session_stats", serde_json::json!({"type": "get_session_stats"})) {
+                    Ok(json) => {
+                        if let Ok(s) = serde_json::to_string(&json) {
                             let _ = tx.blocking_send(SseEvent::SessionStats { json: s });
                         }
                     }
+                    Err(e) => eprintln!("[pi] get_session_stats post-stream error: {}", e),
                 }
             }
 
@@ -970,8 +889,17 @@ impl AgentBackend for PiAgentBackend {
         #[cfg(unix)]
         cmd.process_group(0);
 
-        let env_key = env_var_for_provider(&self.config.provider);
-        cmd.env(env_key, &self.config.api_key);
+        // Inyectar TODOS los providers configurados: modelRuntime.getAvailable()
+        // filtra por providers con credenciales, así que si solo inyectamos la key
+        // del provider activo, un switch cruzado (Miku/groq → Teto/opencode) hace
+        // que set_model falle con "Model not found" aunque el modelo exista.
+        cmd.env(env_var_for_provider(&self.config.provider), &self.config.api_key);
+        for m in crate::config::models::list() {
+            let key = crate::config::keys::KeysStore::resolve(&m.api_key);
+            if !key.is_empty() {
+                cmd.env(env_var_for_provider(&m.provider), key);
+            }
+        }
         cmd.env("PI_CACHE_RETENTION", "long");
 
         // eprintln!("[pi] spawn: flavor={}, path={}, provider={}, model={}", self.config.flavor.as_str(), binary, self.config.provider, self.config.model);

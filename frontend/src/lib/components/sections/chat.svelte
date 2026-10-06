@@ -265,13 +265,17 @@
       const res = await fetch("/api/chat/switch-backend", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ backend: name }),
       });
       const data = await res.json();
       if (data.ok) {
         backend_flavor = data.data.backend;
+      } else {
+        warnings = [...warnings, data.error ?? "No se pudo cambiar de backend"];
       }
-    } catch {}
+    } catch (e) {
+      warnings = [...warnings, `Cambio de backend falló: ${e?.message ?? e}`];
+    }
     switching_backend = false;
   }
 
@@ -355,10 +359,18 @@
         current_model = resolved ? resolved.name : agentModel;
         last_switch_response = data.data;
         current_icon = data.data.icon || null;
+        // El agente puede forzar engine (pi | little-coder): sincronizar el
+        // backend del header/toggle con el que efectivamente quedó activo.
+        if (data.data.backend) backend_flavor = data.data.backend;
+        if (data.data.warning) warnings = [...warnings, data.data.warning];
         await tick();
+      } else {
+        // Sin este else, un fallo (p. ej. set_model RPC inválido) era invisible:
+        // el Tab parecía no hacer nada.
+        warnings = [...warnings, data.error ?? "No se pudo cambiar de agente"];
       }
-    } catch {
-      // Si falla, no se actualiza
+    } catch (e) {
+      warnings = [...warnings, `Cambio de agente falló: ${e?.message ?? e}`];
     }
   }
 
@@ -615,6 +627,13 @@
                   onclick={() => select_agent(agent.name)}
                 >
                   {agent.name}
+                  {#if agent.engine}
+                    <span
+                      class="ml-1 px-1 text-[10px] rounded border {agent.name === $state.eager(current_agent)
+                        ? 'border-back/50 text-back/80'
+                        : 'border-accent-detail/40 text-print/50'}"
+                    >{agent.engine === "little-coder" ? "lc" : agent.engine}</span>
+                  {/if}
                 </button>
               {/each}
               <hr class="border-accent-detail/10 my-1" />

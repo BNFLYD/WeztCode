@@ -19,11 +19,36 @@ use once_cell::sync::Lazy;
 use config::default_terms::DefaultTerm;
 
 static CHAT_SERVICE: Lazy<Mutex<chat::ChatService>> = Lazy::new(|| {
-    let (config, default_agent) = if let Some(agent) = config::sub_agents::get_default() {
+    let (mut config, default_agent) = if let Some(agent) = config::sub_agents::get_default() {
         (chat::ChatConfig::from_sub_agent(&agent), Some(agent))
     } else {
         (chat::ChatConfig::from_default_model(), None)
     };
+    // El agente default puede fijar el backend con `engine:` (pi | little-coder).
+    // Override de default_flavor() solo cuando el valor es válido y el binario existe.
+    if let Some(engine_raw) = default_agent
+        .as_ref()
+        .and_then(|a| a.engine.as_deref())
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
+        match chat::BackendFlavor::parse_strict(engine_raw) {
+            Some(chat::BackendFlavor::LittleCoder)
+                if chat::find_little_coder_binary().is_none() =>
+            {
+                eprintln!(
+                    "[chat] agente default pide engine=little-coder pero no está instalado; se usa {}",
+                    config.flavor.as_str()
+                );
+            }
+            Some(flavor) => config.flavor = flavor,
+            None => eprintln!(
+                "[chat] engine '{}' inválido en agente default; se usa {}",
+                engine_raw,
+                config.flavor.as_str()
+            ),
+        }
+    }
     let mut backend: Box<dyn chat::AgentBackend> = Box::new(chat::PiAgentBackend::new(config));
     if let Some(agent) = default_agent {
         let prompt = if agent.system_prompt.is_empty() {

@@ -4,6 +4,13 @@ pub use backend::*;
 
 use std::thread;
 
+/// Resultado de cambiar de agente: el backend efectivo (post engine-switch)
+/// y un warning descriptivo si el engine pedido no pudo aplicarse.
+pub struct AgentSwitchOutcome {
+    pub backend: BackendFlavor,
+    pub warning: Option<String>,
+}
+
 pub struct ChatService {
     backend: Box<dyn AgentBackend>,
 }
@@ -56,7 +63,39 @@ impl ChatService {
         self.switch_backend(new_backend)
     }
 
-    pub fn switch_agent(&mut self, entry: &crate::config::sub_agents::SubAgentEntry) -> Result<(), String> {
+    /// Cambia de agente. Si el agente declara `engine` (pi | little-coder),
+    /// primero se respawnea el backend con ese sabor y luego se aplican el
+    /// prompt del sistema y el modelo sobre el proceso nuevo (un respawn
+    /// descartaría lo aplicado antes). Devuelve el engine efectivo y un
+    /// warning opcional (p. ej. engine inválido o little-coder no instalado).
+    pub fn switch_agent(&mut self, entry: &crate::config::sub_agents::SubAgentEntry) -> Result<AgentSwitchOutcome, String> {
+        let mut warning: Option<String> = None;
+
+        if let Some(engine_raw) = entry.engine.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+            match BackendFlavor::parse_strict(engine_raw) {
+                Some(BackendFlavor::LittleCoder) if find_little_coder_binary().is_none() => {
+                    warning = Some(format!(
+                        "Agente '{}': engine little-coder no está instalado, se mantiene {}",
+                        entry.name,
+                        self.backend.config().flavor.as_str()
+                    ));
+                }
+                Some(flavor) => {
+                    if flavor != self.backend.config().flavor {
+                        self.switch_backend_flavor(flavor)?;
+                    }
+                }
+                None => {
+                    warning = Some(format!(
+                        "Agente '{}': engine '{}' inválido (usá pi o little-coder), se mantiene {}",
+                        entry.name,
+                        engine_raw,
+                        self.backend.config().flavor.as_str()
+                    ));
+                }
+            }
+        }
+
         let prompt = if entry.system_prompt.is_empty() {
             None
         } else {
@@ -73,7 +112,10 @@ impl ChatService {
             }
         }
 
-        Ok(())
+        Ok(AgentSwitchOutcome {
+            backend: self.backend.config().flavor,
+            warning,
+        })
     }
 
     pub fn switch_model_rpc(&mut self, model_name: &str) -> Result<String, String> {
