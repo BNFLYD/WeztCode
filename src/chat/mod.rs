@@ -13,6 +13,7 @@ pub struct AgentSwitchOutcome {
 
 pub struct ChatService {
     backend: Box<dyn AgentBackend>,
+    default_flavor: BackendFlavor,
 }
 
 impl ChatService {
@@ -20,10 +21,11 @@ impl ChatService {
         if let Err(e) = sync_pi_model_overrides() {
             eprintln!("[chat] Failed to sync pi model overrides: {}", e);
         }
-        if let Err(e) = backend.spawn() {
+        let default_flavor = backend.config().flavor;
+        if let Err(e) = backend.spawn(None) {
             eprintln!("[chat] Failed to spawn agent backend: {}", e);
         }
-        Self { backend }
+        Self { backend, default_flavor }
     }
 
     pub fn switch_backend(&mut self, new_backend: Box<dyn AgentBackend>) -> Result<(), String> {
@@ -31,7 +33,7 @@ impl ChatService {
         if let Err(e) = sync_pi_model_overrides() {
             eprintln!("[chat] Failed to sync pi model overrides: {}", e);
         }
-        backend.spawn()?;
+        backend.spawn(None)?;
         self.backend = backend;
         Ok(())
     }
@@ -40,19 +42,61 @@ impl ChatService {
         self.backend.config().flavor
     }
 
-    /// Cambia entre pi y little-coder en caliente: re-spawnea el proceso con el
-    /// otro binario preservando modelo, proveedor, thinking level y agente activo.
+    /// Cambia el backend global default (llamado desde Settings).
+    /// Actualiza el default global y, si no hay agente con engine activo, cambia el backend activo.
     pub fn switch_backend_flavor(&mut self, flavor: BackendFlavor) -> Result<(), String> {
+        if self.default_flavor == flavor {
+            return Ok(());
+        }
+        self.default_flavor = flavor;
+
+        // Si no hay agente con engine forzando backend, aplicar el cambio
+        if self.backend.config().flavor != flavor {
+            let current_session_id = self.backend.get_state()
+                .ok()
+                .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
+                .and_then(|v| v.get("data").and_then(|d| d.get("sessionId")).and_then(|s| s.as_str()).map(str::to_string));
+
+            let mut new_config = self.backend.config().clone();
+            new_config.flavor = flavor;
+            new_config.pi_path = find_pi_path();
+            new_config.lc_path = find_little_coder_path();
+
+            let pending_prompt = self.backend.peek_agent_prompt();
+
+            let mut new_backend: Box<dyn AgentBackend> = Box::new(PiAgentBackend::new(new_config));
+            if pending_prompt.is_some() {
+                new_backend.set_agent_prompt(pending_prompt);
+            }
+
+            new_backend.spawn(current_session_id.as_deref())?;
+
+            self.backend = new_backend;
+        }
+        Ok(())
+    }
+
+    /// Obtiene el flavor default global (para Settings)
+    pub fn get_default_flavor(&self) -> BackendFlavor {
+        self.default_flavor
+    }
+
+    /// Switch backend sin tocar default_flavor (uso interno para agents con engine)
+    fn switch_backend_internal(&mut self, flavor: BackendFlavor) -> Result<(), String> {
         if self.backend.config().flavor == flavor {
             return Ok(());
         }
+
+        let current_session_id = self.backend.get_state()
+            .ok()
+            .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
+            .and_then(|v| v.get("data").and_then(|d| d.get("sessionId")).and_then(|s| s.as_str()).map(str::to_string));
 
         let mut new_config = self.backend.config().clone();
         new_config.flavor = flavor;
         new_config.pi_path = find_pi_path();
         new_config.lc_path = find_little_coder_path();
 
-        // Preservar un prompt de agente aún no consumido por send_message
         let pending_prompt = self.backend.peek_agent_prompt();
 
         let mut new_backend: Box<dyn AgentBackend> = Box::new(PiAgentBackend::new(new_config));
@@ -60,7 +104,10 @@ impl ChatService {
             new_backend.set_agent_prompt(pending_prompt);
         }
 
-        self.switch_backend(new_backend)
+        new_backend.spawn(current_session_id.as_deref())?;
+
+        self.backend = new_backend;
+        Ok(())
     }
 
     /// Cambia de agente. Si el agente declara `engine` (pi | little-coder),
@@ -70,6 +117,13 @@ impl ChatService {
     /// warning opcional (p. ej. engine inválido o little-coder no instalado).
     pub fn switch_agent(&mut self, entry: &crate::config::sub_agents::SubAgentEntry) -> Result<AgentSwitchOutcome, String> {
         let mut warning: Option<String> = None;
+
+        // Determinar flavor objetivo: engine del agente o default global
+        let target_flavor = entry.engine.as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .and_then(BackendFlavor::parse_strict)
+            .unwrap_or(self.default_flavor);
 
         if let Some(engine_raw) = entry.engine.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
             match BackendFlavor::parse_strict(engine_raw) {
@@ -82,7 +136,7 @@ impl ChatService {
                 }
                 Some(flavor) => {
                     if flavor != self.backend.config().flavor {
-                        self.switch_backend_flavor(flavor)?;
+                        self.switch_backend_internal(flavor)?;
                     }
                 }
                 None => {
@@ -93,6 +147,11 @@ impl ChatService {
                         self.backend.config().flavor.as_str()
                     ));
                 }
+            }
+        } else {
+            // Sin engine: usar default global
+            if target_flavor != self.backend.config().flavor {
+                self.switch_backend_internal(target_flavor)?;
             }
         }
 

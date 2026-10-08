@@ -470,18 +470,7 @@
         </button>
       {/if}
 
-      <button
-        class="flex items-center gap-1 font-mono text-xs {switching_backend ? 'text-accent-detail animate-pulse' : 'text-print/50 hover:text-print'} transition-colors rounded"
-        onclick={() => select_backend(backend_flavor === "little-coder" ? "pi" : "little-coder")}
-        disabled={streaming || switching_backend}
-        title="Cambiar backend del agente (pi / little-coder)"
-      >
-        <Icon
-          icon={backend_flavor === "little-coder" ? "mdi:chip" : "simple-icons:pi"}
-          class="w-4 h-4"
-        />
-        {$state.eager(backend_flavor)}
-      </button>
+
 
       <div class="relative" bind:this={dropdown_container}>
         <button

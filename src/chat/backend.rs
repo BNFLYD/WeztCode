@@ -428,13 +428,13 @@ impl SseEvent {
 }
 
 pub trait AgentBackend: Send {
-    fn spawn(&mut self) -> Result<(), String>;
+    fn spawn(&mut self, session_id: Option<&str>) -> Result<(), String>;
     fn send_message(&mut self, message: &str) -> Result<tokio::sync::mpsc::Receiver<SseEvent>, String>;
     fn shutdown(&mut self);
 
     fn restart(&mut self) -> Result<(), String> {
         self.shutdown();
-        self.spawn()
+        self.spawn(None)
     }
 
     fn get_session_stats(&self) -> Result<String, String> {
@@ -860,7 +860,7 @@ impl AgentBackend for PiAgentBackend {
         Ok(rx)
     }
 
-    fn spawn(&mut self) -> Result<(), String> {
+    fn spawn(&mut self, session_id: Option<&str>) -> Result<(), String> {
         let binary = match self.config.flavor {
             BackendFlavor::Pi => self.config.pi_path.clone(),
             BackendFlavor::LittleCoder => self.config.lc_path.clone(),
@@ -870,6 +870,11 @@ impl AgentBackend for PiAgentBackend {
         cmd.args(["--mode", "rpc"])
             .arg("--provider").arg(&self.config.provider)
             .arg("--model").arg(&self.config.model);
+
+        // Preserve session across engine switches (pi <-> little-coder)
+        if let Some(sid) = session_id {
+            cmd.arg("--session-id").arg(sid);
+        }
 
         if matches!(self.config.flavor, BackendFlavor::LittleCoder) {
             // little-coder lanza pi con --no-extensions; este flag restaura la
@@ -1008,7 +1013,7 @@ impl NullBackend {
 }
 
 impl AgentBackend for NullBackend {
-    fn spawn(&mut self) -> Result<(), String> {
+    fn spawn(&mut self, _session_id: Option<&str>) -> Result<(), String> {
         Ok(())
     }
 
