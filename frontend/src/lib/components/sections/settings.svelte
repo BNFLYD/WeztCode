@@ -3,6 +3,8 @@
 
   let theme = "Dinamico";
   let font_size = 14;
+  let backend_flavor = "pi";
+  let loading_backend = false;
 
   let keys = [];
   let show_add_form = false;
@@ -113,6 +115,44 @@
   }
 
   load_keys();
+
+  async function load_backend() {
+    loading_backend = true;
+    try {
+      const res = await fetch("/api/chat/backend");
+      const data = await res.json();
+      if (data.ok && data.data) {
+        backend_flavor = data.data.backend;
+      }
+    } catch {
+      // keep default
+    } finally {
+      loading_backend = false;
+    }
+  }
+
+  async function switch_backend() {
+    if (loading_backend) return;
+    loading_backend = true;
+    const new_backend = backend_flavor === "pi" ? "little-coder" : "pi";
+    try {
+      const res = await fetch("/api/chat/switch-backend", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ backend: new_backend }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        backend_flavor = new_backend;
+      }
+    } catch {
+      // ignore
+    } finally {
+      loading_backend = false;
+    }
+  }
+
+  load_backend();
 </script>
 
 <div class="space-y-4 py-4">
@@ -291,6 +331,37 @@
         class="font-semibold text-sm px-3 py-1.5 bg-back rounded text-print self-start hover:bg-accent/50 hover:text-back"
         >Editar agentes</button
       >
+    </div>
+  </div>
+
+  <hr class="border-accent/50 my-2" />
+
+  <div class="flex flex-col gap-3">
+    <h3 class="text-md font-bold text-print uppercase tracking-wide">
+      Backend de IA
+    </h3>
+    <p class="text-md text-print">
+      Cambia entre <code>pi</code> (estándar) y <code>little-coder</code> (optimizado para modelos pequeños).
+      Este valor es el default global: solo aplica a agentes SIN <code>engine</code> en su .md
+      y al estado "sin agente seleccionado".
+    </p>
+    <div class="flex items-center gap-3">
+      <span class="text-sm text-print/50">Actual:</span>
+      <select
+        bind:value={backend_flavor}
+        disabled={loading_backend}
+        class="px-3 py-2 bg-back border border-accent-detail rounded text-xs text-print-contrast outline-none w-auto"
+      >
+        <option value="pi">pi</option>
+        <option value="little-coder">little-coder</option>
+      </select>
+      <button
+        on:click={switch_backend}
+        disabled={loading_backend}
+        class="font-semibold text-sm px-3 py-1.5 bg-back rounded text-print self-start hover:bg-accent/50 hover:text-back"
+      >
+        {loading_backend ? "Cambiando..." : "Cambiar"}
+      </button>
     </div>
   </div>
 </div>
