@@ -33,6 +33,9 @@
   let last_switch_response = $state(null);
   let backend_flavor = $state("pi");
   let switching_backend = $state(false);
+  // STT por voxtype (mic del chat)
+  let mic_recording = $state(false);
+  let mic_transcribing = $state(false);
 
   function save() {
     const raw = JSON.stringify(messages);
@@ -43,6 +46,47 @@
       // Si excede cuota, guardamos solo los últimos 50 mensajes
       const trimmed = messages.slice(-50);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
+    }
+  }
+
+  async function toggle_mic() {
+    if (mic_transcribing) return; // un solo frente a la vez
+
+    if (!mic_recording) {
+      // Empezar a grabar
+      try {
+        const res = await fetch("/api/stt/voxtype/start", { method: "POST" });
+        const data = await res.json();
+        if (data.ok) {
+          mic_recording = true;
+        } else {
+          warnings = [...warnings, data.error ?? "No se pudo iniciar la grabación"];
+        }
+      } catch (e) {
+        warnings = [...warnings, `Mic falló: ${e?.message ?? e}`];
+      }
+    } else {
+      // Parar → esperar transcripción → texto al input
+      mic_recording = false;
+      mic_transcribing = true;
+      try {
+        const res = await fetch("/api/stt/voxtype/stop", { method: "POST" });
+        const data = await res.json();
+        if (data.ok) {
+          const text = data.data?.text ?? "";
+          if (text) {
+            input_value = input_value ? input_value.trimEnd() + " " + text : text;
+          } else {
+            warnings = [...warnings, "Grabación vacía (no se detectó voz)"];
+          }
+        } else {
+          warnings = [...warnings, data.error ?? "No se pudo transcribir"];
+        }
+      } catch (e) {
+        warnings = [...warnings, `Transcripción falló: ${e?.message ?? e}`];
+      } finally {
+        mic_transcribing = false;
+      }
     }
   }
 
@@ -579,8 +623,16 @@
         </div>
 
         <div class="absolute right-[25px] -bottom-1 z-50">
-          <button class="text-print/50 hover:text-print active:scale-50 transition-transform">
-            <Icon icon="si:mic-detailed-fill" class="w-4 h-4" />
+          <button
+            class="{mic_recording ? 'text-red-400 animate-pulse' : 'text-print/50 hover:text-print'} active:scale-50 transition-transform"
+            onclick={toggle_mic}
+            disabled={mic_transcribing}
+            title={mic_transcribing ? "Transcribiendo..." : mic_recording ? "Grabando — click para parar" : "Dictar por voz"}
+          >
+            <Icon
+              icon={mic_transcribing ? "svg-spinners:bars-scale-fade" : "si:mic-detailed-fill"}
+              class="w-4 h-4"
+            />
           </button>
         </div>
       </div>
