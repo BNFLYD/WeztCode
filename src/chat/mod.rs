@@ -150,6 +150,11 @@ impl ChatService {
         self.backend.restart()
     }
 
+    /// Aborta el turno en curso del backend (pi/little-coder).
+    pub fn abort(&mut self) -> Result<(), String> {
+        self.backend.abort_stream()
+    }
+
     pub fn send_message_stream(&mut self, message: &str) -> Result<tokio::sync::mpsc::Receiver<String>, String> {
         let mut rx = self.backend.send_message(message)?;
         let (tx, out_rx) = tokio::sync::mpsc::channel::<String>(64);

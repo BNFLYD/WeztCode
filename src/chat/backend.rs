@@ -458,6 +458,11 @@ pub trait AgentBackend: Send {
         Err("set_model_rpc not supported by this backend".to_string())
     }
 
+    /// Aborta el turno en curso (fire-and-forget: no espera respuesta del agente).
+    fn abort_stream(&mut self) -> Result<(), String> {
+        Err("abort not supported by this backend".to_string())
+    }
+
     fn config(&self) -> &ChatConfig;
 }
 
@@ -570,6 +575,32 @@ impl PiAgentBackend {
             Err(format!("set_model failed: {}", err))
         }
     }
+
+    /// Aborta el turno en curso: escribe el comando `abort` al stdin de pi/little-coder.
+    /// Fire-and-forget a propósito: el thread lector del stream retiene el lock de
+    /// stdout hasta `agent_end`, así que esperar la respuesta con rpc_exchange sería
+    /// un deadlock. pi responde el abort más adelante y esa línea la descarta el
+    /// rpc_exchange del próximo comando (correlación por id); tras abortar, pi emite
+    /// `agent_end` y el lector del stream cierra limpio.
+    pub fn abort_stream(&mut self) -> Result<(), String> {
+        let stdin = self.stdin.as_ref()
+            .ok_or_else(|| "Pi not spawned (stdin is None)".to_string())?;
+
+        let id = format!(
+            "weztcode-abort-{}",
+            RPC_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+        );
+        let msg = serde_json::json!({"type": "abort", "id": id});
+        let msg_str = serde_json::to_string(&msg)
+            .map_err(|e| format!("JSON serialize: {}", e))?;
+
+        let mut stdin_lock = stdin.lock().map_err(|e| format!("stdin lock: {}", e))?;
+        writeln!(stdin_lock, "{}", msg_str)
+            .map_err(|e| format!("Failed to write abort: {}", e))?;
+        stdin_lock.flush()
+            .map_err(|e| format!("Failed to flush abort: {}", e))?;
+        Ok(())
+    }
 }
 
 impl AgentBackend for PiAgentBackend {
@@ -595,6 +626,10 @@ impl AgentBackend for PiAgentBackend {
 
     fn set_model_rpc(&mut self, provider: &str, model_id: &str) -> Result<(), String> {
         PiAgentBackend::set_model_rpc(self, provider, model_id)
+    }
+
+    fn abort_stream(&mut self) -> Result<(), String> {
+        PiAgentBackend::abort_stream(self)
     }
 
     fn config(&self) -> &ChatConfig {

@@ -47,6 +47,23 @@ pub async fn handle_chat_new_session() -> impl IntoResponse {
     }
 }
 
+/// POST /chat/abort — aborta el turno EN CURSO del agente (pi/little-coder).
+/// A diferencia del corte de conexión del frontend, esto le dice al proceso
+/// que deje de pensar/ejecutar de verdad.
+pub async fn handle_chat_abort() -> impl IntoResponse {
+    let result = tokio::task::spawn_blocking(|| {
+        let mut service = crate::CHAT_SERVICE.lock()
+            .map_err(|e| format!("Lock: {}", e))?;
+        service.abort()?;
+        Ok::<_, String>(())
+    }).await.unwrap();
+
+    match result {
+        Ok(_) => ok_json(serde_json::json!({"ok": true})),
+        Err(e) => err_json(&config::keys::redact_keys(&e)),
+    }
+}
+
 pub async fn handle_chat_switch_model(
     Json(body): Json<serde_json::Value>,
 ) -> impl IntoResponse {

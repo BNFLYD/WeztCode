@@ -230,7 +230,12 @@
     }
   }
 
-  function cancel() {
+  async function cancel() {
+    // Abortar el turno en pi/little-coder de verdad; sin esto solo cortábamos
+    // la conexión del frontend y el modelo seguía pensando igual.
+    try {
+      await fetch("/api/chat/abort", { method: "POST" });
+    } catch {}
     abort_controller?.abort();
     abort_controller = null;
     streaming = false;
