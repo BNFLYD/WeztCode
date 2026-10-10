@@ -702,12 +702,12 @@
       >
         <button
           class="rounded-lg absolute inset-0 bg-accent-detail translate-x-[14%] skew-x-[-20deg] origin-right"
-          aria-label={streaming ? "Cancelar" : "Enviar"}
-          onclick={streaming ? cancel : send}
+          aria-label={mic_recording ? "Parar grabación" : streaming ? "Cancelar" : "Enviar"}
+          onclick={mic_recording ? toggle_mic : streaming ? cancel : send}
         ></button>
 
         <Icon
-          icon={streaming ? "mdi:circle" : "mingcute:navigation-fill"}
+          icon={mic_recording ? "mdi:square" : streaming ? "mdi:circle" : "mingcute:navigation-fill"}
           class="pointer-events-none text-back-deep w-6 h-6 relative z-10 transition-transform group-active:scale-75"
         />
       </div>
