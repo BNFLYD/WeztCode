@@ -8,6 +8,7 @@ pub mod models;
 pub mod projects;
 pub mod sub_agents;
 pub mod terminal;
+pub mod voxtype;
 
 use std::path::PathBuf;
 
@@ -62,6 +63,9 @@ pub fn router() -> Router {
         .route("/fs/rename", get(fs::handle_rename))
         .route("/fs/move", get(fs::handle_move))
         .route("/fs/image", get(fs::handle_image))
+        .route("/stt/voxtype/start", post(voxtype::handle_voxtype_start))
+        .route("/stt/voxtype/stop", post(voxtype::handle_voxtype_stop))
+        .route("/stt/voxtype/status", get(voxtype::handle_voxtype_status))
 }
 
 pub type ApiResponse = (StatusCode, Json<serde_json::Value>);

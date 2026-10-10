@@ -23,3 +23,7 @@ pi_path = "pi"
 
 -- Ruta al binario little-coder (opcional, solo si no está en las rutas habituales)
 -- lc_path = "/home/mori/.local/share/pnpm/little-coder"
+
+-- STT por mic (voxtype): ruta al binario (opcional, default "voxtype" en PATH)
+-- Requiere el daemon corriendo: systemctl --user start voxtype
+-- voxtype_path = "voxtype"

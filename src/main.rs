@@ -3,6 +3,7 @@ mod config;
 mod gui;
 mod terminal;
 mod chat;
+mod stt_voxtype;
 
 use gui::{GuiPlatform, Gtk4Platform};
 use terminal::{TerminalProtocol, WeztermProtocol};
