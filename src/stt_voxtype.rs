@@ -34,23 +34,10 @@ fn stt_file() -> PathBuf {
     PathBuf::from(temp_dir).join("weztcode-voxtype-stt.txt")
 }
 
-/// ¿Está corriendo el daemon? (`voxtype status` sale 0 si responde).
-pub fn daemon_ok() -> Result<bool, String> {
-    let out = Command::new(voxtype_binary())
-        .arg("status")
-        .output()
-        .map_err(|e| format!("Failed to run voxtype: {}", e))?;
-    Ok(out.status.success())
-}
-
 /// Inicia la grabación por mic; la transcripción se escribirá en stt_file().
+/// Sin pre-check del daemon: `record start` ya reporta un error claro si está
+/// caído, y ahorrar ese spawn extra reduce la latencia del click a la mitad.
 pub fn record_start() -> Result<(), String> {
-    if !daemon_ok()? {
-        return Err(
-            "Voxtype daemon no está corriendo. Inicialo con: systemctl --user start voxtype".to_string(),
-        );
-    }
-
     // Limpiar transcripción anterior para no leer texto viejo en un fallo.
     let _ = std::fs::remove_file(stt_file());
 

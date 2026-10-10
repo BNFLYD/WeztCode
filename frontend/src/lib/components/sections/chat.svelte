@@ -36,6 +36,7 @@
   // STT por voxtype (mic del chat)
   let mic_recording = $state(false);
   let mic_transcribing = $state(false);
+  let mic_starting = $state(false);
 
   function save() {
     const raw = JSON.stringify(messages);
@@ -50,20 +51,24 @@
   }
 
   async function toggle_mic() {
-    if (mic_transcribing) return; // un solo frente a la vez
+    if (mic_transcribing || mic_starting) return; // un solo frente a la vez
 
     if (!mic_recording) {
-      // Empezar a grabar
+      // Empezar a grabar — UI optimista: rojo instantáneo; revertimos si falla
+      mic_starting = true;
+      mic_recording = true;
       try {
         const res = await fetch("/api/stt/voxtype/start", { method: "POST" });
         const data = await res.json();
-        if (data.ok) {
-          mic_recording = true;
-        } else {
+        if (!data.ok) {
+          mic_recording = false;
           warnings = [...warnings, data.error ?? "No se pudo iniciar la grabación"];
         }
       } catch (e) {
+        mic_recording = false;
         warnings = [...warnings, `Mic falló: ${e?.message ?? e}`];
+      } finally {
+        mic_starting = false;
       }
     } else {
       // Parar → esperar transcripción → texto al input
@@ -624,7 +629,7 @@
 
         <div class="absolute right-[25px] -bottom-1 z-50">
           <button
-            class="{mic_recording ? 'text-red-400 animate-pulse' : 'text-print/50 hover:text-print'} active:scale-50 transition-transform"
+            class="{mic_recording ? 'text-red-400 animate-pulse' : 'text-print/50 hover:text-print'} active:scale-50 transition-transform p-2 -m-2"
             onclick={toggle_mic}
             disabled={mic_transcribing}
             title={mic_transcribing ? "Transcribiendo..." : mic_recording ? "Grabando — click para parar" : "Dictar por voz"}
