@@ -15,6 +15,9 @@ pub struct SubAgentEntry {
     pub system_prompt: String,
     pub tools: Option<String>,
     pub skills: Option<String>,
+    /// Carpeta de assets visuales del agente (channel del chat), opcional.
+    #[serde(default)]
+    pub assets: Option<String>,
     #[serde(default)]
     pub default: bool,
 }

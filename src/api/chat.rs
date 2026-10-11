@@ -1,10 +1,12 @@
 use axum::{
-    extract::Json,
+    extract::{Json, Query},
+    http::{header, StatusCode},
     response::sse::{Event, KeepAlive, Sse},
-    response::IntoResponse,
+    response::{IntoResponse, Response},
 };
 use futures::stream::Stream;
 use tokio_stream::StreamExt;
+use std::collections::HashMap;
 use std::convert::Infallible;
 
 use crate::api::{err_json, ok_json, ApiResponse};
@@ -115,6 +117,28 @@ pub async fn handle_chat_active_agent() -> impl IntoResponse {
     match result {
         Ok(agent) => ok_json(serde_json::json!({"ok": true, "data": {"agent": if agent.is_empty() { serde_json::Value::Null } else { serde_json::Value::String(agent) }}})),
         Err(e) => err_json(&config::keys::redact_keys(&e)),
+    }
+}
+
+/// GET /chat/asset?state=standby|talking|thinking|confused — imagen del estado
+/// visual del agente activo (channel del chat en el monitor). Sirve bytes
+/// crudos; el frontend la cachea por URL de estado.
+pub async fn handle_chat_asset(
+    Query(params): Query<HashMap<String, String>>,
+) -> Response {
+    let state = params.get("state").cloned().unwrap_or_default();
+
+    let result = tokio::task::spawn_blocking(move || {
+        let service = crate::CHAT_SERVICE.lock()
+            .map_err(|e| format!("Lock: {}", e))?;
+        service.agent_asset(&state)
+    }).await.unwrap();
+
+    match result {
+        Ok((content_type, bytes)) => {
+            (StatusCode::OK, [(header::CONTENT_TYPE, content_type.as_str())], bytes).into_response()
+        }
+        Err(e) => err_json(&config::keys::redact_keys(&e)).into_response(),
     }
 }
 

@@ -1,12 +1,60 @@
 <script>
   import { onMount, tick } from "svelte";
   import Icon from "@iconify/svelte";
+  import ChatChannel from "../ui/channels/chat_channel.svelte";
+
+  // Bindings del monitor (runes: bindable): el channel del chat dibuja el
+  // visual del agente activo según su estado (assets de su .md).
+  let {
+    active_section = "chat",
+    active_channel = $bindable(null),
+    is_distorting = $bindable(false),
+  } = $props();
 
   const STORAGE_KEY = "weztcode_chat_messages";
 
   // Scope activo: "default" o el nombre del agente. Cada scope tiene su propia
   // conversación (sesión persistida por agente en el backend).
   let active_scope = $state("default");
+
+  // Estado visual del agente para el channel del monitor:
+  // standby | talking | thinking | confused (según el streaming de pi/lc).
+  let agent_visual = $state("standby");
+  // Ownership del channel: solo lo soltamos si lo pusimos nosotros. Evita pisar
+  // el channel del explorer cuando el modelo streamea desde otra sección.
+  let channel_owned = $state(false);
+
+  function set_visual(state) {
+    if (agent_visual !== state) agent_visual = state;
+  }
+
+  function flash_static(ms = 400) {
+    is_distorting = true;
+    setTimeout(() => (is_distorting = false), ms);
+  }
+
+  // Channel del monitor: visible SOLO en la sección chat y SOLO si el agente
+  // activo define assets. Nunca lee active_channel (evita loops de $effect).
+  // Fuera de la sección chat los cambios de estado visual son no-op: el canal
+  // de otra sección queda intacto.
+  $effect(() => {
+    const in_chat = active_section === "chat";
+    const agent = current_agent
+      ? sub_agents.find(a => a.name === current_agent)
+      : null;
+    const show = in_chat && !!agent?.assets;
+
+    if (show) {
+      active_channel = {
+        component: ChatChannel,
+        props: { state: agent_visual, agent_name: current_agent },
+      };
+      channel_owned = true;
+    } else if (channel_owned) {
+      active_channel = null;
+      channel_owned = false;
+    }
+  });
 
   function scope_key(scope) {
     return scope === "default" ? STORAGE_KEY : `${STORAGE_KEY}__${scope}`;
@@ -185,10 +233,12 @@
             switch (data.type) {
               case "token":
                 messages[messages.length - 1].content += data.content;
+                set_visual("talking");
                 save();
                 break;
               case "tool_call":
                 messages[messages.length - 1].content += `\n\n[${data.name}]`;
+                set_visual("thinking");
                 save();
                 break;
               case "warning":
@@ -196,6 +246,7 @@
                 break;
               case "error":
                 messages[messages.length - 1].content += `\n\nError: ${data.message}`;
+                set_visual("confused");
                 save();
                 break;
               case "session_stats":
@@ -230,6 +281,12 @@
       messages[messages.length - 1].content = "(empty response)";
     }
 
+    // Fin del turno: vuelve a stand-by, salvo que haya quedado en confused
+    // (ese estado es sticky hasta el próximo mensaje).
+    if (agent_visual === "thinking" || agent_visual === "talking") {
+      set_visual("standby");
+    }
+
     abort_controller = null;
     streaming = false;
     save();
@@ -254,6 +311,7 @@
     abort_controller?.abort();
     abort_controller = null;
     streaming = false;
+    set_visual("standby");
   }
 
   function handle_keydown(e) {
@@ -461,6 +519,9 @@
         // Cache instantáneo + reconciliación con la sesión real
         messages = load_scope(active_scope);
         await reconcile_messages();
+
+        // Estática de cambio de agente + visual nuevo en el monitor
+        if (agent?.assets) flash_static();
         await tick();
       } else {
         // Sin este else, un fallo (p. ej. set_model RPC inválido) era invisible:
@@ -552,6 +613,12 @@
     // Cache del scope activo + reconciliación con la sesión real
     messages = load_scope(active_scope);
     await reconcile_messages();
+
+    // Aparición del agente al bootear: estática + visual en el monitor
+    const boot_agent = current_agent
+      ? sub_agents.find(a => a.name === current_agent)
+      : null;
+    if (boot_agent?.assets) flash_static();
   }
 
   init();

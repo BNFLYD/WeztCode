@@ -5,6 +5,15 @@ pub use backend::*;
 
 use std::thread;
 
+/// Normaliza claves de assets: minúsculas y SOLO alfanuméricos.
+/// "stand by" / "stand-by" / "StandBy" → "standby".
+fn normalize_asset_key(s: &str) -> String {
+    s.to_lowercase()
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric())
+        .collect()
+}
+
 /// Resultado de cambiar de agente: el backend efectivo (post engine-switch)
 /// y un warning descriptivo si el engine pedido no pudo aplicarse.
 pub struct AgentSwitchOutcome {
@@ -286,6 +295,46 @@ impl ChatService {
     /// Historial real de la sesión activa (para que la UI refleje la verdad).
     pub fn get_messages(&self) -> Result<String, String> {
         self.backend.get_messages()
+    }
+
+    /// Imagen del estado visual del agente activo (channel del chat en el
+    /// monitor). `state` se matchea contra el nombre de archivo ignorando
+    /// espacios/guiones/bajos y mayúsculas ("standby" matchea "stand by.gif"
+    /// y "stand-by.gif" a la vez). Sirve (content_type, bytes).
+    pub fn agent_asset(&self, state: &str) -> Result<(String, Vec<u8>), String> {
+        let name = self.active_agent()
+            .ok_or_else(|| "Sin agente activo (el chat default no tiene assets)".to_string())?;
+        let entry = crate::config::sub_agents::get_by_name(name)
+            .ok_or_else(|| format!("Agente '{}' no encontrado", name))?;
+        let dir_raw = entry.assets.as_deref().map(str::trim).filter(|s| !s.is_empty())
+            .ok_or_else(|| format!("Agente '{}' no define assets en su .md", name))?;
+
+        let dir = std::path::PathBuf::from(dir_raw);
+        let want = normalize_asset_key(state);
+        if want.is_empty() {
+            return Err("Estado vacío".to_string());
+        }
+
+        let entries = std::fs::read_dir(&dir)
+            .map_err(|e| format!("assets dir '{}' inaccesible: {}", dir_raw, e))?;
+        for fs_entry in entries.flatten() {
+            let path = fs_entry.path();
+            let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+            if normalize_asset_key(stem) == want {
+                let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+                let content_type = match ext.as_str() {
+                    "png" => "image/png",
+                    "jpg" | "jpeg" => "image/jpeg",
+                    "webp" => "image/webp",
+                    "svg" => "image/svg+xml",
+                    _ => "image/gif",
+                };
+                let bytes = std::fs::read(&path)
+                    .map_err(|e| format!("leer {:?}: {}", path, e))?;
+                return Ok((content_type.to_string(), bytes));
+            }
+        }
+        Err(format!("Asset '{}' no encontrado en {}", state, dir_raw))
     }
 
     pub fn restart_backend(&mut self) -> Result<(), String> {

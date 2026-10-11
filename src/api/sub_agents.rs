@@ -15,6 +15,7 @@ pub async fn handle_list() -> impl IntoResponse {
                 "icon": a.icon,
                 "engine": a.engine,
                 "default": a.default,
+                "assets": a.assets,
             })
         })
         .collect();

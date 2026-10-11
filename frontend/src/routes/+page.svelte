@@ -33,7 +33,7 @@
     {#if active_section === "explorer"}
       <ExplorerSection {active_section} bind:active_channel bind:is_distorting {pending_explorer_path} />
     {:else if active_section === "chat"}
-      <ChatSection />
+      <ChatSection {active_section} bind:active_channel bind:is_distorting />
     {:else if active_section === "git"}
       <GitSection />
     {:else if active_section === "view"}
