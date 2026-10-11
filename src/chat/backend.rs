@@ -428,13 +428,15 @@ impl SseEvent {
 }
 
 pub trait AgentBackend: Send {
-    fn spawn(&mut self) -> Result<(), String>;
+    /// Spawnea el proceso. `session_id` retoma/crea la sesión de ese scope
+    /// (sesiones por agente); None = comportamiento default de pi.
+    fn spawn(&mut self, session_id: Option<&str>) -> Result<(), String>;
     fn send_message(&mut self, message: &str) -> Result<tokio::sync::mpsc::Receiver<SseEvent>, String>;
     fn shutdown(&mut self);
 
     fn restart(&mut self) -> Result<(), String> {
         self.shutdown();
-        self.spawn()
+        self.spawn(None)
     }
 
     fn get_session_stats(&self) -> Result<String, String> {
@@ -456,6 +458,16 @@ pub trait AgentBackend: Send {
 
     fn set_model_rpc(&mut self, _provider: &str, _model_id: &str) -> Result<(), String> {
         Err("set_model_rpc not supported by this backend".to_string())
+    }
+
+    /// Cambia a una sesión existente en caliente (mismo proceso, sin respawn).
+    fn switch_session_rpc(&mut self, _session_path: &str) -> Result<(), String> {
+        Err("switch_session not supported by this backend".to_string())
+    }
+
+    /// Historial real de la sesión actual (formato de pi: array de mensajes).
+    fn get_messages(&self) -> Result<String, String> {
+        Err("get_messages not supported by this backend".to_string())
     }
 
     /// Aborta el turno en curso (fire-and-forget: no espera respuesta del agente).
@@ -551,6 +563,43 @@ impl PiAgentBackend {
         }
     }
 
+    /// Cambia a una sesión existente en caliente (mismo proceso, sin respawn).
+    pub fn switch_session_rpc(&mut self, session_path: &str) -> Result<(), String> {
+        let stdin = self.stdin.as_ref()
+            .ok_or_else(|| "Pi not spawned (stdin is None)".to_string())?;
+        let stdout_arc = self.stdout.as_ref()
+            .ok_or_else(|| "Pi not spawned (stdout is None)".to_string())?;
+
+        let json = rpc_exchange(stdin, stdout_arc, "switch_session", serde_json::json!({
+            "type": "switch_session",
+            "sessionPath": session_path,
+        }))?;
+
+        let success = json.get("success").and_then(|v| v.as_bool()).unwrap_or(false);
+        if success {
+            Ok(())
+        } else {
+            let err = json.get("error")
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown error");
+            Err(format!("switch_session failed: {}", err))
+        }
+    }
+
+    /// Historial real de la sesión actual (respuesta completa del RPC, JSON).
+    pub fn get_messages(&self) -> Result<String, String> {
+        let stdin = self.stdin.as_ref()
+            .ok_or_else(|| "Pi not spawned (stdin is None)".to_string())?;
+        let stdout_arc = self.stdout.as_ref()
+            .ok_or_else(|| "Pi not spawned (stdout is None)".to_string())?;
+
+        let json = rpc_exchange(stdin, stdout_arc, "get_messages", serde_json::json!({
+            "type": "get_messages",
+        }))?;
+
+        serde_json::to_string(&json).map_err(|e| format!("JSON serialize: {}", e))
+    }
+
     pub fn set_model_rpc(&mut self, provider: &str, model_id: &str) -> Result<(), String> {
         let stdin = self.stdin.as_ref()
             .ok_or_else(|| "Pi not spawned (stdin is None)".to_string())?;
@@ -626,6 +675,14 @@ impl AgentBackend for PiAgentBackend {
 
     fn set_model_rpc(&mut self, provider: &str, model_id: &str) -> Result<(), String> {
         PiAgentBackend::set_model_rpc(self, provider, model_id)
+    }
+
+    fn switch_session_rpc(&mut self, session_path: &str) -> Result<(), String> {
+        PiAgentBackend::switch_session_rpc(self, session_path)
+    }
+
+    fn get_messages(&self) -> Result<String, String> {
+        PiAgentBackend::get_messages(self)
     }
 
     fn abort_stream(&mut self) -> Result<(), String> {
@@ -895,7 +952,7 @@ impl AgentBackend for PiAgentBackend {
         Ok(rx)
     }
 
-    fn spawn(&mut self) -> Result<(), String> {
+    fn spawn(&mut self, session_id: Option<&str>) -> Result<(), String> {
         let binary = match self.config.flavor {
             BackendFlavor::Pi => self.config.pi_path.clone(),
             BackendFlavor::LittleCoder => self.config.lc_path.clone(),
@@ -905,6 +962,12 @@ impl AgentBackend for PiAgentBackend {
         cmd.args(["--mode", "rpc"])
             .arg("--provider").arg(&self.config.provider)
             .arg("--model").arg(&self.config.model);
+
+        // Sesiones por scope: retomar la conversación de ese agente (o crearla
+        // si es la primera vez). pi/little-coder comparten almacenamiento.
+        if let Some(sid) = session_id {
+            cmd.arg("--session-id").arg(sid);
+        }
 
         if matches!(self.config.flavor, BackendFlavor::LittleCoder) {
             // little-coder lanza pi con --no-extensions; este flag restaura la
@@ -1043,7 +1106,7 @@ impl NullBackend {
 }
 
 impl AgentBackend for NullBackend {
-    fn spawn(&mut self) -> Result<(), String> {
+    fn spawn(&mut self, _session_id: Option<&str>) -> Result<(), String> {
         Ok(())
     }
 

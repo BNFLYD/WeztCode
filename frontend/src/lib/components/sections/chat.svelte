@@ -4,7 +4,29 @@
 
   const STORAGE_KEY = "weztcode_chat_messages";
 
-  let messages = $state(JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"));
+  // Scope activo: "default" o el nombre del agente. Cada scope tiene su propia
+  // conversación (sesión persistida por agente en el backend).
+  let active_scope = $state("default");
+
+  function scope_key(scope) {
+    return scope === "default" ? STORAGE_KEY : `${STORAGE_KEY}__${scope}`;
+  }
+  function save_scope(scope) {
+    const raw = JSON.stringify(messages);
+    // localStorage tiene ~5MB, pero prevenimos truncamiento
+    try {
+      localStorage.setItem(scope_key(scope), raw);
+    } catch {
+      // Si excede cuota, guardamos solo los últimos 50 mensajes
+      const trimmed = messages.slice(-50);
+      localStorage.setItem(scope_key(scope), JSON.stringify(trimmed));
+    }
+  }
+  function load_scope(scope) {
+    return JSON.parse(localStorage.getItem(scope_key(scope)) || "[]");
+  }
+
+  let messages = $state(load_scope("default"));
   let input_value = $state("");
   let streaming = $state(false);
   let list_ref = $state(null);
@@ -39,15 +61,7 @@
   let mic_starting = $state(false);
 
   function save() {
-    const raw = JSON.stringify(messages);
-    // localStorage tiene ~5MB, pero prevenimos truncamiento
-    try {
-      localStorage.setItem(STORAGE_KEY, raw);
-    } catch {
-      // Si excede cuota, guardamos solo los últimos 50 mensajes
-      const trimmed = messages.slice(-50);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
-    }
+    save_scope(active_scope);
   }
 
   async function toggle_mic() {
@@ -104,7 +118,8 @@
     show_warnings = false;
     real_context_percent = null;
     real_context_window = null;
-    localStorage.removeItem(STORAGE_KEY);
+    // Reset solo del scope activo: las demás conversaciones quedan intactas.
+    localStorage.removeItem(scope_key(active_scope));
     user_interacted = false;
   }
 
@@ -360,9 +375,8 @@
       const data = await res.json();
       if (data.ok) {
         current_model = name;
-        // Model override: clear agent indicator since user chose manually
-        current_agent = null;
-        current_icon = null;
+        // NOTA: ya no se mata el agente activo al cambiar el modelo manualmente:
+        // la personalidad sigue viva en la sesión del scope (cambio de modelo ≠ cambio de conversación).
       }
     } catch {
       // Si falla, el nombre no se actualiza
@@ -377,6 +391,33 @@
     }
   }
 
+  // La sesión de pi es la fuente de verdad: reemplaza el cache de la UI con el
+  // historial real de la sesión activa (sobrevive restarts, borrados de
+  // localStorage y conversaciones externas vía pi --resume).
+  async function reconcile_messages() {
+    try {
+      const res = await fetch("/api/chat/messages");
+      const data = await res.json();
+      if (data.ok && Array.isArray(data.data?.messages)) {
+        messages = data.data.messages
+          .filter(m => m.role === "user" || m.role === "assistant")
+          .map(m => {
+            let content = Array.isArray(m.content)
+              ? m.content.filter(c => c?.type === "text").map(c => c.text).join("")
+              : String(m.content ?? "");
+            // El backend inyecta el prompt del agente como prefijo del primer
+            // mensaje de una sesión nueva; la UI solo muestra el mensaje real.
+            content = content.replace(/^\[System instructions\]\n[\s\S]*?\n\n---\n\n/, "");
+            return { role: m.role, content };
+          })
+          .filter(m => m.content.trim().length > 0);
+        save();
+      }
+    } catch (e) {
+      console.error("[chat] reconcile_messages:", e);
+    }
+  }
+
   async function select_agent(name) {
     user_interacted = true;
     show_agent_dropdown = false;
@@ -387,36 +428,39 @@
       return;
     }
 
-    if (!name) {
-      // "ninguno" — switch back to default model without agent
-      current_agent = null;
-      current_icon = null;
-      const default_model = models.find((m) => m.default);
-      if (default_model) {
-        await select_model(default_model.name);
-      }
-      return;
-    }
     try {
-      const res = await fetch("/api/sub-agents/switch", {
+      // Selector unificado: agente por nombre, o null para el chat default.
+      // Cada scope tiene su propia sesión; el backend la retoma/crea.
+      const res = await fetch("/api/chat/select-scope", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ agent: name }),
       });
       const data = await res.json();
       if (data.ok) {
-        current_agent = data.data.agent;
-        const agentModel = data.data.model;
-        const resolved = models.find(m =>
-          m.name.localeCompare(agentModel, undefined, { sensitivity: 'base' }) === 0
-        );
-        current_model = resolved ? resolved.name : agentModel;
+        // Swap de conversación: guardar la actual bajo su scope y cargar la nueva
+        save_scope(active_scope);
+        current_agent = name;
+        active_scope = name || "default";
+
+        // Feedback visual del agente/modelo (el backend ya aplicó todo)
+        const agent = name ? sub_agents.find(a => a.name === name) : null;
+        current_icon = agent?.icon || null;
+        if (agent?.model) {
+          const resolved = models.find(m =>
+            m.name.localeCompare(agent.model, undefined, { sensitivity: 'base' }) === 0
+          );
+          current_model = resolved ? resolved.name : agent.model;
+        } else {
+          const dm = models.find(m => m.default);
+          if (dm) current_model = dm.name;
+        }
         last_switch_response = data.data;
-        current_icon = data.data.icon || null;
-        // El agente puede forzar engine (pi | little-coder): sincronizar el
-        // backend del header/toggle con el que efectivamente quedó activo.
-        if (data.data.backend) backend_flavor = data.data.backend;
         if (data.data.warning) warnings = [...warnings, data.data.warning];
+
+        // Cache instantáneo + reconciliación con la sesión real
+        messages = load_scope(active_scope);
+        await reconcile_messages();
         await tick();
       } else {
         // Sin este else, un fallo (p. ej. set_model RPC inválido) era invisible:
@@ -481,20 +525,33 @@
   );
 
   async function init() {
-    await Promise.all([load_models(), load_sub_agents(), load_backend_flavor()]);
-    if (!user_interacted && current_agent === null && sub_agents.length > 0) {
-      const default_agent = sub_agents.find((a) => a.default);
-      if (default_agent) {
-        current_agent = default_agent.name;
-        current_icon = default_agent.icon || null;
-        if (default_agent.model) {
-          const resolved = models.find(m =>
-            m.name.localeCompare(default_agent.model, undefined, { sensitivity: 'base' }) === 0
-          );
-          current_model = resolved ? resolved.name : default_agent.model;
-        }
+    await Promise.all([load_models(), load_sub_agents()]);
+
+    // Scope de arranque: el backend bootea directo con la sesión del agente
+    // default (o del chat default). Preguntamos la verdad en vez de asumir.
+    try {
+      const res = await fetch("/api/chat/active-agent");
+      const data = await res.json();
+      if (data.ok && data.data) {
+        current_agent = data.data.agent || null;
       }
+    } catch {}
+
+    active_scope = current_agent || "default";
+    const agent = current_agent
+      ? sub_agents.find(a => a.name === current_agent)
+      : null;
+    current_icon = agent?.icon || null;
+    if (agent?.model) {
+      const resolved = models.find(m =>
+        m.name.localeCompare(agent.model, undefined, { sensitivity: 'base' }) === 0
+      );
+      current_model = resolved ? resolved.name : agent.model;
     }
+
+    // Cache del scope activo + reconciliación con la sesión real
+    messages = load_scope(active_scope);
+    await reconcile_messages();
   }
 
   init();
