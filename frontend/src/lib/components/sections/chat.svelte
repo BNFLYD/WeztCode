@@ -760,10 +760,13 @@
   <div class="flex flex-col shrink-0">
     <div class="flex mt-auto pt-2 pb-2 w-full items-stretch relative">
       <div
-        class="-mr-2 flex-1 relative px-5 py-6 bg-transparent rounded-l-lg flex items-center justify-center overflow-hidden group"
+        class="-mr-2 flex-1 relative bg-transparent rounded-l-lg flex items-center justify-center overflow-hidden group"
       >
+        <!-- El fondo skeweado es IN-FLOW (antes absolute inset-0): su altura sigue
+             a la del textarea, así el área de input crece hacia arriba al escribir
+             varias líneas (la lista de mensajes flex-1 se achica). -->
         <div
-          class="rounded-lg absolute inset-0 bg-back -translate-x-[4%] skew-x-[-20deg] origin-left"
+          class="rounded-lg bg-back -translate-x-[4%] skew-x-[-20deg] origin-left w-full px-5 py-6"
         >
           <textarea
             rows="1"
