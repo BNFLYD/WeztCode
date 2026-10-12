@@ -47,7 +47,17 @@
     if (show) {
       active_channel = {
         component: ChatChannel,
-        props: { state: agent_visual, agent_name: current_agent },
+        props: {
+          state: agent_visual,
+          agent_name: current_agent,
+          // El canal se auto-cierra al salir de la sección chat (la sección se
+          // desmonta y este $effect muere; el canal detecta el cambio solo,
+          // igual que el explorer_channel).
+          on_close: () => {
+            active_channel = null;
+            channel_owned = false;
+          },
+        },
       };
       channel_owned = true;
     } else if (channel_owned) {
