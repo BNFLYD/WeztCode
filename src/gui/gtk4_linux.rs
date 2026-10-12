@@ -533,7 +533,14 @@ impl Gtk4Platform {
                             }
                         }
                     }
-                    Ok(_) => {} // WindowCreated, WindowDestroyed - ignore
+                    Ok(WmEvent::WindowDestroyed { app_id: _ }) => {
+                        // Kill switch: la ventana de wezterm ES el ciclo de vida de
+                        // la app — si el usuario la cierra, WeztCode se apaga
+                        // completo (el pi/lc hijo muere solo por EOF de stdin).
+                        eprintln!("[weztcode] WezTerm cerrado — apagando WeztCode");
+                        std::process::exit(0);
+                    }
+                    Ok(_) => {} // WindowCreated - ignore
                     Err(std::sync::mpsc::TryRecvError::Empty) => break,
                     Err(std::sync::mpsc::TryRecvError::Disconnected) => return glib::ControlFlow::Break,
                 }

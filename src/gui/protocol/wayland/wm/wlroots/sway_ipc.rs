@@ -336,6 +336,14 @@ impl SwayIpcClient {
                         Self::fullscreen_trigger(event, target_app_id, sender);
                     }
                 }
+                "close" => {
+                    // Kill switch: la ventana de wezterm es el ciclo de vida de
+                    // la app — cerrarla apaga WeztCode completo.
+                    println!("[SwayIPC] -> close: WindowDestroyed (kill switch)");
+                    let _ = sender.send(WmEvent::WindowDestroyed {
+                        app_id: target_app_id.to_string()
+                    });
+                }
                 _ => {
                     // Other changes - ignore
                 }
