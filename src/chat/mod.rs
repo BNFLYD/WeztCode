@@ -99,8 +99,20 @@ impl ChatService {
     fn refresh_session_state(&mut self) {
         self.current_session_id = None;
         self.prompt_dirty = false;
-        let Ok(state) = self.backend.get_state() else { return };
-        let Ok(v) = serde_json::from_str::<serde_json::Value>(&state) else { return };
+        let state = match self.backend.get_state() {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("[chat] refresh_session_state: get_state falló: {}", e);
+                return;
+            }
+        };
+        let v = match serde_json::from_str::<serde_json::Value>(&state) {
+            Ok(v) => v,
+            Err(e) => {
+                eprintln!("[chat] refresh_session_state: JSON inválido: {}", e);
+                return;
+            }
+        };
         let data = v.get("data");
         if let Some(sid) = data
             .and_then(|d| d.get("sessionId"))
@@ -143,6 +155,14 @@ impl ChatService {
     /// Respawn del proceso con otro sabor/engine, retomando la sesión indicada.
     /// El prompt lo maneja ChatService (prompt_dirty): nada que preservar acá.
     fn respawn_with_session(&mut self, flavor: BackendFlavor, sid: &str) -> Result<(), String> {
+        // Apagar el backend viejo ANTES de spawnear el nuevo. Sin esto, el viejo
+        // moría asincrónicamente por EOF de stdin y había una ventana donde dos
+        // procesos convivían con el mismo archivo de sesión abierto (little-coder
+        // incluso podía huérfanar a su pi nieto) — el proceso nuevo podía morir en
+        // esa ventana y el primer mensaje pegaba contra un pipe roto. shutdown()
+        // SIGTERM-ea el process group completo y espera el exit real.
+        self.backend.shutdown();
+
         let mut new_config = self.backend.config().clone();
         new_config.flavor = flavor;
         new_config.pi_path = find_pi_path();
@@ -297,17 +317,17 @@ impl ChatService {
         self.backend.get_messages()
     }
 
-    /// Imagen del estado visual del agente activo (channel del chat en el
-    /// monitor). `state` se matchea contra el nombre de archivo ignorando
-    /// espacios/guiones/bajos y mayúsculas ("standby" matchea "stand by.gif"
-    /// y "stand-by.gif" a la vez). Sirve (content_type, bytes).
-    pub fn agent_asset(&self, state: &str) -> Result<(String, Vec<u8>), String> {
-        let name = self.active_agent()
-            .ok_or_else(|| "Sin agente activo (el chat default no tiene assets)".to_string())?;
-        let entry = crate::config::sub_agents::get_by_name(name)
-            .ok_or_else(|| format!("Agente '{}' no encontrado", name))?;
+    /// Imagen del estado visual de un agente (channel del chat en el monitor).
+    /// Resuelve por el agente EXPLÍCITO (parámetro de la UI, no el estado global)
+    /// para que el cache del browser key-ee por agent+state y no pegue el asset
+    /// de un agente con el URL de otro. `state` se matchea contra el nombre de
+    /// archivo ignorando espacios/guiones/bajos y mayúsculas ("standby" matchea
+    /// "stand by.gif" y "stand-by.gif" a la vez). Devuelve (content_type, bytes).
+    pub fn agent_asset(&self, agent: &str, state: &str) -> Result<(String, Vec<u8>), String> {
+        let entry = crate::config::sub_agents::get_by_name(agent)
+            .ok_or_else(|| format!("Agente '{}' no encontrado", agent))?;
         let dir_raw = entry.assets.as_deref().map(str::trim).filter(|s| !s.is_empty())
-            .ok_or_else(|| format!("Agente '{}' no define assets en su .md", name))?;
+            .ok_or_else(|| format!("Agente '{}' no define assets en su .md", agent))?;
 
         let dir = std::path::PathBuf::from(dir_raw);
         let want = normalize_asset_key(state);

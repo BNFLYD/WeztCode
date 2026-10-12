@@ -1,14 +1,14 @@
 <script>
   // Channel del chat: visual del agente activo en el monitor, según su estado.
-  // Los bytes los sirve el backend (/api/chat/asset) resolviendo el archivo
-  // desde la carpeta `assets:` del .md del agente; el browser cachea por URL
-  // de estado, así que los swaps entre talking/thinking/etc. son instantáneos.
+  // El URL key-ea por agent+state: el cache del browser guarda el asset correcto
+  // de cada agente (switch → URL distinto → imagen nueva, y volver al agente
+  // anterior pega al cache: 0 requests).
   export let state = "standby"; // standby | talking | thinking | confused
   export let agent_name = "";
 </script>
 
 <img
-  src="/api/chat/asset?state={state}"
+  src="/api/chat/asset?agent={encodeURIComponent(agent_name)}&state={state}"
   class="absolute inset-0 w-full h-full object-contain"
   alt={agent_name}
   draggable="false"

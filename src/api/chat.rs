@@ -120,25 +120,46 @@ pub async fn handle_chat_active_agent() -> impl IntoResponse {
     }
 }
 
-/// GET /chat/asset?state=standby|talking|thinking|confused — imagen del estado
-/// visual del agente activo (channel del chat en el monitor). Sirve bytes
-/// crudos; el frontend la cachea por URL de estado.
+/// GET /chat/asset?agent=Miku&state=standby|talking|thinking|confused — imagen
+/// del estado visual de un agente (channel del chat en el monitor). El agente va
+/// EXPLÍCITO en el URL para que el cache del browser key-ee por agent+state
+/// (switch de agente → URL distinto → imagen correcta). Éxito: cache fuerte de
+/// un día; error: 404 + no-store (una respuesta JSON rota no debe pegarse).
 pub async fn handle_chat_asset(
     Query(params): Query<HashMap<String, String>>,
 ) -> Response {
+    let agent = params.get("agent").cloned().unwrap_or_default();
     let state = params.get("state").cloned().unwrap_or_default();
+    let log_ctx = format!("agent={} state={}", agent, state);
 
     let result = tokio::task::spawn_blocking(move || {
         let service = crate::CHAT_SERVICE.lock()
             .map_err(|e| format!("Lock: {}", e))?;
-        service.agent_asset(&state)
+        service.agent_asset(&agent, &state)
     }).await.unwrap();
 
     match result {
         Ok((content_type, bytes)) => {
-            (StatusCode::OK, [(header::CONTENT_TYPE, content_type.as_str())], bytes).into_response()
+            (
+                StatusCode::OK,
+                [
+                    (header::CONTENT_TYPE, content_type.as_str()),
+                    (header::CACHE_CONTROL, "public, max-age=86400"),
+                ],
+                bytes,
+            ).into_response()
         }
-        Err(e) => err_json(&config::keys::redact_keys(&e)).into_response(),
+        Err(e) => {
+            eprintln!("[chat] asset error ({}): {}", log_ctx, e);
+            (
+                StatusCode::NOT_FOUND,
+                [
+                    (header::CONTENT_TYPE, "text/plain; charset=utf-8"),
+                    (header::CACHE_CONTROL, "no-store"),
+                ],
+                config::keys::redact_keys(&e),
+            ).into_response()
+        }
     }
 }
 
