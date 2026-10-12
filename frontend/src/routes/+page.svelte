@@ -21,6 +21,13 @@
 
   function handle_section_change(id) {
     if (id !== "explorer") pending_explorer_path = null;
+    // Los canales viven SOLO dentro de su sección: al cambiar, la página
+    // (siempre montada, dueña de active_channel) limpia el monitor. Cada
+    // sección re-setea su canal al montarse. Sin esto, un canal de vida larga
+    // (como el del chat) quedaba pegado: su sección dueña se desmontaba y
+    // nadie podía limpiarlo sin escribir post-unmount sobre un componente
+    // destruido.
+    active_channel = null;
     active_section = id;
   }
 </script>
