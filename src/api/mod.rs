@@ -5,6 +5,7 @@ pub mod fs;
 pub mod git;
 pub mod keys;
 pub mod models;
+pub mod ports;
 pub mod projects;
 pub mod sub_agents;
 pub mod terminal;
@@ -71,6 +72,10 @@ pub fn router() -> Router {
         .route("/stt/voxtype/start", post(voxtype::handle_voxtype_start))
         .route("/stt/voxtype/stop", post(voxtype::handle_voxtype_stop))
         .route("/stt/voxtype/status", get(voxtype::handle_voxtype_status))
+        .route("/ports/list", get(ports::handle_ports_list))
+        .route("/ports/open", post(ports::handle_port_open))
+        .route("/ports/close", post(ports::handle_port_close))
+        .route("/ports/status", get(ports::handle_port_status))
 }
 
 pub type ApiResponse = (StatusCode, Json<serde_json::Value>);

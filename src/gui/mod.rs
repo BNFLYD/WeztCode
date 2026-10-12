@@ -17,5 +17,6 @@ pub trait GuiPlatform {
 
 pub mod gtk4_linux;
 pub mod protocol;
+pub mod viewer;
 
 pub use gtk4_linux::Gtk4Platform;
