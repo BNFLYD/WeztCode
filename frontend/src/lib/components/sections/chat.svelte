@@ -96,6 +96,7 @@
   let pending_agent = $state(null);
   let pending_model = $state(null);
   let abort_controller = $state(null);
+  let input_ref = $state(null);
   let models_error = $state(null);
   let agents_error = $state(null);
   let user_interacted = $state(false);
@@ -300,6 +301,9 @@
       pending_model = null;
       await select_model(model);
     }
+
+    // Foco de vuelta al input para escribir seguido
+    input_ref?.focus();
   }
 
   async function cancel() {
@@ -312,6 +316,7 @@
     abort_controller = null;
     streaming = false;
     set_visual("standby");
+    input_ref?.focus();
   }
 
   function handle_keydown(e) {
@@ -320,6 +325,17 @@
       send();
     }
   }
+
+  // Auto-resize del textarea: crece con el contenido hasta ~160px (~5 líneas),
+  // después scrollea adentro. Reaccionar a input_value también resetea la altura
+  // cuando send() limpia el campo.
+  $effect(() => {
+    input_value;
+    if (input_ref) {
+      input_ref.style.height = "auto";
+      input_ref.style.height = Math.min(input_ref.scrollHeight, 160) + "px";
+    }
+  });
 
   function handle_tab_keydown(e) {
     if (e.key === "Tab" && sub_agents.length > 0) {
@@ -523,6 +539,7 @@
         // Estática de cambio de agente + visual nuevo en el monitor
         if (agent?.assets) flash_static();
         await tick();
+        input_ref?.focus();
       } else {
         // Sin este else, un fallo (p. ej. set_model RPC inválido) era invisible:
         // el Tab parecía no hacer nada.
@@ -558,6 +575,8 @@
   }
 
   onMount(() => {
+    // Foco automático: al entrar a la sección (se remonta), el cursor queda listo para escribir.
+    input_ref?.focus();
     document.addEventListener("click", handle_click_outside);
     document.addEventListener("keydown", handle_tab_keydown);
     document.addEventListener("keydown", handle_debug_keydown);
@@ -746,14 +765,15 @@
         <div
           class="rounded-lg absolute inset-0 bg-back -translate-x-[4%] skew-x-[-20deg] origin-left"
         >
-          <input
-            type="text"
+          <textarea
+            rows="1"
             placeholder="Decime lo que pensás..."
             bind:value={input_value}
+            bind:this={input_ref}
             onkeydown={handle_keydown}
             disabled={streaming}
-            class="w-full skew-x-[20deg] pl-4 pr-2 bg-transparent rounded-lg text-lg text-print-contrast placeholder:text-print-contrast/50 outline-none"
-          />
+            class="w-full skew-x-[20deg] pl-4 pr-2 bg-transparent rounded-lg text-lg text-print-contrast placeholder:text-print-contrast/50 outline-none resize-none overflow-y-auto max-h-40"
+          ></textarea>
         </div>
 
         <div class="absolute right-[25px] -bottom-1 z-50">
