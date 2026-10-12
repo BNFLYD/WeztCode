@@ -97,6 +97,8 @@
   let pending_model = $state(null);
   let abort_controller = $state(null);
   let input_ref = $state(null);
+  let input_spacer_ref = $state(null);
+  let base_line_h = 0; // altura de 1 línea del textarea (medida al montar)
   let models_error = $state(null);
   let agents_error = $state(null);
   let user_interacted = $state(false);
@@ -326,14 +328,20 @@
     }
   }
 
-  // Auto-resize del textarea: crece con el contenido hasta ~160px (~5 líneas),
-  // después scrollea adentro. Reaccionar a input_value también resetea la altura
-  // cuando send() limpia el campo.
+  // Auto-resize del textarea: crece con el contenido hasta ~3 líneas, después
+  // scrollea adentro. El spacer in-flow refleja SOLO el excedente sobre la
+  // primera línea, así el contenedor conserva sus proporciones originales con
+  // 1 línea y crece hacia arriba a partir de la segunda.
   $effect(() => {
     input_value;
     if (input_ref) {
       input_ref.style.height = "auto";
-      input_ref.style.height = Math.min(input_ref.scrollHeight, 160) + "px";
+      if (!base_line_h) base_line_h = input_ref.scrollHeight;
+      const h = Math.min(input_ref.scrollHeight, base_line_h * 3);
+      input_ref.style.height = h + "px";
+      if (input_spacer_ref) {
+        input_spacer_ref.style.height = Math.max(0, h - base_line_h) + "px";
+      }
     }
   });
 
@@ -760,13 +768,10 @@
   <div class="flex flex-col shrink-0">
     <div class="flex mt-auto pt-2 pb-2 w-full items-stretch relative">
       <div
-        class="-mr-2 flex-1 relative bg-transparent rounded-l-lg flex items-center justify-center overflow-hidden group"
+        class="-mr-2 flex-1 relative px-5 py-6 bg-transparent rounded-l-lg flex items-center justify-center overflow-hidden group"
       >
-        <!-- El fondo skeweado es IN-FLOW (antes absolute inset-0): su altura sigue
-             a la del textarea, así el área de input crece hacia arriba al escribir
-             varias líneas (la lista de mensajes flex-1 se achica). -->
         <div
-          class="rounded-lg bg-back -translate-x-[4%] skew-x-[-20deg] origin-left w-full px-5 py-6"
+          class="rounded-lg absolute inset-0 bg-back -translate-x-[4%] skew-x-[-20deg] origin-left"
         >
           <textarea
             rows="1"
@@ -775,9 +780,14 @@
             bind:this={input_ref}
             onkeydown={handle_keydown}
             disabled={streaming}
-            class="w-full skew-x-[20deg] pl-4 pr-2 bg-transparent rounded-lg text-lg text-print-contrast placeholder:text-print-contrast/50 outline-none resize-none overflow-y-auto max-h-40"
+            class="w-full skew-x-[20deg] pl-4 pr-2 bg-transparent rounded-lg text-lg text-print-contrast placeholder:text-print-contrast/50 outline-none resize-none overflow-y-auto"
           ></textarea>
         </div>
+
+        <!-- Espejo in-flow de la altura del textarea: con 1 línea no aporta nada
+             (el contenedor conserva el alto original de solo py-6) y a partir de
+             la 2ª línea empuja el área hacia arriba por el excedente. -->
+        <div class="w-0" bind:this={input_spacer_ref} aria-hidden="true"></div>
 
         <div class="absolute right-[25px] -bottom-1 z-50">
           <button
@@ -850,7 +860,7 @@
       </div>
 
       <div
-        class="relative pl-5 pr-3 -ml-2 bg-transparent rounded-r-lg flex items-center justify-center overflow-hidden group"
+        class="relative self-end h-12 pl-5 pr-3 -ml-2 bg-transparent rounded-r-lg flex items-center justify-center overflow-hidden group"
       >
         <button
           class="rounded-lg absolute inset-0 bg-accent-detail translate-x-[14%] skew-x-[-20deg] origin-right"
