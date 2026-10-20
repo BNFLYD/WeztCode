@@ -28,7 +28,7 @@ pub enum WmEvent {
 pub trait WindowManager: Send + 'static {
     /// Returns a receiver for all WM events
     /// Events are sent from internal threads to this channel
-    fn event_receiver(&self) -> mpsc::Receiver<WmEvent>;
+    fn event_receiver(&self) -> tokio::sync::mpsc::UnboundedReceiver<WmEvent>;
 
     /// Start monitoring target window in background thread(s)
     /// Events will be sent to the receiver returned by event_receiver()

@@ -23,8 +23,6 @@ pub struct Gtk4Platform {
     window: Rc<RefCell<Option<ApplicationWindow>>>,
     webview: Rc<RefCell<Option<WebView>>>,
     monitor_geo: Rc<RefCell<Option<WindowGeometry>>>,
-    pending_width: Rc<RefCell<Option<u32>>>,
-    debounce_until: Rc<RefCell<Option<Instant>>>,
 }
 
 impl Gtk4Platform {
@@ -38,8 +36,6 @@ impl Gtk4Platform {
             window: Rc::new(RefCell::new(None)),
             webview: Rc::new(RefCell::new(None)),
             monitor_geo: Rc::new(RefCell::new(None)),
-            pending_width: Rc::new(RefCell::new(None)),
-            debounce_until: Rc::new(RefCell::new(None)),
         }
     }
 
@@ -433,20 +429,27 @@ impl Gtk4Platform {
     }
 
     /// Handle WM events and update window visibility accordingly
-    pub fn handle_wm_events(&self, receiver: std::sync::mpsc::Receiver<crate::gui::protocol::wayland::wm::WmEvent>) {
+    /// Handle WM events: 100% event-driven. El recv().await es un Future que
+    /// glib maneja con spawn_local — el main loop DUEERME hasta que llega el
+    /// evento (cero idle-polling). El debounce del padding usa un timer one-shot
+    /// agendado como REACCIÓN al evento (trailing): ráfagas de eventos colapsan
+    /// en una sola actualización.
+    pub fn handle_wm_events(&self, receiver: tokio::sync::mpsc::UnboundedReceiver<crate::gui::protocol::wayland::wm::WmEvent>) {
         use gtk4::glib;
         use crate::gui::protocol::wayland::wm::WmEvent;
 
         let window_weak = self.window.clone();
         let monitor_geo_weak = self.monitor_geo.clone();
-        let pending_width = self.pending_width.clone();
-        let debounce_until = self.debounce_until.clone();
 
-        glib::idle_add_local(move || {
-            // Drain all pending events in one cycle for better reactivity
-            loop {
-                match receiver.try_recv() {
-                    Ok(WmEvent::WindowFocused { app_id }) => {
+        // Debounce trailing del padding reload: width pendiente + timer one-shot
+        let pending_width: Rc<RefCell<Option<u32>>> = Rc::new(RefCell::new(None));
+        let debounce_src: Rc<RefCell<Option<glib::SourceId>>> = Rc::new(RefCell::new(None));
+
+        glib::MainContext::default().spawn_local(async move {
+            let mut receiver = receiver;
+            while let Some(event) = receiver.recv().await {
+                match event {
+                    WmEvent::WindowFocused { app_id: _ } => {
                         if let Ok(window_ref) = window_weak.try_borrow() {
                             if let Some(ref window) = *window_ref {
                                 window.set_visible(true);
@@ -454,111 +457,97 @@ impl Gtk4Platform {
                             }
                         }
                     }
-                    Ok(WmEvent::WindowUnfocused { app_id }) => {
+                    WmEvent::WindowUnfocused { app_id: _ } => {
                         if let Ok(window_ref) = window_weak.try_borrow() {
                             if let Some(ref window) = *window_ref {
                                 window.set_visible(false);
                             }
                         }
                     }
-                    Ok(WmEvent::GeometryChanged { app_id, geometry }) => {
+                    WmEvent::GeometryChanged { app_id: _, geometry } => {
                         if let Ok(window_ref) = window_weak.try_borrow() {
                             if let Some(ref window) = *window_ref {
-                                let overlay_width = ((geometry.width as f32) * 0.20).max(350.0) as i32;
-
-                                window.set_default_size(overlay_width, geometry.height);
-
-                                // Re-detect monitor geometry (handles hotplug)
-                                let fresh_monitor = Self::detect_monitor_geometry(window);
-                                if fresh_monitor.is_some() {
-                                    *monitor_geo_weak.borrow_mut() = fresh_monitor.clone();
-                                }
-                                let monitor = fresh_monitor
-                                    .or_else(|| monitor_geo_weak.borrow().clone());
-
-                                if let Some(monitor) = monitor {
-                                    let (margin_top, margin_bottom, _margin_left, margin_right) =
-                                        Self::calculate_canvas_margins(&monitor, &geometry, overlay_width);
-
-                                    window.set_margin(Edge::Top, margin_top);
-                                    window.set_margin(Edge::Bottom, margin_bottom);
-                                    window.set_margin(Edge::Right, margin_right);
-                                    crate::gui::viewer::set_menu_layout(crate::gui::viewer::MenuLayout {
-                                        top: margin_top,
-                                        bottom: margin_bottom,
-                                        right: margin_right,
-                                        width: overlay_width,
-                                    });
-                                }
-
-                                // Schedule debounced padding + reload
-                                *pending_width.borrow_mut() = Some(overlay_width as u32);
-                                *debounce_until.borrow_mut() = Some(Instant::now() + Duration::from_millis(50));
+                                Self::apply_geometry(window, &monitor_geo_weak, geometry, &pending_width, &debounce_src);
                             }
                         }
                     }
-                    Ok(WmEvent::FullscreenChanged { app_id, geometry, is_fullscreen }) => {
+                    WmEvent::FullscreenChanged { app_id: _, geometry, is_fullscreen: _ } => {
                         if let Ok(window_ref) = window_weak.try_borrow() {
                             if let Some(ref window) = *window_ref {
-                                let overlay_width = ((geometry.width as f32) * 0.20).max(350.0) as i32;
-
-                                window.set_default_size(overlay_width, geometry.height);
-
-                                // Re-detect monitor geometry (handles hotplug)
-                                let fresh_monitor = Self::detect_monitor_geometry(window);
-                                if fresh_monitor.is_some() {
-                                    *monitor_geo_weak.borrow_mut() = fresh_monitor.clone();
-                                }
-                                let monitor = fresh_monitor
-                                    .or_else(|| monitor_geo_weak.borrow().clone());
-
-                                if let Some(monitor) = monitor {
-                                    let (margin_top, margin_bottom, _margin_left, margin_right) =
-                                        Self::calculate_canvas_margins(&monitor, &geometry, overlay_width);
-
-                                    window.set_margin(Edge::Top, margin_top);
-                                    window.set_margin(Edge::Bottom, margin_bottom);
-                                    window.set_margin(Edge::Right, margin_right);
-                                    crate::gui::viewer::set_menu_layout(crate::gui::viewer::MenuLayout {
-                                        top: margin_top,
-                                        bottom: margin_bottom,
-                                        right: margin_right,
-                                        width: overlay_width,
-                                    });
-                                }
-
-                                // Schedule debounced padding + reload
-                                *pending_width.borrow_mut() = Some(overlay_width as u32);
-                                *debounce_until.borrow_mut() = Some(Instant::now() + Duration::from_millis(50));
+                                Self::apply_geometry(window, &monitor_geo_weak, geometry, &pending_width, &debounce_src);
                             }
                         }
                     }
-                    Ok(WmEvent::WindowDestroyed { app_id: _ }) => {
+                    WmEvent::WindowDestroyed { app_id: _ } => {
                         // Kill switch: la ventana de wezterm ES el ciclo de vida de
                         // la app — si el usuario la cierra, WeztCode se apaga
                         // completo (el pi/lc hijo muere solo por EOF de stdin).
                         eprintln!("[weztcode] WezTerm cerrado — apagando WeztCode");
                         std::process::exit(0);
                     }
-                    Ok(_) => {} // WindowCreated - ignore
-                    Err(std::sync::mpsc::TryRecvError::Empty) => break,
-                    Err(std::sync::mpsc::TryRecvError::Disconnected) => return glib::ControlFlow::Break,
+                    _ => {} // WindowCreated - ignore
                 }
             }
-
-            // Apply debounced padding + reload if deadline passed
-            let should_apply = debounce_until.borrow()
-                .map(|d| Instant::now() >= d)
-                .unwrap_or(false);
-            if should_apply {
-                let width = pending_width.borrow_mut().take();
-                if let Some(w) = width {
-                    Self::set_padding_and_reload(w);
-                }
-                *debounce_until.borrow_mut() = None;
-            }
-
-            glib::ControlFlow::Continue
         });
     }
+
+    /// Aplica la geometría al overlay + margen del menú (viewer) + agenda el
+    /// debounce trailing del padding (50ms one-shot).
+    fn apply_geometry(
+        window: &ApplicationWindow,
+        monitor_geo_weak: &Rc<RefCell<Option<WindowGeometry>>>,
+        geometry: WindowGeometry,
+        pending_width: &Rc<RefCell<Option<u32>>>,
+        debounce_src: &Rc<RefCell<Option<gtk4::glib::SourceId>>>,
+    ) {
+        use gtk4::glib;
+
+        let overlay_width = ((geometry.width as f32) * 0.20).max(350.0) as i32;
+        window.set_default_size(overlay_width, geometry.height);
+
+        // Re-detect monitor geometry (handles hotplug)
+        let fresh_monitor = Self::detect_monitor_geometry(window);
+        if fresh_monitor.is_some() {
+            *monitor_geo_weak.borrow_mut() = fresh_monitor.clone();
+        }
+        let monitor = fresh_monitor
+            .or_else(|| monitor_geo_weak.borrow().clone());
+
+        if let Some(monitor) = monitor {
+            let (margin_top, margin_bottom, _margin_left, margin_right) =
+                Self::calculate_canvas_margins(&monitor, &geometry, overlay_width);
+
+            window.set_margin(Edge::Top, margin_top);
+            window.set_margin(Edge::Bottom, margin_bottom);
+            window.set_margin(Edge::Right, margin_right);
+
+            // Mantener el layout del menú sincronizado para el viewer
+            crate::gui::viewer::set_menu_layout(crate::gui::viewer::MenuLayout {
+                top: margin_top,
+                bottom: margin_bottom,
+                right: margin_right,
+                width: overlay_width,
+            });
+        }
+
+        // Trailing debounce: cancelar el timer previo y re-agendar +50ms.
+        // El timer es one-shot y se agenda como reacción al evento — no hay
+        // ningún reloj vigilado en cada idle del loop.
+        if let Some(sid) = debounce_src.borrow_mut().take() {
+            sid.remove();
+        }
+        *pending_width.borrow_mut() = Some(overlay_width as u32);
+        let pw = pending_width.clone();
+        let src = debounce_src.clone();
+        let sid = glib::timeout_add_local(std::time::Duration::from_millis(50), move || {
+            *src.borrow_mut() = None;
+            if let Some(w) = pw.borrow_mut().take() {
+                Self::set_padding_and_reload(w);
+            }
+            glib::ControlFlow::Break
+        });
+        *debounce_src.borrow_mut() = Some(sid);
+    }
+
+
 }

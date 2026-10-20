@@ -45,30 +45,6 @@ impl SwayIpcClient {
     }
 
     /// Inicia un listener en un thread separado para monitorear cambios
-    pub fn subscribe_geometry_changes(
-        &self,
-        target_app_id: String,
-        sender: mpsc::Sender<WindowGeometry>,
-    ) -> Result<thread::JoinHandle<()>, String> {
-        let _socket_path = self.socket_path.clone();
-
-        let handle = thread::spawn(move || {
-            // TODO: Implementar suscripción a eventos de ventana
-            // Por ahora hacemos polling cada 100ms
-            loop {
-                if let Ok(client) = SwayIpcClient::new() {
-                    if let Some(geo) = client.get_window_geometry(&target_app_id) {
-                        let _ = sender.send(geo);
-                    }
-                }
-                thread::sleep(std::time::Duration::from_millis(100));
-            }
-        });
-
-        Ok(handle)
-    }
-
-    /// Inicia un listener en un thread separado para monitorear cambios
     /// Subscribe to window events using swaymsg CLI and send WmEvent through channel
     ///
     /// target_toplevel_id: Optional foreign_toplevel_identifier to identify the exact window instance
@@ -78,7 +54,7 @@ impl SwayIpcClient {
         &self,
         target_app_id: String,
         target_toplevel_id: Option<String>,
-        sender: mpsc::Sender<WmEvent>,
+        sender: tokio::sync::mpsc::UnboundedSender<WmEvent>,
         capture_signal_rx: mpsc::Receiver<()>,
     ) -> Result<Option<WindowGeometry>, String> {
         // Wait for signal to start monitoring (SYNCHRONOUS)
@@ -222,7 +198,7 @@ impl SwayIpcClient {
         thread::spawn(move || {
             // Spawn swaymsg process to subscribe to window and workspace events
             let mut child = match Command::new("swaymsg")
-                .args(["-t", "subscribe", "-m", "[\"window\", \"workspace\"]"])
+                .args(["-t", "subscribe", "-m", "[\"window\", \"workspace\", \"mode\", \"output\"]"])
                 .stdout(Stdio::piped())
                 .stderr(Stdio::null())
                 .spawn()
@@ -255,6 +231,21 @@ impl SwayIpcClient {
 
                         // Parse and process the event
                         if let Ok(event) = serde_json::from_str::<WindowEvent>(&json_str) {
+                            // Recaptura tardía de identidad: la query inicial puede perder
+                            // la carrera con el arranque de wezterm. El primer evento de
+                            // NUESTRA ventana trae el toplevel_id — lo capturamos acá
+                            // (el comentario original lo prometía pero nunca se implementó).
+                            if target_toplevel_id_opt.is_none()
+                                && event.container.app_id.as_deref() == Some(target_app_id.as_str())
+                            {
+                                if let Some(tid) = event.container.foreign_toplevel_identifier.clone() {
+                                    println!("[SwayIPC] Recaptura de toplevel_id desde evento: {}", tid);
+                                    target_toplevel_id_opt = Some(tid);
+                                }
+                                if target_id.is_none() {
+                                    target_id = Some(event.container.id);
+                                }
+                            }
                             // Process all events - fainting_trigger will filter by toplevel_id
                             Self::fainting_trigger(event, &target_app_id, target_toplevel_id_opt.as_deref(), target_id, &sender);
                         } else {
@@ -282,7 +273,7 @@ impl SwayIpcClient {
         target_app_id: &str,
         target_toplevel_id: Option<&str>,
         target_id: Option<i64>,
-        sender: &mpsc::Sender<WmEvent>,
+        sender: &tokio::sync::mpsc::UnboundedSender<WmEvent>,
     ) {
         let event_toplevel_id = event.container.foreign_toplevel_identifier.as_deref();
         println!("[SwayIPC] event: change={}, app_id={:?}, focused={}, toplevel_id={:?}", event.change, event.container.app_id, event.container.focused, event_toplevel_id);
@@ -392,6 +383,11 @@ impl SwayIpcClient {
             }
 
 //             println!("[SwayIPC] === TRIGGER COMPLETED ===");
+        } else if event.change.as_str() == "new" || event.change.as_str() == "close" {
+            // Un vecino nació o murió: el tiling de nuestra ventana cambió de
+            // tamaño sin que sway emita resize (tildado = silencioso). Re-query
+            // de geometría/visibilidad — mismo mecanismo reactivo que layout_trigger.
+            Self::layout_trigger(target_app_id, target_toplevel_id, target_id, sender);
         }
     }
 
@@ -451,7 +447,7 @@ impl SwayIpcClient {
     fn geometry_trigger(
         event: WindowEvent,
         target_app_id: &str,
-        sender: &mpsc::Sender<WmEvent>,
+        sender: &tokio::sync::mpsc::UnboundedSender<WmEvent>,
     ) {
         // Calculate geometry using rect + window_rect
         let global_rect = &event.container.rect;
@@ -477,7 +473,7 @@ impl SwayIpcClient {
     fn fullscreen_trigger(
         event: WindowEvent,
         target_app_id: &str,
-        sender: &mpsc::Sender<WmEvent>,
+        sender: &tokio::sync::mpsc::UnboundedSender<WmEvent>,
     ) {
         // Calculate fullscreen geometry
         let global_rect = &event.container.rect;
@@ -508,7 +504,7 @@ impl SwayIpcClient {
         target_app_id: &str,
         target_toplevel_id: Option<&str>,
         target_id: Option<i64>,
-        sender: &mpsc::Sender<WmEvent>,
+        sender: &tokio::sync::mpsc::UnboundedSender<WmEvent>,
     ) {
         println!("[SwayIPC] layout_trigger: app_id={}, toplevel_id={:?}", target_app_id, target_toplevel_id);
         let client = match Self::new() {

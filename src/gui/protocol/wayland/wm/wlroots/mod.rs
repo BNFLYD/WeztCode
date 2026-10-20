@@ -6,7 +6,7 @@ use std::sync::{Mutex, mpsc};
 use std::thread;
 
 pub struct WlrootsWindowManager {
-    sender: Mutex<Option<mpsc::Sender<WmEvent>>>,
+    sender: Mutex<Option<tokio::sync::mpsc::UnboundedSender<WmEvent>>>,
     capture_signal_receiver: Mutex<Option<mpsc::Receiver<()>>>,
 }
 
@@ -20,8 +20,8 @@ impl WlrootsWindowManager {
 }
 
 impl WindowManager for WlrootsWindowManager {
-    fn event_receiver(&self) -> mpsc::Receiver<WmEvent> {
-        let (tx, rx) = mpsc::channel();
+    fn event_receiver(&self) -> tokio::sync::mpsc::UnboundedReceiver<WmEvent> {
+        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
         *self.sender.lock().unwrap() = Some(tx);
         rx
     }
