@@ -105,6 +105,27 @@ pub async fn handle_chat_messages() -> impl IntoResponse {
     }
 }
 
+/// GET /chat/stats — stats REALES de la sesión activa: contextUsage calculado
+/// por pi contra la ventana real del modelo en uso, tokens y costo. Es el
+/// mismo número que muestra la TUI de pi.
+pub async fn handle_chat_stats() -> impl IntoResponse {
+    let result = tokio::task::spawn_blocking(|| {
+        let service = crate::CHAT_SERVICE.lock()
+            .map_err(|e| format!("Lock: {}", e))?;
+        service.get_session_stats()
+    }).await.unwrap();
+
+    match result {
+        Ok(json) => {
+            let v: serde_json::Value =
+                serde_json::from_str(&json).unwrap_or(serde_json::json!({}));
+            let data = v.get("data").cloned().unwrap_or(serde_json::json!({}));
+            ok_json(serde_json::json!({"ok": true, "data": data}))
+        }
+        Err(e) => err_json(&config::keys::redact_keys(&e)),
+    }
+}
+
 /// GET /chat/active-agent — scope con el que booteó el backend (para que el
 /// frontend arranque mostrando la conversación correcta).
 pub async fn handle_chat_active_agent() -> impl IntoResponse {

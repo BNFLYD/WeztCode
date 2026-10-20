@@ -27,6 +27,7 @@ pub fn router() -> Router {
         .route("/chat/abort", post(chat::handle_chat_abort))
         .route("/chat/select-scope", post(chat::handle_chat_select_scope))
         .route("/chat/messages", get(chat::handle_chat_messages))
+        .route("/chat/stats", get(chat::handle_chat_stats))
         .route("/chat/active-agent", get(chat::handle_chat_active_agent))
         .route("/chat/asset", get(chat::handle_chat_asset))
         .route("/chat/switch-model", post(chat::handle_chat_switch_model))

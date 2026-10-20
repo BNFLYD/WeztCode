@@ -257,8 +257,8 @@
                   const raw = JSON.parse(data.json);
                   const ctx = raw.data?.contextUsage;
                   if (ctx?.percent !== undefined) {
-                    real_context_percent =
-                      (real_context_percent ?? 0) + ctx.percent;
+                    // pi manda el percent TOTAL de la sesión: asignar, no acumular
+                    real_context_percent = ctx.percent;
                   }
                   if (ctx?.contextWindow) {
                     real_context_window = ctx.contextWindow;
@@ -500,6 +500,25 @@
     }
   }
 
+  // Percent real de la sesión activa: lo calcula pi contra la ventana de
+  // contexto real del modelo en uso (el mismo número que muestra la TUI).
+  async function load_stats() {
+    try {
+      const res = await fetch("/api/chat/stats");
+      const data = await res.json();
+      if (data.ok && data.data?.contextUsage) {
+        if (data.data.contextUsage.percent !== undefined) {
+          real_context_percent = data.data.contextUsage.percent;
+        }
+        if (data.data.contextUsage.contextWindow) {
+          real_context_window = data.data.contextUsage.contextWindow;
+        }
+      }
+    } catch {
+      // sin stats, el indicador cae al estimate local
+    }
+  }
+
   async function select_agent(name) {
     user_interacted = true;
     show_agent_dropdown = false;
@@ -543,6 +562,11 @@
         // Cache instantáneo + reconciliación con la sesión real
         messages = load_scope(active_scope);
         await reconcile_messages();
+
+        // Percent de la sesión NUEVA (resetea el del agente anterior)
+        real_context_percent = null;
+        real_context_window = null;
+        await load_stats();
 
         // Estática de cambio de agente + visual nuevo en el monitor
         if (agent?.assets) flash_static();
@@ -603,7 +627,9 @@
     messages.reduce((sum, msg) => sum + estimateTokens(msg.content), 0),
   );
   let context_limit = $derived(
-    models.find((m) => m.name === current_model)?.max_context ?? 4096,
+    models.find((m) => m.name === current_model)?.max_context
+      ?? real_context_window
+      ?? 4096,
   );
   let context_percent = $derived(
     context_limit > 0 ? (used_tokens / context_limit) * 100 : 0,
@@ -640,6 +666,7 @@
     // Cache del scope activo + reconciliación con la sesión real
     messages = load_scope(active_scope);
     await reconcile_messages();
+    await load_stats();
 
     // Aparición del agente al bootear: estática + visual en el monitor
     const boot_agent = current_agent
