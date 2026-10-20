@@ -647,9 +647,15 @@ struct Node {
     foreign_toplevel_identifier: Option<String>,
     rect: Option<Rect>,
     window_rect: Option<Rect>,
+    // Option + default: root/outputs/workspaces NO traen "focused"/"visible"
+    // en el get_tree de sway — un solo nodo incompleto rompía TODO el parseo
+    // (y con él, la captura de target_id para el kill switch).
+    focused: Option<bool>,
+    visible: Option<bool>,
+    #[serde(default)]
     nodes: Vec<Node>,
-    focused: bool,
-    visible: bool,
+    #[serde(default)]
+    floating_nodes: Vec<Node>,
 }
 
 #[derive(Debug, Deserialize, Clone, Copy)]
@@ -663,6 +669,10 @@ struct Rect {
 fn flatten_nodes(node: &Node) -> Vec<&Node> {
     let mut result = vec![node];
     for child in &node.nodes {
+        result.extend(flatten_nodes(child));
+    }
+    // Las ventanas flotantes viven en floating_nodes, no en nodes
+    for child in &node.floating_nodes {
         result.extend(flatten_nodes(child));
     }
     result
