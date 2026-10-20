@@ -196,9 +196,13 @@ impl SwayIpcClient {
 
         // Spawn event thread with captured data
         thread::spawn(move || {
-            // Spawn swaymsg process to subscribe to window and workspace events
-            let mut child = match Command::new("swaymsg")
-                .args(["-t", "subscribe", "-m", "[\"window\", \"workspace\", \"mode\", \"output\"]"])
+            // Spawn swaymsg process to subscribe to window, workspace, mode and
+            // output events. stdbuf -oL fuerza line-buffering: swaymsg es C y con
+            // stdout a pipe usa full-buffering de 4KB, lo que retenía eventos
+            // (closes/floating/moves quedaban pegados en el buffer — la causa
+            // raíz de que el recálculo "solo funcionara" con ráfagas grandes).
+            let mut child = match Command::new("stdbuf")
+                .args(["-oL", "swaymsg", "-t", "subscribe", "-m", "[\"window\", \"workspace\", \"mode\", \"output\"]"])
                 .stdout(Stdio::piped())
                 .stderr(Stdio::null())
                 .spawn()
@@ -318,7 +322,7 @@ impl SwayIpcClient {
                         });
                     }
                 }
-                "move" | "resize" => {
+                "move" | "resize" | "floating" => {
                     println!("[SwayIPC] -> geometry_trigger: change={}, x={}, y={}, w={}, h={}", event.change, geometry.x, geometry.y, geometry.width, geometry.height);
                     Self::geometry_trigger(event, target_app_id, sender);
                 }
@@ -383,11 +387,28 @@ impl SwayIpcClient {
             }
 
 //             println!("[SwayIPC] === TRIGGER COMPLETED ===");
-        } else if event.change.as_str() == "new" || event.change.as_str() == "close" {
-            // Un vecino nació o murió: el tiling de nuestra ventana cambió de
-            // tamaño sin que sway emita resize (tildado = silencioso). Re-query
-            // de geometría/visibilidad — mismo mecanismo reactivo que layout_trigger.
+        } else if event.change.as_str() == "new"
+            || event.change.as_str() == "close"
+            || event.change.as_str() == "move"
+            || event.change.as_str() == "floating"
+        {
+            // Un vecino cambió el tiling (nació, murió, se movió de workspace
+            // o togglear floating) — sway no emite resize para tildados.
+            // Re-query inmediato...
             Self::layout_trigger(target_app_id, target_toplevel_id, target_id, sender);
+
+            // ...+ confirmación diferida: los cambios de layout de sway se
+            // aplican por transacciones, así que en el instante del evento el
+            // árbol puede seguir mostrando la geometría vieja (típico al cerrar
+            // un vecino). Un re-query diferido one-shot, agendado como reacción
+            // al evento (mismo patrón que el debounce del padding, no polling).
+            let app_id = target_app_id.to_string();
+            let toplevel = target_toplevel_id.map(str::to_string);
+            let sender = sender.clone();
+            thread::spawn(move || {
+                thread::sleep(std::time::Duration::from_millis(150));
+                Self::layout_trigger(&app_id, toplevel.as_deref(), None, &sender);
+            });
         }
     }
 
