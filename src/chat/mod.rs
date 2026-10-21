@@ -76,7 +76,7 @@ impl ChatService {
             current_session_id: None,
             sessions,
         };
-        service.refresh_session_state();
+        let _ = service.refresh_session_state();
         service
     }
 
@@ -96,21 +96,18 @@ impl ChatService {
     /// Lee sessionId + messageCount del estado real del proceso. Registra el
     /// session-id real en el mapa del scope activo (p. ej. tras new_session, que
     /// genera un id nuevo) y marca prompt_dirty si la sesión está vacía.
-    fn refresh_session_state(&mut self) {
+    fn refresh_session_state(&mut self) -> Result<(), String> {
         self.current_session_id = None;
         self.prompt_dirty = false;
-        let state = match self.backend.get_state() {
-            Ok(s) => s,
-            Err(e) => {
-                eprintln!("[chat] refresh_session_state: get_state falló: {}", e);
-                return;
-            }
-        };
+        let state = self.backend.get_state().map_err(|e| {
+            eprintln!("[chat] refresh_session_state: get_state falló: {}", e);
+            format!("El proceso {} no responde tras el cambio: {} (¿murió al bootear? revisá stderr)", self.backend.config().flavor.as_str(), e)
+        })?;
         let v = match serde_json::from_str::<serde_json::Value>(&state) {
             Ok(v) => v,
             Err(e) => {
                 eprintln!("[chat] refresh_session_state: JSON inválido: {}", e);
-                return;
+                return Ok(());
             }
         };
         let data = v.get("data");
@@ -127,6 +124,7 @@ impl ChatService {
             .and_then(|c| c.as_u64())
             .unwrap_or(0);
         self.prompt_dirty = count == 0 && self.active_prompt.is_some();
+        Ok(())
     }
 
     /// Asegura que el backend corre con `flavor` y la sesión del scope:
@@ -202,7 +200,7 @@ impl ChatService {
                 self.backend.set_model_rpc(&m.provider, &m.model)?;
             }
         }
-        self.refresh_session_state();
+        self.refresh_session_state()?;
 
         Ok(AgentSwitchOutcome {
             backend: self.backend.config().flavor,
@@ -259,7 +257,7 @@ impl ChatService {
             }
         }
 
-        self.refresh_session_state();
+        self.refresh_session_state()?;
 
         Ok(AgentSwitchOutcome {
             backend: self.backend.config().flavor,
@@ -304,7 +302,7 @@ impl ChatService {
     /// registra en el mapa para que el próximo respawn retome ESTA y no la vieja.
     pub fn new_conversation(&mut self) -> Result<(), String> {
         self.backend.new_session()?;
-        self.refresh_session_state();
+        self.refresh_session_state()?;
         Ok(())
     }
 
@@ -342,25 +340,45 @@ impl ChatService {
         .to_string())
     }
 
-    /// Cambia el scope activo a una conversación existente del proyecto
-    /// actual (picker de la UI). Switch en caliente vía RPC; el mapa queda
-    /// apuntando a esta conversación para futuros respawns.
-    pub fn select_conversation(&mut self, session_id: &str) -> Result<(), String> {
-        // Validar que la conversación exista en el proyecto actual — sin
-        // confiar en paths del cliente.
+    /// Cambia a una conversación existente del proyecto actual (picker de la
+    /// UI). Si la conversación pertenece a OTRO scope (p. ej. se elige una de
+    /// Teto estando activa Miku), la persona cambia JUNTO con la conversación
+    /// — agente, prompt, modelo y engine — reusando el flujo completo de
+    /// select_scope, para no mezclar identidades ni contaminar el mapa
+    /// por-proyecto con sesiones ajenas.
+    /// Devuelve JSON {agent, scope} con el dueño resultante de la conversación.
+    pub fn select_conversation(&mut self, session_id: &str) -> Result<serde_json::Value, String> {
+        // Validar que exista en el proyecto actual — sin confiar en paths del
+        // cliente.
         let path = sessions::find_session_file(session_id).ok_or_else(|| {
             format!("Conversación '{}' no encontrada en este proyecto", session_id)
         })?;
-        if self.current_session_id.as_deref() == Some(session_id) {
-            return Ok(()); // ya está activa
+
+        // Dueño de la conversación: agente del prompt inyectado, o default.
+        let conv_agent = sessions::conversation_agent(&path);
+
+        // Cambio de persona si el dueño difiere del scope activo. select_scope
+        // aplica TODO: engine con fallbacks, modelo, prompt y su sesión mapped
+        // (que se pisa justo después con la conversación elegida).
+        if self.active_agent.as_deref() != conv_agent.as_deref() {
+            self.select_scope(conv_agent.as_deref())?;
         }
-        self.backend
-            .switch_session_rpc(&path.to_string_lossy())?;
+
+        // Registrar bajo el scope DUEÑO y retomar exactamente ESTA
+        // conversación (switch en caliente al archivo — ensure_session
+        // resuelve el path por el id).
         let scope = self.active_scope();
-        self.sessions.set(&scope, session_id.to_string());
-        self.current_session_id = Some(session_id.to_string());
-        self.refresh_session_state();
-        Ok(())
+        if self.current_session_id.as_deref() != Some(session_id) {
+            self.sessions.set(&scope, session_id.to_string());
+            let flavor = self.backend.config().flavor;
+            self.ensure_session(&scope, flavor)?;
+            self.refresh_session_state()?;
+        }
+
+        Ok(serde_json::json!({
+            "agent": conv_agent,
+            "scope": self.active_scope(),
+        }))
     }
 
     pub fn get_state(&self) -> Result<String, String> {
@@ -421,7 +439,8 @@ impl ChatService {
         let scope = self.active_scope();
         let flavor = self.backend.config().flavor;
         let sid = self.sessions.get_or_derive(&scope);
-        self.respawn_with_session(flavor, &sid)
+        self.respawn_with_session(flavor, &sid)?;
+        self.refresh_session_state()
     }
 
     /// Aborta el turno en curso del backend (pi/little-coder).

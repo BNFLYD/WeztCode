@@ -97,7 +97,6 @@
   // Picker de conversaciones del proyecto actual (botón de búsqueda de la barra).
   let conversations = $state([]);
   let show_conversations = $state(false);
-  let conversations_container = $state(null);
   let conversations_loading = $state(false);
   let conversations_error = $state(null);
   let switching_conversation = $state(false);
@@ -479,9 +478,41 @@
         return;
       }
       show_conversations = false;
+
+      // La conversación puede pertenecer a OTRO agente (o al chat default):
+      // el backend ya cambió la persona junto con ella — reflejar el cambio en
+      // la UI igual que en select_agent (icono, modelo, scope del cache).
+      const new_agent = data.data?.agent ?? null;
+      if (new_agent !== current_agent) {
+        save_scope(active_scope);
+        current_agent = new_agent;
+        active_scope = new_agent || "default";
+        const agent = new_agent ? sub_agents.find(a => a.name === new_agent) : null;
+        current_icon = agent?.icon || null;
+        if (agent?.model) {
+          const resolved = models.find(m =>
+            m.name.localeCompare(agent.model, undefined, { sensitivity: 'base' }) === 0
+          );
+          current_model = resolved ? resolved.name : agent.model;
+        } else {
+          const dm = models.find(m => m.default);
+          if (dm) current_model = dm.name;
+        }
+      }
+
+      // Cache instantáneo + reconciliación con la conversación real
+      messages = load_scope(active_scope);
       await reconcile_messages();
-      load_stats();
+
+      // Percent de la conversación nueva (resetea el de la anterior)
+      real_context_percent = null;
+      real_context_window = null;
+      await load_stats();
+
+      // Feedback visual del swap de contexto + foco en el input
       flash_static();
+      await tick();
+      input_ref?.focus();
     } catch (e) {
       warnings = [...warnings, `Cambio de conversación falló: ${e?.message ?? e}`];
     } finally {
@@ -672,13 +703,6 @@
     ) {
       show_agent_dropdown = false;
     }
-    if (
-      show_conversations &&
-      conversations_container &&
-      !conversations_container.contains(e.target)
-    ) {
-      show_conversations = false;
-    }
   }
 
   onMount(() => {
@@ -757,55 +781,14 @@
   <div
     class="flex items-center gap-2 px-3 py-2 text-sm text-accent-detail/50 border-b border-accent-detail/20 mb-2 flex-shrink-0"
   >
-    <div class="relative" bind:this={conversations_container}>
-      <button
-        class="text-accent-detail/70 hover:text-accent-detail transition-colors"
-        onclick={toggle_conversations}
-        disabled={streaming || switching || switching_conversation}
-        title="Conversaciones de este proyecto"
-      >
-        <Icon icon="ri:search-line" class="w-4 h-4" />
-      </button>
-      {#if show_conversations}
-        <div
-          class="absolute top-full left-0 mt-3 z-50 min-w-[300px] max-w-[380px] max-h-[50vh] overflow-y-auto bg-back rounded-md shadow-lg py-1 border border-accent-detail/10"
-        >
-          <div class="px-3 py-1 text-[10px] font-mono text-print/40 border-b border-accent-detail/10 mb-1">
-            Conversaciones — {conversations.length} en este proyecto
-          </div>
-          {#if conversations_loading}
-            <div class="px-3 py-2 text-xs text-print/50 font-mono">Cargando…</div>
-          {:else if conversations_error}
-            <div class="px-3 py-2 text-xs text-red-500">{conversations_error}</div>
-          {:else if conversations.length === 0}
-            <div class="px-3 py-2 text-xs text-print/50">Sin conversaciones en este proyecto</div>
-          {:else}
-            {#each conversations as c (c.id)}
-              <button
-                class="block w-full text-left px-3 py-1.5 rounded-md transition-colors
-                     {c.current
-                      ? 'bg-accent-detail/15 text-print'
-                      : 'text-print/70 hover:bg-accent-detail/10 hover:text-print'}"
-                onclick={() => pick_conversation(c.id)}
-                disabled={switching_conversation || streaming || c.current}
-              >
-                <div class="flex items-center gap-1.5 text-[11px] font-mono text-print/50">
-                  <span>{fmt_conv_date(c.modified_ms || c.created)}</span>
-                  {#if c.agent}
-                    <span class="px-1 rounded bg-accent-detail/20 text-accent-detail">{c.agent}</span>
-                  {:else}
-                    <span class="px-1 rounded bg-accent-detail/10 text-print/50">default</span>
-                  {/if}
-                  <span class="ml-auto">{c.messages} msgs</span>
-                  {#if c.current}<span class="text-accent-detail">●</span>{/if}
-                </div>
-                <div class="text-xs truncate">{c.preview ?? "(sin mensajes)"}</div>
-              </button>
-            {/each}
-          {/if}
-        </div>
-      {/if}
-    </div>
+    <button
+      class="text-accent-detail/70 hover:text-accent-detail transition-colors {show_conversations ? 'text-accent-detail' : ''}"
+      onclick={toggle_conversations}
+      disabled={streaming || switching || switching_conversation}
+      title="Conversaciones de este proyecto"
+    >
+      <Icon icon="ri:search-line" class="w-4 h-4" />
+    </button>
     <span class="font-mono truncate flex items-center gap-1 text-print/50"></span>
     <div class="ml-auto flex items-center gap-2">
       {#if warnings.length > 0}
@@ -871,6 +854,45 @@
       </button>
     </div>
   </div>
+
+  {#if show_conversations}
+    <!-- Mismo cuadro que el de advertencias; los items copian el estilo de la
+         lista de modelos (selección bg-accent-detail text-back, hover muted). -->
+    <div
+      class="mx-3 mb-2 p-2 rounded bg-back max-h-52 overflow-y-auto text-sm font-mono text-print"
+    >
+      <div class="px-1 pb-1 mb-1 text-[10px] text-print/40 border-b border-accent-detail/10">
+        Conversaciones de este proyecto ({conversations.length})
+      </div>
+      {#if conversations_loading}
+        <div class="px-3 py-1.5 text-xs text-print/50">Cargando…</div>
+      {:else if conversations_error}
+        <div class="px-3 py-1.5 text-xs text-red-500">{conversations_error}</div>
+      {:else if conversations.length === 0}
+        <div class="px-3 py-1.5 text-xs text-print/50">Sin conversaciones en este proyecto</div>
+      {:else}
+        {#each conversations as c (c.id)}
+          <button
+            class="font-semibold block w-full text-left text-sm px-3 py-1.5 rounded-md transition-colors
+                   {c.current
+                    ? 'bg-accent-detail text-back transition-colors'
+                    : 'text-print hover:bg-accent-detail/10 transition-colors'}"
+            onclick={() => pick_conversation(c.id)}
+            disabled={switching_conversation || streaming || c.current}
+          >
+            <span class="block truncate">{c.preview ?? "(sin mensajes)"}</span>
+            <span
+              class="block font-normal text-[11px] truncate
+                   {c.current ? 'text-back/70' : 'text-print/50'}"
+            >
+              {fmt_conv_date(c.modified_ms || c.created)} · {c.agent ?? "default"} ·
+              {c.messages} msgs{#if c.current} · actual{/if}
+            </span>
+          </button>
+        {/each}
+      {/if}
+    </div>
+  {/if}
 
   {#if show_warnings && warnings.length > 0}
     <div

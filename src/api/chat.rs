@@ -143,7 +143,7 @@ pub async fn handle_chat_select_conversation(
     }).await.unwrap();
 
     match result {
-        Ok(()) => ok_json(serde_json::json!({"ok": true})),
+        Ok(v) => ok_json(serde_json::json!({"ok": true, "data": v})),
         Err(e) => err_json(&config::keys::redact_keys(&e)),
     }
 }

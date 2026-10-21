@@ -296,3 +296,34 @@ fn truncate(s: &str, max: usize) -> String {
         format!("{}…", t)
     }
 }
+
+/// Dueño de una conversación: el agente detectado del prompt inyectado en su
+/// primer mensaje de usuario (None = conversación del chat default). Lee solo
+/// hasta ese mensaje — no escanea el archivo completo.
+pub fn conversation_agent(path: &std::path::Path) -> Option<String> {
+    use std::io::BufRead;
+    let file = std::fs::File::open(path).ok()?;
+    let mut reader = std::io::BufReader::new(file);
+    let mut line = String::new();
+    loop {
+        line.clear();
+        match reader.read_line(&mut line) {
+            Ok(0) | Err(_) => break,
+            Ok(_) => {}
+        }
+        let t = line.trim();
+        if t.contains("\"type\":\"message\"") && t.contains("\"role\":\"user\"") {
+            let text = extract_user_text(t)?;
+            if text.starts_with("[System instructions]") {
+                return text
+                    .trim_start_matches("[System instructions]")
+                    .trim_start()
+                    .strip_prefix("Tu nombre es ")
+                    .map(|r| r.split(',').next().unwrap_or(r).trim().to_string())
+                    .filter(|a| !a.is_empty());
+            }
+            return None; // primer mensaje real del usuario: chat default
+        }
+    }
+    None
+}
