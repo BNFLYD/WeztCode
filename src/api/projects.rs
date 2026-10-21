@@ -50,8 +50,14 @@ pub async fn handle_projects_switch(
         if !dir.is_dir() {
             return Err("Directory not found".to_string());
         }
+        // Lock del chat ANTES de tocar current_root: si un handler del chat
+        // corriera entre el cambio de root y el respawn (p. ej. el select-scope
+        // del frontend re-renderizando tras el switch), registraría el sid del
+        // proceso VIEJO bajo la clave del proyecto NUEVO y el respawn
+        // arrancaría una sesión huérfana con ese id contaminado.
+        let mut service = crate::CHAT_SERVICE.lock().unwrap();
         crate::config::current_root::set(&path)?;
-        crate::CHAT_SERVICE.lock().unwrap().restart_backend()?;
+        service.restart_backend()?;
         Ok::<_, String>(())
     }).await.unwrap();
 

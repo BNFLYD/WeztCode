@@ -5,6 +5,14 @@
 //! El mapa se guarda en ~/.config/weztcode/preferences/sessions.json para que
 //! las sesiones sobrevivan restarts de la app y para que "nueva conversación"
 //! no resucite la sesión archivada de ese scope.
+//!
+//! La clave del mapa es compuesta: "{proyecto}::{scope}". Las sesiones de pi
+//! viven en un directorio POR PROYECTO (--{cwd}--), así que un mapa global
+//! plano hacía que cambiar de proyecto creara conversaciones nuevas vacías:
+//! el id mapeado solo existía en el directorio del proyecto anterior y el
+//! respawn con --session-id generaba una sesión vacía en el proyecto actual
+//! (mientras la conversación real quedaba huérfana en el disco). Con claves
+//! por-proyecto, cada proyecto recuerda SU sesión de cada agente.
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -17,16 +25,41 @@ fn map_path() -> PathBuf {
     PathBuf::from(home).join(".config/weztcode/preferences/sessions.json")
 }
 
+/// Clave compuesta "{proyecto}::{scope}" para el mapa por-proyecto.
+fn composite_key(scope: &str) -> String {
+    let project = crate::config::current_root::get();
+    format!("{}::{}", project.to_string_lossy(), scope)
+}
+
 pub struct SessionMap {
     map: HashMap<String, String>,
 }
 
 impl SessionMap {
     pub fn load() -> Self {
-        let map = std::fs::read_to_string(map_path())
+        let mut map = std::fs::read_to_string(map_path())
             .ok()
             .and_then(|c| serde_json::from_str::<HashMap<String, String>>(&c).ok())
             .unwrap_or_default();
+        // Migración del formato viejo (claves planas, mapa global): el
+        // proyecto actual reclama las entradas huérfanas una única vez y se
+        // persiste el resultado. Es la mejor aproximación: el último id
+        // guardado pertenecía a lo que la app tenía como sesión viva.
+        let legacy: Vec<(String, String)> = map
+            .iter()
+            .filter(|(k, _)| !k.contains("::"))
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
+        if !legacy.is_empty() {
+            for (k, v) in legacy {
+                map.remove(&k);
+                let scope = k;
+                map.insert(composite_key(&scope), v);
+            }
+            let new = Self { map };
+            new.save();
+            return new;
+        }
         Self { map }
     }
 
@@ -40,20 +73,23 @@ impl SessionMap {
         }
     }
 
-    /// session-id del scope; si no existe, deriva uno del nombre y lo registra.
+    /// session-id del scope en el proyecto actual; si no existe, deriva uno
+    /// del nombre y lo registra.
     pub fn get_or_derive(&mut self, scope: &str) -> String {
-        if let Some(sid) = self.map.get(scope) {
+        let key = composite_key(scope);
+        if let Some(sid) = self.map.get(&key) {
             return sid.clone();
         }
         let sid = sanitize_id(scope);
-        self.map.insert(scope.to_string(), sid.clone());
+        self.map.insert(key, sid.clone());
         self.save();
         sid
     }
 
     pub fn set(&mut self, scope: &str, sid: String) {
-        if self.map.get(scope).map(String::as_str) != Some(sid.as_str()) {
-            self.map.insert(scope.to_string(), sid);
+        let key = composite_key(scope);
+        if self.map.get(&key).map(String::as_str) != Some(sid.as_str()) {
+            self.map.insert(key, sid);
             self.save();
         }
     }

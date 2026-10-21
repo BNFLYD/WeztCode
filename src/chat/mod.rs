@@ -172,6 +172,10 @@ impl ChatService {
         new_backend.spawn(Some(sid))?;
 
         self.backend = new_backend;
+        // El proceso corre con ESTA sesión (pi la retoma si existe en el dir
+        // del proyecto, o la crea con este id si no) — reflejarla para que el
+        // próximo ensure_session no force un switch innecesario.
+        self.current_session_id = Some(sid.to_string());
         Ok(())
     }
 
@@ -358,7 +362,15 @@ impl ChatService {
     }
 
     pub fn restart_backend(&mut self) -> Result<(), String> {
-        self.backend.restart()
+        // Re-resuelve la sesión del scope activo PARA EL PROYECTO ACTUAL (acaba
+        // de cambiar). Un spawn(None) arrancaría una sesión nueva en blanco y
+        // la conversación real de este proyecto quedaría huérfana hasta el
+        // próximo ensure_session. Con el id por-proyecto, el respawn retoma
+        // la conversación de ESTE proyecto (o la crea con el id derivado).
+        let scope = self.active_scope();
+        let flavor = self.backend.config().flavor;
+        let sid = self.sessions.get_or_derive(&scope);
+        self.respawn_with_session(flavor, &sid)
     }
 
     /// Aborta el turno en curso del backend (pi/little-coder).
