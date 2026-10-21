@@ -93,6 +93,14 @@
   let current_icon = $state(null);
   let show_agent_dropdown = $state(false);
   let agent_dropdown_container = $state(null);
+
+  // Picker de conversaciones del proyecto actual (botón de búsqueda de la barra).
+  let conversations = $state([]);
+  let show_conversations = $state(false);
+  let conversations_container = $state(null);
+  let conversations_loading = $state(false);
+  let conversations_error = $state(null);
+  let switching_conversation = $state(false);
   let pending_agent = $state(null);
   let pending_model = $state(null);
   let abort_controller = $state(null);
@@ -430,6 +438,66 @@
     switching_backend = false;
   }
 
+  // Picker de conversaciones: lista las sesiones del proyecto actual (leo
+  // directo del storage de pi) y permite retomar cualquiera — incluidas las
+  // huérfanas de switches de proyecto previos al fix del mapa por-proyecto.
+  async function load_conversations() {
+    conversations_loading = true;
+    conversations_error = null;
+    try {
+      const res = await fetch("/api/chat/conversations");
+      const data = await res.json();
+      if (data.ok && Array.isArray(data.data?.conversations)) {
+        conversations = data.data.conversations;
+      } else {
+        conversations_error = data.error ?? "No se pudo listar";
+      }
+    } catch (e) {
+      conversations_error = `Lista falló: ${e?.message ?? e}`;
+    } finally {
+      conversations_loading = false;
+    }
+  }
+
+  function toggle_conversations() {
+    show_conversations = !show_conversations;
+    if (show_conversations) load_conversations();
+  }
+
+  async function pick_conversation(id) {
+    if (switching_conversation || switching || streaming) return;
+    switching_conversation = true;
+    try {
+      const res = await fetch("/api/chat/select-conversation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        warnings = [...warnings, data.error ?? "No se pudo cambiar de conversación"];
+        return;
+      }
+      show_conversations = false;
+      await reconcile_messages();
+      load_stats();
+      flash_static();
+    } catch (e) {
+      warnings = [...warnings, `Cambio de conversación falló: ${e?.message ?? e}`];
+    } finally {
+      switching_conversation = false;
+    }
+  }
+
+  function fmt_conv_date(c) {
+    const d = typeof c === "number" ? new Date(c) : new Date(String(c).replace(" ", "T"));
+    if (isNaN(d)) return "?";
+    return d.toLocaleDateString(undefined, {
+      day: "2-digit", month: "short",
+      hour: "2-digit", minute: "2-digit",
+    });
+  }
+
   function toggle_dropdown() {
     show_dropdown = !show_dropdown;
   }
@@ -604,6 +672,13 @@
     ) {
       show_agent_dropdown = false;
     }
+    if (
+      show_conversations &&
+      conversations_container &&
+      !conversations_container.contains(e.target)
+    ) {
+      show_conversations = false;
+    }
   }
 
   onMount(() => {
@@ -682,7 +757,55 @@
   <div
     class="flex items-center gap-2 px-3 py-2 text-sm text-accent-detail/50 border-b border-accent-detail/20 mb-2 flex-shrink-0"
   >
-    <Icon icon="ri:search-line" class="w-4 h-4 hover:text-accent-detail" />
+    <div class="relative" bind:this={conversations_container}>
+      <button
+        class="text-accent-detail/70 hover:text-accent-detail transition-colors"
+        onclick={toggle_conversations}
+        disabled={streaming || switching || switching_conversation}
+        title="Conversaciones de este proyecto"
+      >
+        <Icon icon="ri:search-line" class="w-4 h-4" />
+      </button>
+      {#if show_conversations}
+        <div
+          class="absolute top-full left-0 mt-3 z-50 min-w-[300px] max-w-[380px] max-h-[50vh] overflow-y-auto bg-back rounded-md shadow-lg py-1 border border-accent-detail/10"
+        >
+          <div class="px-3 py-1 text-[10px] font-mono text-print/40 border-b border-accent-detail/10 mb-1">
+            Conversaciones — {conversations.length} en este proyecto
+          </div>
+          {#if conversations_loading}
+            <div class="px-3 py-2 text-xs text-print/50 font-mono">Cargando…</div>
+          {:else if conversations_error}
+            <div class="px-3 py-2 text-xs text-red-500">{conversations_error}</div>
+          {:else if conversations.length === 0}
+            <div class="px-3 py-2 text-xs text-print/50">Sin conversaciones en este proyecto</div>
+          {:else}
+            {#each conversations as c (c.id)}
+              <button
+                class="block w-full text-left px-3 py-1.5 rounded-md transition-colors
+                     {c.current
+                      ? 'bg-accent-detail/15 text-print'
+                      : 'text-print/70 hover:bg-accent-detail/10 hover:text-print'}"
+                onclick={() => pick_conversation(c.id)}
+                disabled={switching_conversation || streaming || c.current}
+              >
+                <div class="flex items-center gap-1.5 text-[11px] font-mono text-print/50">
+                  <span>{fmt_conv_date(c.modified_ms || c.created)}</span>
+                  {#if c.agent}
+                    <span class="px-1 rounded bg-accent-detail/20 text-accent-detail">{c.agent}</span>
+                  {:else}
+                    <span class="px-1 rounded bg-accent-detail/10 text-print/50">default</span>
+                  {/if}
+                  <span class="ml-auto">{c.messages} msgs</span>
+                  {#if c.current}<span class="text-accent-detail">●</span>{/if}
+                </div>
+                <div class="text-xs truncate">{c.preview ?? "(sin mensajes)"}</div>
+              </button>
+            {/each}
+          {/if}
+        </div>
+      {/if}
+    </div>
     <span class="font-mono truncate flex items-center gap-1 text-print/50"></span>
     <div class="ml-auto flex items-center gap-2">
       {#if warnings.length > 0}

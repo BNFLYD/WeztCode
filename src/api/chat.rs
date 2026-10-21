@@ -108,6 +108,46 @@ pub async fn handle_chat_messages() -> impl IntoResponse {
 /// GET /chat/stats — stats REALES de la sesión activa: contextUsage calculado
 /// por pi contra la ventana real del modelo en uso, tokens y costo. Es el
 /// mismo número que muestra la TUI de pi.
+/// GET /chat/conversations — lista las conversaciones del proyecto actual
+/// con la sesión actual del scope activo marcada (picker de la UI).
+pub async fn handle_chat_conversations() -> impl IntoResponse {
+    let result = tokio::task::spawn_blocking(|| {
+        let service = crate::CHAT_SERVICE.lock()
+            .map_err(|e| format!("Lock: {}", e))?;
+        service.list_conversations()
+    }).await.unwrap();
+
+    match result {
+        Ok(json) => {
+            let v: serde_json::Value =
+                serde_json::from_str(&json).unwrap_or(serde_json::json!({}));
+            ok_json(serde_json::json!({"ok": true, "data": v}))
+        }
+        Err(e) => err_json(&config::keys::redact_keys(&e)),
+    }
+}
+
+/// POST /chat/select-conversation — cambia el scope activo a una conversación
+/// existente del proyecto actual. Body: {"id": "<session-id>"}.
+pub async fn handle_chat_select_conversation(
+    Json(body): Json<serde_json::Value>,
+) -> impl IntoResponse {
+    let Some(session_id) = body.get("id").and_then(|v| v.as_str()) else {
+        return err_json("Missing 'id' field (session-id string)");
+    };
+    let session_id = session_id.to_string();
+    let result = tokio::task::spawn_blocking(move || {
+        let mut service = crate::CHAT_SERVICE.lock()
+            .map_err(|e| format!("Lock: {}", e))?;
+        service.select_conversation(&session_id)
+    }).await.unwrap();
+
+    match result {
+        Ok(()) => ok_json(serde_json::json!({"ok": true})),
+        Err(e) => err_json(&config::keys::redact_keys(&e)),
+    }
+}
+
 pub async fn handle_chat_stats() -> impl IntoResponse {
     let result = tokio::task::spawn_blocking(|| {
         let service = crate::CHAT_SERVICE.lock()

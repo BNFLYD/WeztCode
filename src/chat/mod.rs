@@ -312,6 +312,57 @@ impl ChatService {
         self.backend.get_session_stats()
     }
 
+    /// Lista las conversaciones del proyecto actual con la sesión actual del
+    /// scope activo marcada (para el picker de la UI). JSON serializado.
+    pub fn list_conversations(&self) -> Result<String, String> {
+        let convs = sessions::list_conversations();
+        let current = self.current_session_id.clone();
+        let scope = self.active_scope();
+        let items: Vec<serde_json::Value> = convs
+            .iter()
+            .map(|c| {
+                serde_json::json!({
+                    "id": c.id,
+                    "file": c.file,
+                    "created": c.created,
+                    "modified_ms": c.modified_ms,
+                    "size": c.size,
+                    "messages": c.messages,
+                    "preview": c.preview,
+                    "agent": c.agent,
+                    "current": current.as_deref() == Some(c.id.as_str()),
+                })
+            })
+            .collect();
+        Ok(serde_json::json!({
+            "conversations": items,
+            "scope": scope,
+            "project": crate::config::current_root::get().to_string_lossy(),
+        })
+        .to_string())
+    }
+
+    /// Cambia el scope activo a una conversación existente del proyecto
+    /// actual (picker de la UI). Switch en caliente vía RPC; el mapa queda
+    /// apuntando a esta conversación para futuros respawns.
+    pub fn select_conversation(&mut self, session_id: &str) -> Result<(), String> {
+        // Validar que la conversación exista en el proyecto actual — sin
+        // confiar en paths del cliente.
+        let path = sessions::find_session_file(session_id).ok_or_else(|| {
+            format!("Conversación '{}' no encontrada en este proyecto", session_id)
+        })?;
+        if self.current_session_id.as_deref() == Some(session_id) {
+            return Ok(()); // ya está activa
+        }
+        self.backend
+            .switch_session_rpc(&path.to_string_lossy())?;
+        let scope = self.active_scope();
+        self.sessions.set(&scope, session_id.to_string());
+        self.current_session_id = Some(session_id.to_string());
+        self.refresh_session_state();
+        Ok(())
+    }
+
     pub fn get_state(&self) -> Result<String, String> {
         self.backend.get_state()
     }

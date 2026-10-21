@@ -136,3 +136,163 @@ pub fn find_session_file(sid: &str) -> Option<PathBuf> {
     }
     best.map(|(_, p)| p)
 }
+
+/// Metadatos de una conversación del proyecto actual (para el picker de la UI).
+pub struct ConversationInfo {
+    pub id: String,
+    pub file: String,
+    /// Timestamp de creación (del header de sesión).
+    pub created: String,
+    /// Última modificación del archivo (epoch ms, la UI ordena/formatea).
+    pub modified_ms: u64,
+    pub size: u64,
+    /// Mensajes user+assistant (conteo aproximado por substring).
+    pub messages: u64,
+    /// Preview: primer mensaje REAL del usuario (salta el prompt inyectado).
+    pub preview: Option<String>,
+    /// Agente dueño de la conversación (detectado del prompt inyectado).
+    pub agent: Option<String>,
+}
+
+/// Lista todas las conversaciones del proyecto actual, la más reciente
+/// primero. Lee los .jsonl del directorio de sesiones de pi sin tocar el
+/// proceso vivo.
+pub fn list_conversations() -> Vec<ConversationInfo> {
+    use std::io::BufRead;
+
+    let dir = project_session_dir();
+    let Ok(entries) = std::fs::read_dir(&dir) else {
+        return Vec::new();
+    };
+
+    let mut out: Vec<ConversationInfo> = Vec::new();
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) != Some("jsonl") {
+            continue;
+        }
+        let Ok(file) = std::fs::File::open(&path) else { continue };
+        let meta = match std::fs::metadata(&path) {
+            Ok(m) => m,
+            Err(_) => continue,
+        };
+        let modified_ms = meta
+            .modified()
+            .ok()
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0);
+
+        let mut id = String::new();
+        let mut created = String::new();
+        let mut messages: u64 = 0;
+        // Primer y segundo mensaje de usuario: si el primero es el prompt
+        // inyectado del agente, el preview sale del segundo (el mensaje real).
+        let mut first_user: Option<String> = None;
+        let mut second_user: Option<String> = None;
+
+        let mut reader = std::io::BufReader::new(file);
+        let mut line = String::new();
+        loop {
+            line.clear();
+            match reader.read_line(&mut line) {
+                Ok(0) | Err(_) => break,
+                Ok(_) => {}
+            }
+            let t = line.trim();
+            if t.starts_with("{\"type\":\"session\"") {
+                if let Ok(v) = serde_json::from_str::<serde_json::Value>(t) {
+                    id = v
+                        .get("id")
+                        .and_then(|x| x.as_str())
+                        .unwrap_or_default()
+                        .to_string();
+                    created = v
+                        .get("timestamp")
+                        .and_then(|x| x.as_str())
+                        .unwrap_or_default()
+                        .to_string();
+                }
+            } else if t.contains("\"type\":\"message\"") {
+                let is_user = t.contains("\"role\":\"user\"");
+                if is_user || t.contains("\"role\":\"assistant\"") {
+                    messages += 1;
+                }
+                if is_user && second_user.is_none() {
+                    if first_user.is_none() {
+                        first_user = extract_user_text(t);
+                    } else {
+                        second_user = extract_user_text(t);
+                    }
+                }
+            }
+        }
+
+        // Fallback del id: el filename es {timestamp}_{id}.jsonl.
+        if id.is_empty() {
+            if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                if let Some(stripped) = name.strip_suffix(".jsonl") {
+                    if let Some(pos) = stripped.rfind('_') {
+                        id = stripped[pos + 1..].to_string();
+                    }
+                }
+            }
+        }
+        if id.is_empty() {
+            continue; // archivo sin id usable: ignorar
+        }
+
+        // Preview + agente: el prompt inyectado empieza con "[System instructions]".
+        let (preview, agent) = match (&first_user, &second_user) {
+            (Some(f), s) if f.starts_with("[System instructions]") => {
+                let agent = f
+                    .trim_start_matches("[System instructions]")
+                    .trim_start()
+                    .strip_prefix("Tu nombre es ")
+                    .map(|r| r.split(',').next().unwrap_or(r).trim().to_string());
+                (s.clone().map(|x| truncate(&x, 100)), agent.filter(|a| !a.is_empty()))
+            }
+            (Some(f), _) => (Some(truncate(f, 100)), None),
+            (None, _) => (None, None),
+        };
+
+        out.push(ConversationInfo {
+            id,
+            file: path.to_string_lossy().to_string(),
+            created,
+            modified_ms,
+            size: meta.len(),
+            messages,
+            preview,
+            agent,
+        });
+    }
+
+    out.sort_by(|a, b| b.modified_ms.cmp(&a.modified_ms));
+    out
+}
+
+/// Extrae el texto del content de un registro de mensaje de usuario.
+fn extract_user_text(line: &str) -> Option<String> {
+    let v = serde_json::from_str::<serde_json::Value>(line).ok()?;
+    let content = v.get("message")?.get("content")?;
+    match content {
+        serde_json::Value::String(s) => Some(s.clone()),
+        serde_json::Value::Array(arr) => Some(
+            arr.iter()
+                .filter_map(|c| c.get("text").and_then(|t| t.as_str()))
+                .collect::<Vec<_>>()
+                .join(""),
+        ),
+        _ => None,
+    }
+}
+
+fn truncate(s: &str, max: usize) -> String {
+    if s.chars().count() <= max {
+        s.to_string()
+    } else {
+        let t: String = s.chars().take(max).collect();
+        format!("{}…", t)
+    }
+}
