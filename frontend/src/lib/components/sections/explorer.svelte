@@ -30,6 +30,7 @@
   let move_input;
   let controller = null;
   let show_projects = false;
+  let switching_project = false;
   let projects = [];
   let project_loading = false;
   let pending_g = false;
@@ -306,14 +307,25 @@
   }
 
   async function select_project(path) {
-    const res = await fetch(`/api/projects/switch?path=${encodeURIComponent(path)}`);
-    const json = await res.json();
-    if (json.ok) {
-      show_projects = false;
-      projects = [];
-      await load_dir("/");
-    } else {
-      error = json.error;
+    if (switching_project) return;
+    switching_project = true;
+    try {
+      const res = await fetch(`/api/projects/switch?path=${encodeURIComponent(path)}`);
+      const json = await res.json();
+      if (json.ok) {
+        show_projects = false;
+        projects = [];
+        // El switch terminó (el backend ya corre con la sesión del proyecto
+        // NUEVO): avisarle al resto de la app. El chat escucha este evento y
+        // re-sincroniza agente/historial — sin esto, un init que corrió durante
+        // el switch quedaba con el estado del proyecto VIEJO hasta recargar.
+        window.dispatchEvent(new CustomEvent("weztcode:project-switched"));
+        await load_dir("/");
+      } else {
+        error = json.error;
+      }
+    } finally {
+      switching_project = false;
     }
   }
 
@@ -665,6 +677,12 @@
           <span class="text-print/50 text-lg">No hay proyectos</span>
         </div>
       {:else}
+        {#if switching_project}
+          <div class="flex items-center gap-2 px-3 py-2 text-print/60 text-sm font-mono border-b border-accent/10">
+            <Icon icon="svg-spinners:bars-scale-fade" class="w-4 h-4" />
+            Cambiando de proyecto…
+          </div>
+        {/if}
         {#each projects as proj, index (proj.path)}
           <!-- svelte-ignore a11y-click-events-have-key-events -->
           <!-- svelte-ignore a11y_no_static_element_interactions -->

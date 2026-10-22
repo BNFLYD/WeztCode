@@ -110,6 +110,7 @@
         body: JSON.stringify({ path: primary }),
       });
       await fetch(`/api/projects/switch?path=${encodeURIComponent(primary)}`);
+      window.dispatchEvent(new CustomEvent("weztcode:project-switched"));
       on_navigate_to_explorer("/");
     }
   }

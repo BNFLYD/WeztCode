@@ -176,7 +176,13 @@ pub async fn handle_chat_active_agent() -> impl IntoResponse {
     }).await.unwrap();
 
     match result {
-        Ok(agent) => ok_json(serde_json::json!({"ok": true, "data": {"agent": if agent.is_empty() { serde_json::Value::Null } else { serde_json::Value::String(agent) }}})),
+        Ok(agent) => ok_json(serde_json::json!({"ok": true, "data": {
+            "agent": if agent.is_empty() { serde_json::Value::Null } else { serde_json::Value::String(agent) },
+            // Proyecto actual: el frontend key-ea su cache de mensajes por
+            // proyecto+agente (el instant-paint tras un switch nunca muestra
+            // la conversación de otro proyecto).
+            "project": crate::config::current_root::get().to_string_lossy(),
+        }})),
         Err(e) => err_json(&config::keys::redact_keys(&e)),
     }
 }

@@ -56,8 +56,14 @@
     }
   });
 
+  // Proyecto actual (viene del backend en /chat/active-agent). Key-ea el
+  // cache de mensajes por proyecto+agente: el instant-paint tras un switch
+  // muestra el cache de ESTE proyecto, nunca la conversación de otro.
+  let current_project = $state("");
+
   function scope_key(scope) {
-    return scope === "default" ? STORAGE_KEY : `${STORAGE_KEY}__${scope}`;
+    const base = scope === "default" ? STORAGE_KEY : `${STORAGE_KEY}__${scope}`;
+    return current_project ? `${base}__${current_project}` : base;
   }
   function save_scope(scope) {
     const raw = JSON.stringify(messages);
@@ -593,9 +599,15 @@
           })
           .filter(m => m.content.trim().length > 0);
         save();
+      } else {
+        // Sin esto, un backend muerto a mitad de switch dejaba el cache stale
+        // mostrado en silencio (solo console.error) y parecía "el historial
+        // no cargó" hasta recargar la página.
+        warnings = [...warnings, data.error ?? "No se pudo sincronizar el historial con la sesión real"];
       }
     } catch (e) {
       console.error("[chat] reconcile_messages:", e);
+      warnings = [...warnings, "No se pudo sincronizar el historial con la sesión real"];
     }
   }
 
@@ -705,16 +717,26 @@
     }
   }
 
+  // El proyecto cambió (switch desde explorer/settings): re-sincronizar TODO
+  // con el backend nuevo. El switch del explorer ya terminó cuando este evento
+  // llega, así que las consultas ven la sesión del proyecto correcto — cubre la
+  // carrera de un init que corrió DURANTE el switch y quedó con estado viejo.
+  async function handle_project_switched() {
+    await init();
+  }
+
   onMount(() => {
     // Foco automático: al entrar a la sección (se remonta), el cursor queda listo para escribir.
     input_ref?.focus();
     document.addEventListener("click", handle_click_outside);
     document.addEventListener("keydown", handle_tab_keydown);
     document.addEventListener("keydown", handle_debug_keydown);
+    window.addEventListener("weztcode:project-switched", handle_project_switched);
     return () => {
       document.removeEventListener("click", handle_click_outside);
       document.removeEventListener("keydown", handle_tab_keydown);
       document.removeEventListener("keydown", handle_debug_keydown);
+      window.removeEventListener("weztcode:project-switched", handle_project_switched);
     };
   });
 
@@ -747,6 +769,7 @@
       const data = await res.json();
       if (data.ok && data.data) {
         current_agent = data.data.agent || null;
+        current_project = data.data.project || "";
       }
     } catch {}
 
