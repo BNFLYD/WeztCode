@@ -327,3 +327,33 @@ pub fn conversation_agent(path: &std::path::Path) -> Option<String> {
     }
     None
 }
+
+/// ¿La sesión de ese id está vacía? Lo decide por inspección del ARCHIVO,
+/// sin tocar el proceso: sin archivo = sesión nueva/vacía; con archivo,
+/// vacía solo si no tiene ningún mensaje user/assistant. Se usa para
+/// prompt_dirty tras un respawn sin esperar el boot completo de pi
+/// (un get_state ahí bloquea ~4s el project switch).
+pub fn session_is_empty(sid: &str) -> bool {
+    use std::io::BufRead;
+    let Some(path) = find_session_file(sid) else {
+        return true; // sin archivo: pi la crea vacía al retomarla
+    };
+    let Ok(file) = std::fs::File::open(&path) else {
+        return true;
+    };
+    let mut reader = std::io::BufReader::new(file);
+    let mut line = String::new();
+    loop {
+        line.clear();
+        match reader.read_line(&mut line) {
+            Ok(0) | Err(_) => return true,
+            Ok(_) => {}
+        }
+        let t = line.trim();
+        if t.contains("\"type\":\"message\"")
+            && (t.contains("\"role\":\"user\"") || t.contains("\"role\":\"assistant\""))
+        {
+            return false;
+        }
+    }
+}

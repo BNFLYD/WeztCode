@@ -76,7 +76,16 @@ impl ChatService {
             current_session_id: None,
             sessions,
         };
-        let _ = service.refresh_session_state();
+        // SIN refresh_session_state acá: su get_state espera el boot completo
+        // de pi (20-30s en frío con extensiones) CON EL LOCK DEL SERVICIO
+        // TOMADO — el primer request de la vida de la app pegaba contra esa
+        // pared. Inspección de archivo en su lugar (mismo criterio que
+        // restart_backend): current_session_id lo respeta pi con ids custom,
+        // y prompt_dirty sale del archivo de sesión. El primer get_state real
+        // lo hace lazy el flujo que lo necesite (switch de agente, etc.).
+        service.current_session_id = Some(sid.clone());
+        service.prompt_dirty =
+            sessions::session_is_empty(&sid) && service.active_prompt.is_some();
         service
     }
 
@@ -440,7 +449,14 @@ impl ChatService {
         let flavor = self.backend.config().flavor;
         let sid = self.sessions.get_or_derive(&scope);
         self.respawn_with_session(flavor, &sid)?;
-        self.refresh_session_state()
+        // prompt_dirty por inspección del ARCHIVO de sesión, sin un get_state
+        // que espere el boot completo de pi (~4s con extensiones): sin
+        // archivo → sesión vacía → inyectar la persona en el próximo mensaje.
+        // current_session_id ya lo seteó respawn_with_session. Si pi muriera
+        // tras el spawn (crash tardío), el próximo RPC falla y la UI lo
+        // avisa — el switch no bloquea 6s esperando esa respuesta.
+        self.prompt_dirty = sessions::session_is_empty(&sid) && self.active_prompt.is_some();
+        Ok(())
     }
 
     /// Aborta el turno en curso del backend (pi/little-coder).
