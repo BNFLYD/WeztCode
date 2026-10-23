@@ -3,6 +3,7 @@ mod sessions;
 
 pub use backend::*;
 
+use std::sync::Arc;
 use std::thread;
 
 /// Normaliza claves de assets: minúsculas y SOLO alfanuméricos.
@@ -39,8 +40,55 @@ pub struct ChatService {
     prompt_dirty: bool,
     /// session-id en curso (para saber si un switch same-engine necesita cambio).
     current_session_id: Option<String>,
+    /// Turno de chat en curso (None = idle). Ver `ActiveTurn`.
+    active_turn: Option<std::sync::Arc<ActiveTurn>>,
     /// scope → session-id, persistido en disco (sessions.json).
     sessions: sessions::SessionMap,
+}
+
+/// Turno de chat en curso: eventos acumulados + canal live para re-attach.
+///
+/// El forwarder SIEMPRE drena pi aunque no haya cliente SSE conectado.
+/// Antes, si el cliente se desconectaba (cambio de sección), el forwarder
+/// cortaba en el send fallido → el canal del reader llenaba su capacidad →
+/// nadie drenaba el stdout de pi → el pipe del SO (64KB) se llenaba → pi
+/// quedaba COLGADO escribiendo (el agente se congelaba de verdad). Con el
+/// buffer, el turno sobrevive al ausencia del cliente y cualquier UI puede
+/// re-attacharse después (GET /chat/stream): replay del buffer + live.
+pub struct ActiveTurn {
+    /// Agente dueño del turno (para que la UI sepa quién está trabajando).
+    pub agent: Option<String>,
+    events: std::sync::Mutex<Vec<String>>,
+    live: tokio::sync::broadcast::Sender<String>,
+    done: std::sync::atomic::AtomicBool,
+}
+
+impl ActiveTurn {
+    /// Suscribirse a los eventos live Y capturar el buffer actual, sin
+    /// huecos ni duplicados: la suscripción y el snapshot van bajo el mismo
+    /// lock con el que el forwarder publica (snapshot-then-live exacto).
+    pub fn attach(&self) -> (Vec<String>, tokio::sync::broadcast::Receiver<String>) {
+        let events = self.events.lock().unwrap();
+        let snapshot = events.clone();
+        let rx = self.live.subscribe();
+        (snapshot, rx)
+    }
+
+    pub fn is_done(&self) -> bool {
+        self.done.load(std::sync::atomic::Ordering::SeqCst)
+    }
+
+    fn publish(&self, sse: String) {
+        let mut events = self.events.lock().unwrap();
+        events.push(sse.clone());
+        // broadcast::send no bloquea; sin subscriptores es Err (no importa:
+        // el buffer es la fuente de verdad para el replay del re-attach).
+        let _ = self.live.send(sse);
+    }
+
+    fn finish(&self) {
+        self.done.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
 }
 
 impl ChatService {
@@ -74,6 +122,7 @@ impl ChatService {
             active_prompt: prompt,
             prompt_dirty: false,
             current_session_id: None,
+            active_turn: None,
             sessions,
         };
         // SIN refresh_session_state acá: su get_state espera el boot completo
@@ -316,6 +365,14 @@ impl ChatService {
     }
 
     pub fn get_session_stats(&self) -> Result<String, String> {
+        // Fast-fail durante turno activo — misma razón que get_messages
+        // (el stdout de pi lo consume el reader del stream). El stream manda
+        // el SessionStats como evento; la UI no necesita este endpoint acá.
+        if let Some(t) = &self.active_turn {
+            if !t.is_done() {
+                return Err("Turno en curso".to_string());
+            }
+        }
         self.backend.get_session_stats()
     }
 
@@ -396,6 +453,17 @@ impl ChatService {
 
     /// Historial real de la sesión activa (para que la UI refleje la verdad).
     pub fn get_messages(&self) -> Result<String, String> {
+        // Durante un turno activo, el reader del stream sostiene el stdout
+        // de pi hasta el agent_end: un RPC concurrente se muere de hambre
+        // esperando ese lock — y este handler sostiene el lock del SERVICIO
+        // mientras espera, congelando todos los demás endpoints (active-agent,
+        // sub-agents...). Con turno en curso, el stream ES la verdad; el
+        // historial se pide recién al terminar.
+        if let Some(t) = &self.active_turn {
+            if !t.is_done() {
+                return Err("Turno en curso: el historial se actualiza al terminar".to_string());
+            }
+        }
         self.backend.get_messages()
     }
 
@@ -464,7 +532,18 @@ impl ChatService {
         self.backend.abort_stream()
     }
 
-    pub fn send_message_stream(&mut self, message: &str) -> Result<tokio::sync::mpsc::Receiver<String>, String> {
+    pub fn send_message_stream(
+        &mut self,
+        message: &str,
+    ) -> Result<tokio::sync::broadcast::Receiver<String>, String> {
+        // Guard: un solo turno a la vez (protege el double-send que la UI
+        // permitía al re-attachearse con streaming ya activo).
+        if let Some(t) = &self.active_turn {
+            if !t.is_done() {
+                return Err("Ya hay un turno en curso en este agente".to_string());
+            }
+        }
+
         // Inyección del prompt: solo cuando la sesión del scope está vacía
         // (prompt_dirty). Si ya tiene historial, la personalidad ya vive en el
         // contexto — re-inyectar duplicaría las instrucciones.
@@ -481,17 +560,56 @@ impl ChatService {
         self.backend.set_agent_prompt(None);
 
         let mut rx = self.backend.send_message(&final_message)?;
-        let (tx, out_rx) = tokio::sync::mpsc::channel::<String>(64);
+
+        // Turno activo: buffer + broadcast. La suscripción del que envía se
+        // crea ANTES de spawnear el forwarder → no se pierde ningún evento.
+        let (live_tx, out_rx) = tokio::sync::broadcast::channel::<String>(1024);
+        let turn = Arc::new(ActiveTurn {
+            agent: self.active_agent.clone(),
+            events: std::sync::Mutex::new(Vec::new()),
+            live: live_tx,
+            done: std::sync::atomic::AtomicBool::new(false),
+        });
+        self.active_turn = Some(turn.clone());
 
         thread::spawn(move || {
+            // Drena SIEMPRE hasta el final (Done o EOF) aunque no haya nadie
+            // escuchando: pi sigue vivo aunque la UI se haya ido a otra
+            // sección — el turno queda en el buffer para el re-attach.
             while let Some(event) = rx.blocking_recv() {
                 let sse_str = event.to_sse_string();
-                if tx.blocking_send(sse_str).is_err() { break; }
-                if matches!(event, SseEvent::Done) { break; }
+                let is_done = matches!(event, SseEvent::Done);
+                turn.publish(sse_str);
+                if is_done {
+                    break;
+                }
             }
+            turn.finish();
         });
 
         Ok(out_rx)
+    }
+
+    /// Estado del turno activo para el re-attach de la UI (GET /chat/stream).
+    /// None si no hay turno en curso: la UI reconcilia con el historial.
+    pub fn attach_turn(
+        &self,
+    ) -> Result<
+        Option<(
+            Option<String>,
+            Vec<String>,
+            tokio::sync::broadcast::Receiver<String>,
+        )>,
+        String,
+    > {
+        match &self.active_turn {
+            None => Ok(None),
+            Some(t) if t.is_done() => Ok(None),
+            Some(t) => {
+                let (snapshot, live_rx) = t.attach();
+                Ok(Some((t.agent.clone(), snapshot, live_rx)))
+            }
+        }
     }
 }
 

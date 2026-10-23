@@ -11,6 +11,35 @@ use std::convert::Infallible;
 
 use crate::api::{err_json, ok_json, ApiResponse};
 use crate::chat::BackendFlavor;
+
+/// Stream SSE desde un receiver de broadcast del turno: termina al ver el
+/// evento done (el sender vive en el ActiveTurn del servicio, así que el
+/// Closed del broadcast no llega nunca mientras el turno exista).
+fn turn_sse_stream(
+    mut rx: tokio::sync::broadcast::Receiver<String>,
+) -> impl futures::Stream<Item = Result<Event, Infallible>> {
+    futures::stream::unfold((rx, false), |(mut rx, done_seen)| async move {
+        if done_seen {
+            return None;
+        }
+        loop {
+            match rx.recv().await {
+                Ok(sse) => {
+                    let is_done = sse.contains("\"type\":\"done\"");
+                    let item = Ok(Event::default().data(sse));
+                    if is_done {
+                        return Some((item, (rx, true)));
+                    }
+                    return Some((item, (rx, false)));
+                }
+                // Consumidor lento: salta los eventos lagged — el buffer del
+                // ActiveTurn persiste todo para un futuro re-attach.
+                Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
+                Err(_) => return None,
+            }
+        }
+    })
+}
 use crate::config;
 
 pub async fn handle_chat_send(
@@ -29,10 +58,51 @@ pub async fn handle_chat_send(
             .map_err(|e| config::keys::redact_keys(&e))
     }).await.unwrap().map_err(|e| err_json(&e))?;
 
-    let stream = tokio_stream::wrappers::ReceiverStream::new(rx)
-        .map(|data| Ok(Event::default().data(data)));
+    Ok(Sse::new(turn_sse_stream(rx)).keep_alive(KeepAlive::default()))
+}
 
-    Ok(Sse::new(stream).keep_alive(KeepAlive::default()))
+/// GET /chat/stream — re-attach a un turno en curso (la UI se monta tras un
+/// cambio de sección): replay del buffer del turno + eventos live hasta done.
+/// Si no hay turno activo, emite un único evento `idle` y cierra — la UI
+/// reconcilia con el historial y listo.
+pub async fn handle_chat_stream() -> Result<Sse<impl futures::Stream<Item = Result<Event, Infallible>>>, ApiResponse> {
+    let attach = tokio::task::spawn_blocking(|| {
+        let service = crate::CHAT_SERVICE.lock()
+            .map_err(|e| format!("Lock: {}", e))?;
+        service.attach_turn()
+    }).await.unwrap().map_err(|e| err_json(&e))?;
+
+    type ChatStream = std::pin::Pin<Box<dyn futures::Stream<Item = Result<Event, Infallible>> + Send>>;
+    match attach {
+        // Sin turno en curso (o ya terminado: el reconcile lo trae del historial)
+        None => {
+            let idle = Event::default().data("{\"type\":\"idle\"}");
+            Ok(Sse::new(
+                Box::pin(futures::stream::iter(vec![Ok::<_, Infallible>(idle)])) as ChatStream,
+            ))
+        }
+        Some((agent, snapshot, live_rx)) => {
+            // Primer evento: "attached" — la UI lo usa para decidir ANTES de
+            // reconciliar (con turno activo el reconcile se salta: el RPC
+            // compite por el stdout que consume el reader del stream).
+            let attached = serde_json::json!({"type": "attached", "agent": agent})
+                .to_string();
+            // Replay del buffer (todo lo que pasó mientras la UI estuvo fuera)
+            // encadenado con los eventos live a partir de acá.
+            let replay = futures::stream::iter(
+                std::iter::once(Ok::<_, Infallible>(Event::default().data(attached)))
+                    .chain(
+                        snapshot
+                            .into_iter()
+                            .map(|sse| Ok::<_, Infallible>(Event::default().data(sse))),
+                    )
+                    .collect::<Vec<_>>(),
+            );
+            let live = turn_sse_stream(live_rx);
+            let chained = futures::stream::StreamExt::chain(replay, live);
+            Ok(Sse::new(Box::pin(chained) as ChatStream))
+        }
+    }
 }
 
 pub async fn handle_chat_new_session() -> impl IntoResponse {

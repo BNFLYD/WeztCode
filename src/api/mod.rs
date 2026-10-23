@@ -23,6 +23,7 @@ use axum::{
 pub fn router() -> Router {
     Router::new()
         .route("/chat/send", post(chat::handle_chat_send))
+        .route("/chat/stream", get(chat::handle_chat_stream))
         .route("/chat/new-session", post(chat::handle_chat_new_session))
         .route("/chat/abort", post(chat::handle_chat_abort))
         .route("/chat/select-scope", post(chat::handle_chat_select_scope))

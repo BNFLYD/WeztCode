@@ -196,6 +196,129 @@
     }
   });
 
+  // === Procesamiento de eventos del stream del turno (compartido entre el
+  // send directo y el re-attach tras volver de otra sección) ===
+
+  // Asegura que haya un mensaje assistant "en vuelo" para acumular tokens:
+  // en el send ya existe (placeholder); en el re-attach hay que crearlo tras
+  // el reconcile (la historia no incluye el mensaje que pi está generando).
+  function ensure_assistant_target() {
+    if (messages.length === 0 || messages[messages.length - 1].role !== "assistant") {
+      messages = [...messages, { role: "assistant", content: "" }];
+    }
+  }
+
+  // Procesa un evento data del turno. Devuelve "done"/"idle" para que la
+  // bomba sepa que el turno terminó (o que no había turno activo).
+  function process_sse_data(data) {
+    switch (data.type) {
+      case "token":
+        ensure_assistant_target();
+        messages[messages.length - 1].content += data.content;
+        set_visual("talking");
+        save();
+        break;
+      case "tool_call":
+        ensure_assistant_target();
+        messages[messages.length - 1].content += `\n\n[${data.name}]`;
+        set_visual("thinking");
+        save();
+        break;
+      case "warning":
+        warnings = [...warnings, data.message];
+        break;
+      case "error":
+        ensure_assistant_target();
+        messages[messages.length - 1].content += `\n\nError: ${data.message}`;
+        set_visual("confused");
+        save();
+        break;
+      case "session_stats":
+        try {
+          const raw = JSON.parse(data.json);
+          const ctx = raw.data?.contextUsage;
+          if (ctx?.percent !== undefined) {
+            // pi manda el percent TOTAL de la sesión: asignar, no acumular
+            real_context_percent = ctx.percent;
+          }
+          if (ctx?.contextWindow) {
+            real_context_window = ctx.contextWindow;
+          }
+        } catch {}
+        break;
+      case "attached": {
+        // Turno activo en el backend: el cache puede tener el mensaje
+        // assistant PARCIAL del turno (lo que llegó antes de irnos de la
+        // sección) — el replay reconstruye el turno COMPLETO desde el
+        // buffer, así que soltamos el parcial para no duplicar la cabeza.
+        if (messages.length && messages[messages.length - 1].role === "assistant") {
+          messages = messages.slice(0, -1);
+        }
+        set_visual("thinking");
+        break;
+      }
+      case "done":
+        return "done";
+      case "idle":
+        return "idle";
+    }
+    return null;
+  }
+
+  // Bomba del stream SSE: lee hasta ver done/idle o el cierre de conexión.
+  async function pump_sse(res) {
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        try {
+          const outcome = process_sse_data(JSON.parse(line.slice(6)));
+          if (outcome) return outcome;
+        } catch (e) {
+          console.error("[chat] SSE parse error:", e, "line:", line);
+        }
+      }
+    }
+    return "closed";
+  }
+
+  // Cierre de turno: shared entre el send directo y el re-attach.
+  function finish_turn() {
+    if (messages.length && !messages[messages.length - 1].content.trim()) {
+      messages[messages.length - 1].content = "(empty response)";
+    }
+
+    // Fin del turno: vuelve a stand-by, salvo que haya quedado en confused
+    // (ese estado es sticky hasta el próximo mensaje).
+    if (agent_visual === "thinking" || agent_visual === "talking") {
+      set_visual("standby");
+    }
+
+    abort_controller = null;
+    streaming = false;
+    save();
+
+    if (pending_agent !== null) {
+      const agent = pending_agent;
+      pending_agent = null;
+      select_agent(agent);
+    } else if (pending_model !== null) {
+      const model = pending_model;
+      pending_model = null;
+      select_model(model);
+    }
+
+    // Foco de vuelta al input para escribir seguido
+    input_ref?.focus();
+  }
+
   async function send() {
     const text = input_value.trim();
     if (!text || streaming) return;
@@ -229,96 +352,22 @@
         return;
       }
 
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-
-          try {
-            const data = JSON.parse(line.slice(6));
-            switch (data.type) {
-              case "token":
-                messages[messages.length - 1].content += data.content;
-                set_visual("talking");
-                save();
-                break;
-              case "tool_call":
-                messages[messages.length - 1].content += `\n\n[${data.name}]`;
-                set_visual("thinking");
-                save();
-                break;
-              case "warning":
-                warnings = [...warnings, data.message];
-                break;
-              case "error":
-                messages[messages.length - 1].content += `\n\nError: ${data.message}`;
-                set_visual("confused");
-                save();
-                break;
-              case "session_stats":
-                try {
-                  const raw = JSON.parse(data.json);
-                  const ctx = raw.data?.contextUsage;
-                  if (ctx?.percent !== undefined) {
-                    // pi manda el percent TOTAL de la sesión: asignar, no acumular
-                    real_context_percent = ctx.percent;
-                  }
-                  if (ctx?.contextWindow) {
-                    real_context_window = ctx.contextWindow;
-                  }
-                } catch {}
-                break;
-              case "done":
-                break;
-            }
-          } catch (e) {
-            console.error("[chat] SSE parse error:", e, "line:", line);
-          }
-        }
-      }
+      await pump_sse(res);
     } catch (e) {
-      if (e?.name !== 'AbortError') {
-        messages[messages.length - 1].content += `\n\nConnection error: ${e.message}`;
-        save();
+      if (e?.name === 'AbortError') {
+        // Abort por cambio de sección (cleanup) o cancel manual: el turno
+        // SIGUE VIVO en el backend (el forwarder drena siempre) — NO lo
+        // cerremos acá como fallido (escribía "(empty response)" al cache
+        // aunque el agente seguía trabajando). Al volver, /chat/stream
+        // re-attacha y el reconcile trae la verdad.
+        return;
       }
+      ensure_assistant_target();
+      messages[messages.length - 1].content += `\n\nConnection error: ${e.message}`;
+      save();
     }
 
-    if (!messages[messages.length - 1].content.trim()) {
-      messages[messages.length - 1].content = "(empty response)";
-    }
-
-    // Fin del turno: vuelve a stand-by, salvo que haya quedado en confused
-    // (ese estado es sticky hasta el próximo mensaje).
-    if (agent_visual === "thinking" || agent_visual === "talking") {
-      set_visual("standby");
-    }
-
-    abort_controller = null;
-    streaming = false;
-    save();
-
-    if (pending_agent !== null) {
-      const agent = pending_agent;
-      pending_agent = null;
-      await select_agent(agent);
-    } else if (pending_model !== null) {
-      const model = pending_model;
-      pending_model = null;
-      await select_model(model);
-    }
-
-    // Foco de vuelta al input para escribir seguido
-    input_ref?.focus();
+    finish_turn();
   }
 
   async function cancel() {
@@ -737,6 +786,10 @@
       document.removeEventListener("keydown", handle_tab_keydown);
       document.removeEventListener("keydown", handle_debug_keydown);
       window.removeEventListener("weztcode:project-switched", handle_project_switched);
+      // Al cambiar de sección cortamos la conexión SSE — es SEGURO: el backend
+      // drena el turno siempre (pi sigue trabajando en background) y al
+      // volver, /chat/stream re-attacha desde el buffer sin perder eventos.
+      abort_controller?.abort();
     };
   });
 
@@ -785,10 +838,49 @@
       current_model = resolved ? resolved.name : agent.model;
     }
 
-    // Cache del scope activo + reconciliación con la sesión real
+    // Re-attach ANTES que el reconcile: durante un turno activo, el RPC de
+    // get_messages se muere de hambre esperando el stdout de pi (lo consume
+    // el reader del stream) y congela el lock del servicio entero. Con turno
+    // activo, el stream ES la verdad (replay + live); reconcile recién al
+    // terminar el turno — o directamente si no hay turno (idle).
+    let turn_res = null;
+    try {
+      abort_controller = new AbortController();
+      turn_res = await fetch("/api/chat/stream", {
+        signal: abort_controller.signal,
+      });
+    } catch (e) {
+      abort_controller = null;
+      console.error("[chat] re-attach fetch:", e);
+    }
+
     messages = load_scope(active_scope);
-    await reconcile_messages();
-    await load_stats();
+
+    const is_sse =
+      turn_res?.ok &&
+      turn_res.headers.get("Content-Type")?.includes("text/event-stream");
+    if (is_sse) {
+      // El primer evento del stream decide: "attached" (turno activo) o
+      // "idle". El pump procesa ambos — ver process_sse_data.
+      streaming = true;
+      const outcome = await pump_sse(turn_res);
+      if (outcome === "idle") {
+        streaming = false;
+        abort_controller = null;
+        await reconcile_messages();
+        await load_stats();
+      } else {
+        // El turno terminó (re-attach consumió su final): sincronizar con
+        // la verdad de pi y refrescar el percent del contexto.
+        finish_turn();
+        await reconcile_messages();
+        await load_stats();
+      }
+    } else {
+      abort_controller = null;
+      await reconcile_messages();
+      await load_stats();
+    }
 
     // Aparición del agente al bootear: estática + visual en el monitor
     const boot_agent = current_agent
