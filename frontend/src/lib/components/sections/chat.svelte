@@ -124,7 +124,7 @@
   let conv_cursor = $state(0);
   let conv_delete_confirm = $state(null);
   let conversations_panel_ref = $state(null);
-  let pending_agent = $state(null);
+
   let pending_model = $state(null);
   let abort_controller = $state(null);
   let input_ref = $state(null);
@@ -323,11 +323,7 @@
     streaming = false;
     save();
 
-    if (pending_agent !== null) {
-      const agent = pending_agent;
-      pending_agent = null;
-      select_agent(agent);
-    } else if (pending_model !== null) {
+    if (pending_model !== null) {
       const model = pending_model;
       pending_model = null;
       select_model(model);
@@ -800,9 +796,15 @@
     show_agent_dropdown = false;
     if (name === current_agent) return;
 
+    // Multi-agente paralelo: el turno del agente actual SIGUE corriendo en
+    // el backend (drena siempre) — solo soltamos SU conexión para que su
+    // pump no escriba sobre la vista del agente nuevo. Al volver a ese
+    // agente, /chat/stream?agent=X re-attacha su turno donde estaba.
     if (streaming) {
-      pending_agent = name;
-      return;
+      abort_controller?.abort();
+      abort_controller = null;
+      streaming = false;
+      set_visual("standby");
     }
 
     try {
@@ -835,14 +837,14 @@
         last_switch_response = data.data;
         if (data.data.warning) warnings = [...warnings, data.data.warning];
 
-        // Cache instantáneo + reconciliación con la sesión real
-        messages = load_scope(active_scope);
-        await reconcile_messages();
-
         // Percent de la sesión NUEVA (resetea el del agente anterior)
         real_context_percent = null;
         real_context_window = null;
-        await load_stats();
+
+        // Vista del scope NUEVO: cache → attach a SU turno (si está
+        // trabajando) → reconcile con su historial real.
+        messages = load_scope(active_scope);
+        await sync_scope_view();
 
         // Estática de cambio de agente + visual nuevo en el monitor
         if (agent?.assets) flash_static();
@@ -928,49 +930,24 @@
     Math.round(real_context_percent ?? context_percent),
   );
 
-  async function init() {
-    await Promise.all([load_models(), load_sub_agents()]);
-
-    // Scope de arranque: el backend bootea directo con la sesión del agente
-    // default (o del chat default). Preguntamos la verdad en vez de asumir.
-    try {
-      const res = await fetch("/api/chat/active-agent");
-      const data = await res.json();
-      if (data.ok && data.data) {
-        current_agent = data.data.agent || null;
-        current_project = data.data.project || "";
-      }
-    } catch {}
-
-    active_scope = current_agent || "default";
-    const agent = current_agent
-      ? sub_agents.find(a => a.name === current_agent)
-      : null;
-    current_icon = agent?.icon || null;
-    if (agent?.model) {
-      const resolved = models.find(m =>
-        m.name.localeCompare(agent.model, undefined, { sensitivity: 'base' }) === 0
-      );
-      current_model = resolved ? resolved.name : agent.model;
-    }
-
-    // Re-attach ANTES que el reconcile: durante un turno activo, el RPC de
-    // get_messages se muere de hambre esperando el stdout de pi (lo consume
-    // el reader del stream) y congela el lock del servicio entero. Con turno
-    // activo, el stream ES la verdad (replay + live); reconcile recién al
-    // terminar el turno — o directamente si no hay turno (idle).
+  // Sincroniza la vista con el scope ACTIVO. Attach primero (con
+  // ?agent=<scope>): durante un turno activo, el RPC de get_messages se muere
+  // de hambre esperando el stdout de pi (lo consume el reader del stream) y
+  // congelaría el lock del servicio. Con turno activo, el stream ES la
+  // verdad (replay + live); reconcile recién al terminar — o directamente si
+  // está idle.
+  async function sync_scope_view() {
     let turn_res = null;
     try {
       abort_controller = new AbortController();
-      turn_res = await fetch("/api/chat/stream", {
-        signal: abort_controller.signal,
-      });
+      turn_res = await fetch(
+        `/api/chat/stream?agent=${encodeURIComponent(active_scope)}`,
+        { signal: abort_controller.signal },
+      );
     } catch (e) {
       abort_controller = null;
       console.error("[chat] re-attach fetch:", e);
     }
-
-    messages = load_scope(active_scope);
 
     const is_sse =
       turn_res?.ok &&
@@ -997,6 +974,38 @@
       await reconcile_messages();
       await load_stats();
     }
+  }
+
+  async function init() {
+    await Promise.all([load_models(), load_sub_agents()]);
+
+    // Scope de arranque: el backend bootea directo con la sesión del agente
+    // default (o del chat default). Preguntamos la verdad en vez de asumir.
+    try {
+      const res = await fetch("/api/chat/active-agent");
+      const data = await res.json();
+      if (data.ok && data.data) {
+        current_agent = data.data.agent || null;
+        current_project = data.data.project || "";
+      }
+    } catch {}
+
+    active_scope = current_agent || "default";
+    const agent = current_agent
+      ? sub_agents.find(a => a.name === current_agent)
+      : null;
+    current_icon = agent?.icon || null;
+    if (agent?.model) {
+      const resolved = models.find(m =>
+        m.name.localeCompare(agent.model, undefined, { sensitivity: 'base' }) === 0
+      );
+      current_model = resolved ? resolved.name : agent.model;
+    }
+
+      // Vista del scope: attach a SU turno en curso (multi-agente: cada
+    // agente re-attacha el suyo — nunca el de otro) o reconcile si idle.
+    messages = load_scope(active_scope);
+    await sync_scope_view();
 
     // Aparición del agente al bootear: estática + visual en el monitor
     const boot_agent = current_agent
@@ -1221,16 +1230,14 @@
         class="absolute left-0 bottom-2 z-50"
         bind:this={agent_dropdown_container}
       >
+        <!-- Multi-agente: SIEMPRE clickeable — cambiar de agente mientras
+             uno trabaja es el feature, no un peligro (fase 2). -->
         <button
-          class="flex items-center gap-1 px-2 py-0.5 text-xs font-semibold font-mono {agents_error ? 'text-red-400' : pending_agent !== null ? 'text-accent-detail' : 'text-print/50 hover:text-print'} transition-colors rounded"
+          class="flex items-center gap-1 px-2 py-0.5 text-xs font-semibold font-mono {agents_error ? 'text-red-400' : 'text-print/50 hover:text-print'} transition-colors rounded"
           onclick={toggle_agent_dropdown}
-          disabled={streaming}
         >
           <Icon icon={streaming ? "svg-spinners:bars-scale-fade" : current_icon || "simple-icons:pi"} class="w-4 h-4" />
           {agents_error ? `⚠ ${agents_error}` : ($state.eager(current_agent) || "default")}
-          {#if pending_agent !== null}
-            <span class="ml-1 w-2 h-2 rounded-full bg-accent-detail animate-pulse"></span>  
-          {/if}
         </button>
         {#if show_agent_dropdown}
           <div
