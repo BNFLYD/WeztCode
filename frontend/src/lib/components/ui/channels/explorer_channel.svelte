@@ -6,6 +6,10 @@
   export let icon = "";
   export let name = "";
   export let active_section = "explorer";
+  // Sección dueña del canal: el diálogo se cierra si el usuario cambia de
+  // sección. Default "explorer" (su uso original); el chat pasa "chat" para
+  // su confirmación de borrado de conversaciones.
+  export let owner_section = "explorer";
   export let image_path = "";
   export let on_confirm = () => {};
   export let on_cancel = () => {};
@@ -20,7 +24,7 @@
     on_close();
   }
 
-  $: if (active_section !== "explorer") {
+  $: if (active_section !== owner_section) {
     on_close();
   }
 

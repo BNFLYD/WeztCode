@@ -376,6 +376,33 @@ impl ChatService {
         self.backend.get_session_stats()
     }
 
+    /// Elimina el archivo de una conversación del proyecto actual. La
+    /// conversación ACTIVA también se puede borrar por pedido explícito: se
+    /// arranca una conversación nueva en el mismo scope y se elimina el
+    /// archivo de la vieja (pi ya no la usa tras el new_session). El path
+    /// sale de find_session_file, que solo lista el directorio de sesiones
+    /// del proyecto actual — no puede escapar de ahí.
+    pub fn delete_conversation(&mut self, session_id: &str) -> Result<(), String> {
+        if self.current_session_id.as_deref() == Some(session_id) {
+            // Sin turno en curso: un new_session mientras el reader consume
+            // el stdout de pi se muere de hambre (mismo lock que get_messages).
+            if let Some(t) = &self.active_turn {
+                if !t.is_done() {
+                    return Err(
+                        "El agente está trabajando: esperá a que termine el turno".to_string(),
+                    );
+                }
+            }
+            self.backend.new_session()?;
+            self.refresh_session_state()?; // registra el sid NUEVO en el mapa
+        }
+        let path = sessions::find_session_file(session_id).ok_or_else(|| {
+            format!("Conversación '{}' no encontrada en este proyecto", session_id)
+        })?;
+        std::fs::remove_file(&path)
+            .map_err(|e| format!("No se pudo eliminar: {}", e))
+    }
+
     /// Lista las conversaciones del proyecto actual con la sesión actual del
     /// scope activo marcada (para el picker de la UI). JSON serializado.
     pub fn list_conversations(&self) -> Result<String, String> {

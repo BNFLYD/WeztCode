@@ -2,6 +2,9 @@
   import { onMount, tick } from "svelte";
   import Icon from "@iconify/svelte";
   import ChatChannel from "../ui/channels/chat_channel.svelte";
+  // Reuso del diálogo de confirmación Si/No del canal del explorer (mismo
+  // cartel, mismo teclado) para eliminar conversaciones.
+  import ExplorerChannel from "../ui/channels/explorer_channel.svelte";
 
   // Bindings del monitor (runes: bindable): el channel del chat dibuja el
   // visual del agente activo según su estado (assets de su .md).
@@ -39,6 +42,16 @@
   // de otra sección queda intacto.
   $effect(() => {
     const in_chat = active_section === "chat";
+
+    // El diálogo de confirmación (borrar conversación) vive en el MONITOR:
+    // mientras esté abierto, NO pisarlo con el visual del agente. Si el
+    // usuario se fue de la sección con el diálogo abierto, +page nuló el
+    // canal: cancelar la confirmación pendiente para no dejar estado huérfano.
+    if (conv_delete_confirm) {
+      if (!in_chat) conv_delete_confirm = null;
+      return;
+    }
+
     const agent = current_agent
       ? sub_agents.find(a => a.name === current_agent)
       : null;
@@ -106,6 +119,11 @@
   let conversations_loading = $state(false);
   let conversations_error = $state(null);
   let switching_conversation = $state(false);
+  // Cursor de teclado (j/k/arrows) y confirmación de borrado (d) — mismo
+  // esquema de navegación que la sección de archivos del explorer.
+  let conv_cursor = $state(0);
+  let conv_delete_confirm = $state(null);
+  let conversations_panel_ref = $state(null);
   let pending_agent = $state(null);
   let pending_model = $state(null);
   let abort_controller = $state(null);
@@ -515,7 +533,105 @@
 
   function toggle_conversations() {
     show_conversations = !show_conversations;
-    if (show_conversations) load_conversations();
+    if (show_conversations) {
+      conv_cursor = 0;
+      conv_delete_confirm = null;
+      load_conversations().then(async () => {
+        await tick();
+        conversations_panel_ref?.focus();
+      });
+    }
+  }
+
+  // Navegación por teclado del panel — mismos movimientos que el fs:
+  // k/↑ y j/↓ mueven el cursor, l/→ retoma la conversación, d pide
+  // confirmación para eliminar (diálogo Si/No del canal del explorer),
+  // Escape cierra. El panel tiene el foco mientras se navega, así los keys
+  // no le roban la escritura al input del chat.
+  function handle_conversations_keydown(e) {
+    // El diálogo Si/No maneja sus propios keys (burbujean hasta acá): ignorar.
+    if (conv_delete_confirm) return;
+    const n = conversations.length;
+    if (!n) return;
+    const handled = ["j", "k", "l", "d", "D", "ArrowDown", "ArrowUp", "ArrowRight", "Escape"];
+    if (!handled.includes(e.key)) return;
+    e.preventDefault();
+    switch (e.key) {
+      case "k":
+      case "ArrowUp":
+        conv_cursor = (conv_cursor - 1 + n) % n;
+        conv_scroll_cursor();
+        break;
+      case "j":
+      case "ArrowDown":
+        conv_cursor = (conv_cursor + 1) % n;
+        conv_scroll_cursor();
+        break;
+      case "l":
+      case "ArrowRight":
+        pick_conversation(conversations[conv_cursor]?.id);
+        break;
+      case "d":
+      case "D": {
+        const c = conversations[conv_cursor];
+        if (c) {
+          conv_delete_confirm = c;
+          // El cartel Si/No vive en el MONITOR (mismo lugar y animación que
+          // los diálogos del explorer), no sobre la lista.
+          active_channel = {
+            component: ExplorerChannel,
+            props: {
+              mode: "confirm",
+              owner_section: "chat",
+              icon: "ri:chat-delete-line",
+              name: c.preview ?? c.id.slice(0, 12),
+              on_confirm: () => delete_conversation(c.id),
+              on_cancel: () => {},
+              on_close: () => {
+                conv_delete_confirm = null;
+                // El diálogo tenía el foco: devolvérselo al picker para
+                // poder seguir borrando sin tocar el mouse.
+                conversations_panel_ref?.focus();
+              },
+            },
+          };
+        }
+        break;
+      }
+      case "Escape":
+        show_conversations = false;
+        input_ref?.focus();
+        break;
+    }
+  }
+
+  function conv_scroll_cursor() {
+    conversations_panel_ref
+      ?.querySelector(`[data-cindex="${conv_cursor}"]`)
+      ?.scrollIntoView({ block: "nearest" });
+  }
+
+  async function delete_conversation(id) {
+    try {
+      const res = await fetch("/api/chat/delete-conversation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        warnings = [...warnings, data.error ?? "No se pudo eliminar la conversación"];
+        return;
+      }
+      await load_conversations();
+      if (conv_cursor >= conversations.length) {
+        conv_cursor = Math.max(0, conversations.length - 1);
+      }
+      // Mantener el flujo de borrado continuo: foco de vuelta al picker.
+      conversations_panel_ref?.focus();
+    } catch (e) {
+      warnings = [...warnings, `Eliminar conversación falló: ${e?.message ?? e}`];
+    }
   }
 
   async function pick_conversation(id) {
@@ -972,12 +1088,16 @@
 
   {#if show_conversations}
     <!-- Mismo cuadro que el de advertencias; los items copian el estilo de la
-         lista de modelos (selección bg-accent-detail text-back, hover muted). -->
+         lista de modelos. Navegación de teclado igual al fs (k/j/l/d) — el
+         panel toma el foco al abrirse para no pisar la escritura del chat. -->
     <div
-      class="mx-3 mb-2 p-2 rounded bg-back max-h-52 overflow-y-auto text-sm font-mono text-print"
+      bind:this={conversations_panel_ref}
+      tabindex="0"
+      onkeydown={handle_conversations_keydown}
+      class="mx-3 mb-2 p-2 rounded bg-back max-h-52 overflow-y-auto text-sm font-mono text-print outline-none"
     >
       <div class="px-1 pb-1 mb-1 text-[10px] text-print/40 border-b border-accent-detail/10">
-        Conversaciones de este proyecto ({conversations.length})
+        Conversaciones de este proyecto ({conversations.length}) — k/j mover · l abrir · d borrar
       </div>
       {#if conversations_loading}
         <div class="px-3 py-1.5 text-xs text-print/50">Cargando…</div>
@@ -986,19 +1106,24 @@
       {:else if conversations.length === 0}
         <div class="px-3 py-1.5 text-xs text-print/50">Sin conversaciones en este proyecto</div>
       {:else}
-        {#each conversations as c (c.id)}
+        {#each conversations as c, index (c.id)}
           <button
+            data-cindex={index}
+            onmouseenter={() => (conv_cursor = index)}
             class="font-semibold block w-full text-left text-sm px-3 py-1.5 rounded-md transition-colors
-                   {c.current
-                    ? 'bg-accent-detail text-back transition-colors'
-                    : 'text-print hover:bg-accent-detail/10 transition-colors'}"
-            onclick={() => pick_conversation(c.id)}
+                   {conv_cursor === index
+                    ? 'bg-accent-detail text-back'
+                    : 'text-print hover:bg-accent-detail/10'}"
+            onclick={() => {
+              conv_cursor = index;
+              pick_conversation(c.id);
+            }}
             disabled={switching_conversation || streaming || c.current}
           >
             <span class="block truncate">{c.preview ?? "(sin mensajes)"}</span>
             <span
               class="block font-normal text-[11px] truncate
-                   {c.current ? 'text-back/70' : 'text-print/50'}"
+                   {conv_cursor === index ? 'text-back/70' : 'text-print/50'}"
             >
               {fmt_conv_date(c.modified_ms || c.created)} · {c.agent ?? "default"} ·
               {c.messages} msgs{#if c.current} · actual{/if}
@@ -1006,6 +1131,7 @@
           </button>
         {/each}
       {/if}
+
     </div>
   {/if}
 

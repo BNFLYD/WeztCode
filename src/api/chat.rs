@@ -197,6 +197,28 @@ pub async fn handle_chat_conversations() -> impl IntoResponse {
     }
 }
 
+/// POST /chat/delete-conversation — borra el archivo de una conversación del
+/// proyecto actual. Body: {"id": "<session-id>"}. La conversación activa no
+/// se puede borrar (el proceso pi la usa).
+pub async fn handle_chat_delete_conversation(
+    Json(body): Json<serde_json::Value>,
+) -> impl IntoResponse {
+    let Some(id) = body.get("id").and_then(|v| v.as_str()) else {
+        return err_json("Missing 'id' field (session-id string)");
+    };
+    let id = id.to_string();
+    let result = tokio::task::spawn_blocking(move || {
+        let mut service = crate::CHAT_SERVICE.lock()
+            .map_err(|e| format!("Lock: {}", e))?;
+        service.delete_conversation(&id)
+    }).await.unwrap();
+
+    match result {
+        Ok(()) => ok_json(serde_json::json!({"ok": true})),
+        Err(e) => err_json(&config::keys::redact_keys(&e)),
+    }
+}
+
 /// POST /chat/select-conversation — cambia el scope activo a una conversación
 /// existente del proyecto actual. Body: {"id": "<session-id>"}.
 pub async fn handle_chat_select_conversation(
