@@ -324,9 +324,10 @@
     save();
 
     if (pending_model !== null) {
-      const model = pending_model;
+      // Fase 3: el backend aplicó el modelo encolado al terminar el turno
+      // (y persistió el .md) — reflejarlo en la vista sin re-enviar.
+      current_model = pending_model;
       pending_model = null;
-      select_model(model);
     }
 
     // Foco de vuelta al input para escribir seguido
@@ -708,11 +709,6 @@
     }
     show_dropdown = false;
 
-    if (streaming) {
-      pending_model = name;
-      return;
-    }
-
     switching = true;
     try {
       const res = await fetch("/api/chat/switch-model", {
@@ -722,7 +718,17 @@
       });
       const data = await res.json();
       if (data.ok) {
-        current_model = name;
+        const info = data.data ?? {};
+        if (info.queued) {
+          // Fase 3: el agente está trabajando — el backend encola el cambio
+          // y lo aplica (y persiste al .md) cuando SU turno termina, aunque
+          // ya estemos viendo a otro agente. El dot pulsante lo indica.
+          pending_model = name;
+          switching = false;
+          return;
+        }
+        current_model = info.model ?? name;
+        pending_model = null;
         // NOTA: ya no se mata el agente activo al cambiar el modelo manualmente:
         // la personalidad sigue viva en la sesión del scope (cambio de modelo ≠ cambio de conversación).
       }
@@ -795,6 +801,10 @@
     user_interacted = true;
     show_agent_dropdown = false;
     if (name === current_agent) return;
+
+    // pending_model es visual del scope VISTO: el pendiente real vive en el
+    // backend (aplica aunque estemos en otro agente). No filtrarlo.
+    pending_model = null;
 
     // Multi-agente paralelo: el turno del agente actual SIGUE corriendo en
     // el backend (drena siempre) — solo soltamos SU conexión para que su
@@ -1054,7 +1064,7 @@
         <button
           class="px-1 font-mono text-xs {models_error ? 'text-red-400' : pending_model !== null ? 'text-accent-detail' : 'text-print/50 hover:text-print'} rounded hover:text-print transition-colors max-w-[120px] truncate"
           onclick={toggle_dropdown}
-          disabled={switching || streaming}
+          disabled={switching}
         >
           {models_error ? `⚠ ${models_error}` : ($state.eager(current_model) || "sin modelos")}
           {#if pending_model !== null}

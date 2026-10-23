@@ -353,15 +353,22 @@ pub async fn handle_chat_switch_model(
         None => return err_json("Missing 'name' field"),
     };
 
+    let name_for_json = name.clone();
     let result = tokio::task::spawn_blocking(move || {
         let mut service = crate::CHAT_SERVICE.lock()
             .map_err(|e| format!("Lock: {}", e))?;
-        let model_name = service.switch_model_rpc(&name)?;
-        Ok::<_, String>(model_name)
+        service.switch_model_rpc(&name)
     }).await.unwrap();
 
     match result {
-        Ok(model_name) => ok_json(serde_json::json!({"ok": true, "model": model_name})),
+        // {model, queued, persisted}: queued=true cuando el agente está
+        // trabajando (aplica solo al terminar su turno, incluso si la UI ya
+        // está viendo a otro); persisted=true cuando se reescribió el .md.
+        Ok(json) => {
+            let v: serde_json::Value =
+                serde_json::from_str(&json).unwrap_or(serde_json::json!({"model": name_for_json}));
+            ok_json(serde_json::json!({"ok": true, "data": v}))
+        }
         Err(e) => err_json(&config::keys::redact_keys(&e)),
     }
 }

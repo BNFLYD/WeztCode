@@ -54,6 +54,10 @@ pub struct ChatService {
 pub struct ScopeState {
     pub session_id: Option<String>,
     pub prompt_dirty: bool,
+    /// Modelo encolado (fase 3): el usuario lo eligió mientras el agente
+    /// trabajaba — aplica automáticamente cuando SU turno termina, aunque
+    /// esté viendo a otro agente.
+    pub pending_model: Option<String>,
 }
 
 /// Turno de chat en curso: eventos acumulados + canal live para re-attach.
@@ -146,6 +150,7 @@ impl ChatService {
             ScopeState {
                 session_id: Some(sid),
                 prompt_dirty,
+                pending_model: None,
             },
         );
         service
@@ -203,7 +208,7 @@ impl ChatService {
         self.backends.insert(scope.to_string(), b);
         self.scope_states.insert(
             scope.to_string(),
-            ScopeState { session_id: Some(sid.to_string()), prompt_dirty: dirty },
+            ScopeState { session_id: Some(sid.to_string()), prompt_dirty: dirty, pending_model: None },
         );
         Ok(())
     }
@@ -423,23 +428,85 @@ impl ChatService {
         Ok(())
     }
 
-    /// Cambio manual de modelo desde el dropdown: NO toca el agente ni su
-    /// prompt (la personalidad sigue viva en la sesión del scope).
+    /// Cambio de modelo desde el dropdown = CONFIGURACIÓN del agente (fase 3):
+    /// - Agente trabajando → se ENCOLA en su ScopeState: un set_model_rpc con
+    ///   el reader del stream consumiendo el stdout se muere de hambre (el
+    ///   pipe del agente queda intacto). Aplica cuando SU turno termina,
+    ///   esté quien sea viendo la UI.
+    /// - Idle → aplica ya al proceso + persiste al .md del agente: nace con
+    ///   él en respawns/switches/boots, y el switch_agent nunca lo revierte.
+    /// Devuelve JSON {model, queued, persisted}.
     pub fn switch_model_rpc(&mut self, model_name: &str) -> Result<String, String> {
-        if self.turn_running(&self.active_scope()) {
-            return Err("Turno en curso: cambiate de modelo al terminar".to_string());
-        }
         let models = crate::config::models::list();
         let entry = models.into_iter()
             .find(|m| m.name == model_name)
             .ok_or_else(|| format!("Model '{}' not found", model_name))?;
 
-        let current_model = self.active_backend().config().model.clone();
-        if current_model != entry.model {
-            self.active_backend_mut().set_model_rpc(&entry.provider, &entry.model)?;
+        let scope = self.active_scope();
+        if self.turn_running(&scope) {
+            if let Some(st) = self.scope_states.get_mut(&scope) {
+                st.pending_model = Some(entry.name.clone());
+            }
+            return Ok(serde_json::json!({
+                "model": entry.name,
+                "queued": true,
+                "persisted": false,
+            })
+            .to_string());
         }
+        let persisted = self.apply_model_to_agent(&scope, &entry)?;
+        Ok(serde_json::json!({
+            "model": entry.name,
+            "queued": false,
+            "persisted": persisted,
+        })
+        .to_string())
+    }
 
-        Ok(entry.name)
+    /// Aplica el modelo al proceso del scope (idle) y persiste al .md si el
+    /// scope es un agente (el chat default no tiene .md: su modelo es el
+    /// global, efímero por diseño). Devuelve si persistió.
+    fn apply_model_to_agent(
+        &mut self,
+        scope: &str,
+        entry: &crate::config::models::ModelEntry,
+    ) -> Result<bool, String> {
+        let backend = self
+            .backends
+            .get_mut(scope)
+            .ok_or_else(|| format!("Scope '{}' sin backend", scope))?;
+        if backend.config().model != entry.model {
+            backend.set_model_rpc(&entry.provider, &entry.model)?;
+        }
+        if scope != "default" {
+            crate::config::sub_agents::update_agent_model(scope, &entry.name)?;
+            return Ok(true);
+        }
+        Ok(false)
+    }
+
+    /// Aplica el modelo encolado del scope — lo llama el forwarder cuando el
+    /// turno de ESE scope termina (el backend es dueño de la cola: aplica
+    /// aunque la UI esté viendo a otro agente).
+    pub fn apply_pending_model(&mut self, scope: &str) {
+        let pending = match self.scope_states.get_mut(scope) {
+            Some(st) => st.pending_model.take(),
+            None => return,
+        };
+        let Some(model_name) = pending else { return };
+        if self.turn_running(scope) {
+            // Otro turno arrancó justo antes: re-encolar para el próximo fin
+            if let Some(st) = self.scope_states.get_mut(scope) {
+                st.pending_model = Some(model_name);
+            }
+            return;
+        }
+        let models = crate::config::models::list();
+        if let Some(entry) = models.into_iter().find(|m| m.name == model_name) {
+            if let Err(e) = self.apply_model_to_agent(scope, &entry) {
+                eprintln!("[chat] modelo pendiente de '{}': {}", scope, e);
+            }
+        }
     }
 
     /// "Nueva conversación": resetea SOLO la sesión del scope activo. Las demás
@@ -689,7 +756,7 @@ impl ChatService {
             live: live_tx,
             done: std::sync::atomic::AtomicBool::new(false),
         });
-        self.active_turns.insert(scope, turn.clone());
+        self.active_turns.insert(scope.clone(), turn.clone());
 
         thread::spawn(move || {
             // Drena SIEMPRE hasta el final (Done o EOF) aunque no haya nadie
@@ -704,6 +771,13 @@ impl ChatService {
                 }
             }
             turn.finish();
+            // Fase 3: el turno terminó — aplicar el modelo que el usuario
+            // encoló para ESTE agente mientras trabajaba (aunque la UI esté
+            // viendo a otro). El lock del servicio está libre acá: nadie lo
+            // sostiene esperando el fin del turno (los RPCs fast-failan).
+            if let Ok(mut service) = crate::CHAT_SERVICE.lock() {
+                service.apply_pending_model(&scope);
+            }
         });
 
         Ok(out_rx)

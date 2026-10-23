@@ -108,3 +108,69 @@ pub fn builtins() -> Vec<&'static str> {
         "delegate",
     ]
 }
+
+/// Busca el archivo .md de un agente (por su frontmatter name, no por
+/// filename — robusto a renombres de archivo).
+fn find_agent_file(name: &str) -> Option<PathBuf> {
+    for dir in agent_dirs() {
+        if !dir.exists() {
+            continue;
+        }
+        if let Ok(entries) = std::fs::read_dir(&dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.extension().and_then(|e| e.to_str()) != Some("md") {
+                    continue;
+                }
+                if let Some(a) = parse_agent_file(&path) {
+                    if a.name == name {
+                        return Some(path);
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Reescribe el frontmatter `model:` de un agente, QUIRÚRGICAMENTE: solo esa
+/// línea dentro del bloque ---, preservando el resto byte a byte (icon,
+/// descripción, assets, prompt — nada se toca). Devuelve el modelo anterior.
+/// Escribí el nombre de display (ej. "MiniMax M3.1"), no el id del provider.
+pub fn update_agent_model(name: &str, new_model: &str) -> Result<String, String> {
+    let path = find_agent_file(name)
+        .ok_or_else(|| format!("Archivo del agente '{}' no encontrado", name))?;
+    let content = std::fs::read_to_string(&path)
+        .map_err(|e| format!("leer {:?}: {}", path, e))?;
+
+    let mut lines: Vec<String> = content.lines().map(str::to_string).collect();
+    let mut in_fm = false;
+    let mut model_idx = None;
+    for (i, line) in lines.iter().enumerate() {
+        let t = line.trim();
+        if t == "---" {
+            if !in_fm {
+                in_fm = true;
+                continue;
+            } else {
+                break; // fin del frontmatter
+            }
+        }
+        if in_fm && t.starts_with("model:") {
+            model_idx = Some(i);
+            break;
+        }
+    }
+    let i = model_idx.ok_or_else(|| {
+        format!("frontmatter de '{}' sin línea model:", name)
+    })?;
+    let old = lines[i]["model:".len()..].trim().to_string();
+    lines[i] = format!("model: {}", new_model);
+
+    let mut out = lines.join("\n");
+    if content.ends_with('\n') {
+        out.push('\n');
+    }
+    std::fs::write(&path, out).map_err(|e| format!("escribir {:?}: {}", path, e))?;
+    Ok(old)
+}
