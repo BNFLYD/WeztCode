@@ -489,6 +489,9 @@ fn env_var_for_provider(provider: &str) -> &'static str {
         "mistral" => "MISTRAL_API_KEY",
         "groq" => "GROQ_API_KEY",
         "xai" => "XAI_API_KEY",
+        // API oficial de Cline (docs.cline.bot/api) — key creada en app.cline.bot.
+        // La extensión ~/.pi/agent/extensions/cline-api.ts lee esta variable.
+        "cline" => "CLINE_API_KEY",
         _ => "OPENROUTER_API_KEY",
     }
 }
