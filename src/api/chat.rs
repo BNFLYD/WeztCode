@@ -65,11 +65,17 @@ pub async fn handle_chat_send(
 /// cambio de sección): replay del buffer del turno + eventos live hasta done.
 /// Si no hay turno activo, emite un único evento `idle` y cierra — la UI
 /// reconcilia con el historial y listo.
-pub async fn handle_chat_stream() -> Result<Sse<impl futures::Stream<Item = Result<Event, Infallible>>>, ApiResponse> {
-    let attach = tokio::task::spawn_blocking(|| {
+pub async fn handle_chat_stream(
+    Query(params): Query<std::collections::HashMap<String, String>>,
+) -> Result<Sse<impl futures::Stream<Item = Result<Event, Infallible>>>, ApiResponse> {
+    // ?agent=X: el turno de ESE scope (default: el activo). La UI re-attacha
+    // al scope que está viendo — con multi-agente, el turno de otro agente
+    // puede seguir corriendo en paralelo.
+    let agent = params.get("agent").cloned();
+    let attach = tokio::task::spawn_blocking(move || {
         let service = crate::CHAT_SERVICE.lock()
             .map_err(|e| format!("Lock: {}", e))?;
-        service.attach_turn()
+        service.attach_turn(agent.as_deref())
     }).await.unwrap().map_err(|e| err_json(&e))?;
 
     type ChatStream = std::pin::Pin<Box<dyn futures::Stream<Item = Result<Event, Infallible>> + Send>>;
