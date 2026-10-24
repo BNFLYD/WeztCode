@@ -338,6 +338,29 @@
     const text = input_value.trim();
     if (!text || streaming) return;
 
+    // Slash-commands al estilo del CLI de pi. /compact: resume el contexto
+    // de la sesión del agente activo (manual — pi también auto-compacta).
+    if (text === "/compact") {
+      input_value = "";
+      try {
+        const res = await fetch("/api/chat/compact", { method: "POST" });
+        const data = await res.json();
+        if (data.ok) {
+          warnings = [...warnings, "Contexto compactado ✓"];
+          // La compaction reescribió la sesión (resumen + cola): traer la
+          // verdad nueva y refrescar el percent.
+          await reconcile_messages();
+          await load_stats();
+        } else {
+          warnings = [...warnings, data.error ?? "Compact falló"];
+        }
+      } catch (e) {
+        warnings = [...warnings, `Compact falló: ${e?.message ?? e}`];
+      }
+      input_ref?.focus();
+      return;
+    }
+
     messages = [...messages, { role: "user", content: text }];
     save();
     input_value = "";
@@ -1035,7 +1058,6 @@
       class="text-accent-detail/70 hover:text-accent-detail transition-colors {show_conversations ? 'text-accent-detail' : ''}"
       onclick={toggle_conversations}
       disabled={streaming || switching || switching_conversation}
-      title="Conversaciones de este proyecto"
     >
       <Icon icon="ic:round-chat-bubble-outline" class="w-4 h-4" />
     </button>

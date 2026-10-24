@@ -26,6 +26,7 @@ pub fn router() -> Router {
         .route("/chat/stream", get(chat::handle_chat_stream))
         .route("/chat/new-session", post(chat::handle_chat_new_session))
         .route("/chat/abort", post(chat::handle_chat_abort))
+        .route("/chat/compact", post(chat::handle_chat_compact))
         .route("/chat/select-scope", post(chat::handle_chat_select_scope))
         .route("/chat/messages", get(chat::handle_chat_messages))
         .route("/chat/conversations", get(chat::handle_chat_conversations))

@@ -465,6 +465,12 @@ pub trait AgentBackend: Send {
         Err("switch_session not supported by this backend".to_string())
     }
 
+    /// /compact: resume el contexto de la sesión (manual). Default: no
+    /// soportado por el backend.
+    fn compact_rpc(&mut self) -> Result<String, String> {
+        Err("compact not supported by this backend".to_string())
+    }
+
     /// Historial real de la sesión actual (formato de pi: array de mensajes).
     fn get_messages(&self) -> Result<String, String> {
         Err("get_messages not supported by this backend".to_string())
@@ -567,6 +573,20 @@ impl PiAgentBackend {
     }
 
     /// Cambia a una sesión existente en caliente (mismo proceso, sin respawn).
+    /// Compaction manual del contexto (el /compact del CLI): resume los
+    /// mensajes viejos y deja la ventana despejada. Response correlacionada
+    /// por id (los eventos compaction_start/end son async y se descartan).
+    pub fn compact_rpc(&mut self) -> Result<String, String> {
+        let stdin = self.stdin.as_ref()
+            .ok_or_else(|| "Pi not spawned (stdin is None)".to_string())?;
+        let stdout_arc = self.stdout.as_ref()
+            .ok_or_else(|| "Pi not spawned (stdout is None)".to_string())?;
+        let json = rpc_exchange(stdin, stdout_arc, "compact", serde_json::json!({
+            "type": "compact",
+        }))?;
+        Ok(json.to_string())
+    }
+
     pub fn switch_session_rpc(&mut self, session_path: &str) -> Result<(), String> {
         let stdin = self.stdin.as_ref()
             .ok_or_else(|| "Pi not spawned (stdin is None)".to_string())?;
@@ -682,6 +702,10 @@ impl AgentBackend for PiAgentBackend {
 
     fn switch_session_rpc(&mut self, session_path: &str) -> Result<(), String> {
         PiAgentBackend::switch_session_rpc(self, session_path)
+    }
+
+    fn compact_rpc(&mut self) -> Result<String, String> {
+        PiAgentBackend::compact_rpc(self)
     }
 
     fn get_messages(&self) -> Result<String, String> {

@@ -328,6 +328,32 @@ pub async fn handle_chat_asset(
     }
 }
 
+/// POST /chat/compact — /compact manual del scope activo (resume del
+/// contexto, el mismo del CLI de pi). La response de pi llega con
+/// success/error; los eventos de progreso son async (se descartan).
+pub async fn handle_chat_compact() -> impl IntoResponse {
+    let result = tokio::task::spawn_blocking(|| {
+        let mut service = crate::CHAT_SERVICE.lock()
+            .map_err(|e| format!("Lock: {}", e))?;
+        service.compact()
+    }).await.unwrap();
+
+    match result {
+        Ok(json) => {
+            let v: serde_json::Value = serde_json::from_str(&json)
+                .unwrap_or(serde_json::json!({"success": false, "error": "respuesta no parseable"}));
+            let ok = v.get("success").and_then(|b| b.as_bool()).unwrap_or(false);
+            let err = v.get("error").and_then(|e| e.as_str()).map(str::to_string);
+            if ok {
+                ok_json(serde_json::json!({"ok": true, "data": v}))
+            } else {
+                err_json(&err.unwrap_or_else(|| "Compact falló".to_string()))
+            }
+        }
+        Err(e) => err_json(&config::keys::redact_keys(&e)),
+    }
+}
+
 /// POST /chat/abort — aborta el turno EN CURSO del agente (pi/little-coder).
 /// A diferencia del corte de conexión del frontend, esto le dice al proceso
 /// que deje de pensar/ejecutar de verdad.

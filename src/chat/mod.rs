@@ -711,6 +711,16 @@ impl ChatService {
         Ok(())
     }
 
+    /// /compact manual del scope activo: resume el contexto de SU sesión
+    /// (el mismo /compact del CLI de pi, vía RPC). No durante un turno: el
+    /// RPC compite por el stdout que consume el reader del stream.
+    pub fn compact(&mut self) -> Result<String, String> {
+        if self.turn_running(&self.active_scope()) {
+            return Err("El agente está trabajando: compactá al terminar el turno".to_string());
+        }
+        self.active_backend_mut().compact_rpc()
+    }
+
     /// Aborta el turno en curso del backend (pi/little-coder).
     pub fn abort(&mut self) -> Result<(), String> {
         self.active_backend_mut().abort_stream()
