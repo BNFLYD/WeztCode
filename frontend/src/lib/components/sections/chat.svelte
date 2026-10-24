@@ -1037,7 +1037,7 @@
       disabled={streaming || switching || switching_conversation}
       title="Conversaciones de este proyecto"
     >
-      <Icon icon="ri:search-line" class="w-4 h-4" />
+      <Icon icon="ic:round-chat-bubble-outline" class="w-4 h-4" />
     </button>
     <span class="font-mono truncate flex items-center gap-1 text-print/50"></span>
     <div class="ml-auto flex items-center gap-2">
@@ -1115,15 +1115,10 @@
       onkeydown={handle_conversations_keydown}
       class="mx-3 mb-2 p-2 rounded bg-back max-h-52 overflow-y-auto text-sm font-mono text-print outline-none"
     >
-      <div class="px-1 pb-1 mb-1 text-[10px] text-print/40 border-b border-accent-detail/10">
-        Conversaciones de este proyecto ({conversations.length}) — k/j mover · l abrir · d borrar
-      </div>
       {#if conversations_loading}
-        <div class="px-3 py-1.5 text-xs text-print/50">Cargando…</div>
+        <div class="px-3 py-1.5 text-xs text-print/50">Cargando</div>
       {:else if conversations_error}
         <div class="px-3 py-1.5 text-xs text-red-500">{conversations_error}</div>
-      {:else if conversations.length === 0}
-        <div class="px-3 py-1.5 text-xs text-print/50">Sin conversaciones en este proyecto</div>
       {:else}
         {#each conversations as c, index (c.id)}
           <button
@@ -1150,7 +1145,12 @@
           </button>
         {/each}
       {/if}
-
+      <div class="px-1 text-[10px] text-print/70 border-t border-accent-detail/10 text-center">
+        Conversaciones de este proyecto [{conversations.length}]
+      </div>
+      <div class="px-1 pb-1 mb-1 text-[10px] text-print/60 border-b border-accent-detail/10 text-center">
+        k/j mover · l abrir · d borrar
+      </div>
     </div>
   {/if}
 
@@ -1171,7 +1171,7 @@
       <div class="flex items-center justify-center h-full">
         <div class="text-center text-print/50">
           <Icon icon="mdi:thinking" class="w-20 h-20 mx-auto mb-3 opacity-50" />
-          <p class="text-xl">Animate a crear...</p>
+          <p class="text-xl">Animate a crear</p>
         </div>
       </div>
     {:else}
@@ -1243,11 +1243,17 @@
         <!-- Multi-agente: SIEMPRE clickeable — cambiar de agente mientras
              uno trabaja es el feature, no un peligro (fase 2). -->
         <button
-          class="flex items-center gap-1 px-2 py-0.5 text-xs font-semibold font-mono {agents_error ? 'text-red-400' : 'text-print/50 hover:text-print'} transition-colors rounded"
+          class="flex items-center gap-1 px-2 py-0.5 text-xs font-semibold font-mono {agents_error ? 'text-red-400' : pending_model !== null ? 'text-accent-detail' : 'text-print/50 hover:text-print'} transition-colors rounded"
           onclick={toggle_agent_dropdown}
         >
           <Icon icon={streaming ? "svg-spinners:bars-scale-fade" : current_icon || "simple-icons:pi"} class="w-4 h-4" />
           {agents_error ? `⚠ ${agents_error}` : ($state.eager(current_agent) || "default")}
+          <!-- Fase 3: cambio de modelo encolado — aplica cuando el agente
+               termine su turno. El mismo indicador intermitente que tenía
+               el switch pendiente, ahora para la configuración del agente. -->
+          {#if pending_model !== null}
+            <span class="ml-1 w-2 h-2 rounded-full bg-accent-detail animate-pulse"></span>
+          {/if}
         </button>
         {#if show_agent_dropdown}
           <div
