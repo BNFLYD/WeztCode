@@ -342,15 +342,22 @@
     // de la sesión del agente activo (manual — pi también auto-compacta).
     if (text === "/compact") {
       input_value = "";
+      // Feedback inmediato: el resume tarda decenas de segundos y el
+      // servicio queda LIBRE mientras tanto (el RPC corre fuera del lock).
+      warnings = [...warnings, "Compactando el contexto… (puede tardar ~40s)"];
+      const scope_at_start = active_scope;
       try {
         const res = await fetch("/api/chat/compact", { method: "POST" });
         const data = await res.json();
         if (data.ok) {
           warnings = [...warnings, "Contexto compactado ✓"];
           // La compaction reescribió la sesión (resumen + cola): traer la
-          // verdad nueva y refrescar el percent.
-          await reconcile_messages();
-          await load_stats();
+          // verdad nueva y refrescar el percent — SOLO si seguimos viendo
+          // al mismo agente (durante el compact se pudo swichear).
+          if (active_scope === scope_at_start) {
+            await reconcile_messages();
+            await load_stats();
+          }
         } else {
           warnings = [...warnings, data.error ?? "Compact falló"];
         }

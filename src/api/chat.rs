@@ -329,19 +329,50 @@ pub async fn handle_chat_asset(
 }
 
 /// POST /chat/compact — /compact manual del scope activo (resume del
-/// contexto, el mismo del CLI de pi). La response de pi llega con
-/// success/error; los eventos de progreso son async (se descartan).
+/// contexto, el mismo del CLI de pi). TRES fases: el lock del servicio se
+/// toma solo para validar/extraer handles y para el registro final — el
+/// RPC del compact (decenas de segundos de resume del LLM) corre FUERA del
+/// lock, así el switch de agente, active-agent y todo el resto siguen
+/// vivos mientras compacta.
 pub async fn handle_chat_compact() -> impl IntoResponse {
-    let result = tokio::task::spawn_blocking(|| {
+    // Fase 1 (lock breve): validar + handles + flag compacting
+    let begin = tokio::task::spawn_blocking(|| {
         let mut service = crate::CHAT_SERVICE.lock()
             .map_err(|e| format!("Lock: {}", e))?;
-        service.compact()
-    }).await.unwrap();
+        service.compact_begin()
+    })
+    .await
+    .unwrap()
+    .map_err(|e| err_json(&config::keys::redact_keys(&e)));
+
+    let (scope, stdin, stdout) = match begin {
+        Ok(b) => b,
+        Err(resp) => return resp,
+    };
+
+    // Fase 2 (SIN lock): el RPC — acá pasan los ~40s del resume.
+    let result = tokio::task::spawn_blocking(move || {
+        crate::chat::backend::rpc_exchange(
+            &stdin,
+            &stdout,
+            "compact",
+            serde_json::json!({"type": "compact"}),
+        )
+    })
+    .await
+    .unwrap();
+
+    // Fase 3 (lock breve): liberar el flag del scope ORIGINAL.
+    let scope_for_end = scope.clone();
+    let _ = tokio::task::spawn_blocking(move || {
+        if let Ok(mut service) = crate::CHAT_SERVICE.lock() {
+            service.compact_end(&scope_for_end);
+        }
+    })
+    .await;
 
     match result {
-        Ok(json) => {
-            let v: serde_json::Value = serde_json::from_str(&json)
-                .unwrap_or(serde_json::json!({"success": false, "error": "respuesta no parseable"}));
+        Ok(v) => {
             let ok = v.get("success").and_then(|b| b.as_bool()).unwrap_or(false);
             let err = v.get("error").and_then(|e| e.as_str()).map(str::to_string);
             if ok {

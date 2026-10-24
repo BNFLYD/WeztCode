@@ -1,4 +1,4 @@
-mod backend;
+pub mod backend;
 mod sessions;
 
 pub use backend::*;
@@ -58,6 +58,10 @@ pub struct ScopeState {
     /// trabajaba — aplica automáticamente cuando SU turno termina, aunque
     /// esté viendo a otro agente.
     pub pending_model: Option<String>,
+    /// Compactación manual en curso para ESTE agente: su RPC tarda decenas
+    /// de segundos (resume del LLM) — los demás endpoints de este scope
+    /// fast-failan mientras tanto (mismo esquema que un turno activo).
+    pub compacting: bool,
 }
 
 /// Turno de chat en curso: eventos acumulados + canal live para re-attach.
@@ -151,6 +155,7 @@ impl ChatService {
                 session_id: Some(sid),
                 prompt_dirty,
                 pending_model: None,
+                compacting: false,
             },
         );
         service
@@ -208,7 +213,7 @@ impl ChatService {
         self.backends.insert(scope.to_string(), b);
         self.scope_states.insert(
             scope.to_string(),
-            ScopeState { session_id: Some(sid.to_string()), prompt_dirty: dirty, pending_model: None },
+            ScopeState { session_id: Some(sid.to_string()), prompt_dirty: dirty, pending_model: None, compacting: false },
         );
         Ok(())
     }
@@ -527,6 +532,9 @@ impl ChatService {
         if self.turn_running(&self.active_scope()) {
             return Err("Turno en curso".to_string());
         }
+        if self.scope_compacting(&self.active_scope()) {
+            return Err("Compactando el contexto".to_string());
+        }
         self.active_backend().get_session_stats()
     }
 
@@ -646,6 +654,9 @@ impl ChatService {
         if self.turn_running(&self.active_scope()) {
             return Err("Turno en curso: el historial se actualiza al terminar".to_string());
         }
+        if self.scope_compacting(&self.active_scope()) {
+            return Err("Compactando el contexto: probá en unos segundos".to_string());
+        }
         self.active_backend().get_messages()
     }
 
@@ -712,13 +723,59 @@ impl ChatService {
     }
 
     /// /compact manual del scope activo: resume el contexto de SU sesión
-    /// (el mismo /compact del CLI de pi, vía RPC). No durante un turno: el
-    /// RPC compite por el stdout que consume el reader del stream.
-    pub fn compact(&mut self) -> Result<String, String> {
-        if self.turn_running(&self.active_scope()) {
+    /// (el mismo /compact del CLI de pi). El RPC tarda decenas de segundos —
+    /// por eso va en DOS fases: compact_begin toma el lock SOLO para
+    /// validar y extraer los handles del proceso, y el RPC corre FUERA del
+    /// lock (compact RPC en handle_chat_compact). Sin esto, el handler
+    /// sostenía el lock del servicio durante TODO el resume y congelaba a
+    /// todos los demás endpoints (switch de agente, active-agent, init).
+    pub fn compact_begin(
+        &mut self,
+    ) -> Result<
+        (
+            String,
+            std::sync::Arc<std::sync::Mutex<std::process::ChildStdin>>,
+            std::sync::Arc<std::sync::Mutex<std::process::ChildStdout>>,
+        ),
+        String,
+    > {
+        let scope = self.active_scope();
+        if self.turn_running(&scope) {
             return Err("El agente está trabajando: compactá al terminar el turno".to_string());
         }
-        self.active_backend_mut().compact_rpc()
+        let compacting = self
+            .scope_states
+            .get(&scope)
+            .map(|st| st.compacting)
+            .unwrap_or(false);
+        if compacting {
+            return Err("Ya se está compactando el contexto".to_string());
+        }
+        let handles = self
+            .active_backend()
+            .compact_handles()
+            .ok_or_else(|| "compact not supported by this backend".to_string())?;
+        if let Some(st) = self.scope_states.get_mut(&scope) {
+            st.compacting = true;
+        }
+        Ok((scope, handles.0, handles.1))
+    }
+
+    /// Fase final del compact (con lock, breve): libera el flag del scope
+    /// ORIGINAL — el usuario puede haber cambiado de agente durante el
+    /// resume (decenas de segundos con el servicio libre, por diseño).
+    pub fn compact_end(&mut self, scope: &str) {
+        if let Some(st) = self.scope_states.get_mut(scope) {
+            st.compacting = false;
+        }
+    }
+
+    /// ¿El scope está compactando? (guards de fast-fail de RPCs)
+    fn scope_compacting(&self, scope: &str) -> bool {
+        self.scope_states
+            .get(scope)
+            .map(|st| st.compacting)
+            .unwrap_or(false)
     }
 
     /// Aborta el turno en curso del backend (pi/little-coder).
@@ -735,6 +792,9 @@ impl ChatService {
         let scope = self.active_scope();
         if self.turn_running(&scope) {
             return Err("Ya hay un turno en curso en este agente".to_string());
+        }
+        if self.scope_compacting(&scope) {
+            return Err("Compactando el contexto: esperá a que termine".to_string());
         }
 
         // Inyección del prompt: solo cuando la sesión del scope está vacía

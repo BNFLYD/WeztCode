@@ -300,7 +300,7 @@ static RPC_COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64:
 /// fuera de orden, además de eventos (`extension_ui_request`, notificaciones)
 /// en cualquier momento: sin correlación por id, el primer línea disponible se
 /// interpretaba como la respuesta y el protocolo se desincronizaba.
-fn rpc_exchange(
+pub(crate) fn rpc_exchange(
     stdin: &Arc<Mutex<ChildStdin>>,
     stdout: &Arc<Mutex<ChildStdout>>,
     command: &str,
@@ -471,6 +471,19 @@ pub trait AgentBackend: Send {
         Err("compact not supported by this backend".to_string())
     }
 
+    /// Handles (stdin/stdout Arcs) del proceso para correr el compact FUERA
+    /// del lock del servicio — la compactación tarda decenas de segundos
+    /// (resume del LLM) y sostener el lock ahí congela todos los demás
+    /// endpoints. Default: None (backend sin soporte).
+    fn compact_handles(
+        &self,
+    ) -> Option<(
+        std::sync::Arc<std::sync::Mutex<std::process::ChildStdin>>,
+        std::sync::Arc<std::sync::Mutex<std::process::ChildStdout>>,
+    )> {
+        None
+    }
+
     /// Historial real de la sesión actual (formato de pi: array de mensajes).
     fn get_messages(&self) -> Result<String, String> {
         Err("get_messages not supported by this backend".to_string())
@@ -573,6 +586,18 @@ impl PiAgentBackend {
     }
 
     /// Cambia a una sesión existente en caliente (mismo proceso, sin respawn).
+    /// Handles (stdin, stdout) del proceso — para el compact fuera-del-lock.
+    pub fn compact_handles(
+        &self,
+    ) -> Option<(
+        std::sync::Arc<std::sync::Mutex<std::process::ChildStdin>>,
+        std::sync::Arc<std::sync::Mutex<std::process::ChildStdout>>,
+    )> {
+        let stdin = self.stdin.as_ref()?.clone();
+        let stdout = self.stdout.as_ref()?.clone();
+        Some((stdin, stdout))
+    }
+
     /// Compaction manual del contexto (el /compact del CLI): resume los
     /// mensajes viejos y deja la ventana despejada. Response correlacionada
     /// por id (los eventos compaction_start/end son async y se descartan).
@@ -706,6 +731,15 @@ impl AgentBackend for PiAgentBackend {
 
     fn compact_rpc(&mut self) -> Result<String, String> {
         PiAgentBackend::compact_rpc(self)
+    }
+
+    fn compact_handles(
+        &self,
+    ) -> Option<(
+        std::sync::Arc<std::sync::Mutex<std::process::ChildStdin>>,
+        std::sync::Arc<std::sync::Mutex<std::process::ChildStdout>>,
+    )> {
+        PiAgentBackend::compact_handles(self)
     }
 
     fn get_messages(&self) -> Result<String, String> {
