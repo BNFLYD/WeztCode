@@ -5,11 +5,12 @@
 <script>
   import { afterUpdate, onDestroy } from "svelte";
   import Icon from "@iconify/svelte";
-  import ExplorerChannel from "$lib/components/ui/channels/explorer_channel.svelte";
+  // Canal del explorer: la sección solo detecta eventos y dispara
+  // signals; las vistas del monitor (preview + cartel Si/No) viven en
+  // el canal, y las transiciones (estática) en el monitor.
+  import * as explorer_channel from "$lib/components/ui/channels/explorer_channel.js";
 
   export let active_section = "explorer";
-  export let active_channel = null;
-  export let is_distorting = false;
   export let pending_explorer_path = null;
 
   let current_path = "/";
@@ -35,89 +36,29 @@
   let project_loading = false;
   let pending_g = false;
 
-  let channel_obj = null;
-  let channel_timeout = null;
-  let preview_data = null;
-  let preview_timeout = null;
+  // Diálogo de confirmación abierto: bloquea el teclado de la sección.
+  // El canal le gana la precedencia al preview mientras esté abierto.
+  let dialog_open = false;
 
-  $: channel_active = !!channel_obj;
-
-  $: if (channel_obj) {
-    active_channel = { component: ExplorerChannel, props: channel_obj.props };
-  } else if (preview_data) {
-    active_channel = {
-      component: ExplorerChannel,
-      props: {
-        mode: "preview",
-        image_path: preview_data.image_path,
-        icon: preview_data.icon,
-        name: preview_data.name,
-        on_close: handle_preview_close
-      }
-    };
-  } else {
-    active_channel = null;
-  }
-
+  // Preview automático: cursor sobre imagen/GIF → signal al canal del
+  // explorer (clear para todo lo demás). La transición (estática →
+  // vista) la maneja el monitor; acá no hay tiempos ni estados del
+  // monitor. Al cerrarse el diálogo esto re-sincroniza el preview del
+  // archivo bajo el cursor.
   $: {
-    const entry = entries[cursor_index];
-    if (entry && entry.entry_type === 'file') {
-      const icon = file_icon(entry.name);
-      if (icon === "garden:file-image-fill-12" || icon === "fluent:gif-16-filled") {
-        handle_channel({ id: 'preview', props: { path: entry.path, icon, name: entry.name } });
+    const entry = show_projects ? null : entries[cursor_index];
+    if (!dialog_open) {
+      if (entry && entry.entry_type === "file") {
+        const icon = file_icon(entry.name);
+        if (icon === "garden:file-image-fill-12" || icon === "fluent:gif-16-filled") {
+          explorer_channel.signal({ type: "preview", path: entry.path, icon, name: entry.name });
+        } else {
+          explorer_channel.signal({ type: "clear" });
+        }
       } else {
-        handle_channel(null);
+        explorer_channel.signal({ type: "clear" });
       }
-    } else {
-      handle_channel(null);
     }
-  }
-
-  function handle_channel(ch) {
-    if (!ch) {
-      preview_data = null;
-      return;
-    }
-    if (ch.id === 'preview') {
-      if (preview_timeout) clearTimeout(preview_timeout);
-      preview_data = { image_path: ch.props.path, icon: ch.props.icon, name: ch.props.name };
-      is_distorting = true;
-      preview_timeout = setTimeout(() => {
-        is_distorting = false;
-        preview_timeout = null;
-      }, 200);
-      return;
-    }
-    preview_data = null;
-    if (channel_timeout) return;
-    if (channel_obj) return;
-    is_distorting = true;
-    channel_timeout = setTimeout(() => {
-      channel_obj = { props: ch.props };
-      channel_timeout = null;
-      setTimeout(() => {
-        is_distorting = false;
-      }, 200);
-    }, 300);
-  }
-
-  function handle_channel_close() {
-    preview_data = null;
-    if (channel_timeout) clearTimeout(channel_timeout);
-    channel_timeout = null;
-    channel_obj = null;
-    is_distorting = true;
-    channel_timeout = setTimeout(() => {
-      is_distorting = false;
-      channel_timeout = null;
-    }, 300);
-  }
-
-  function handle_preview_close() {
-    preview_data = null;
-    is_distorting = false;
-    if (preview_timeout) clearTimeout(preview_timeout);
-    preview_timeout = null;
   }
 
   async function load_dir(path, focus_name = null) {
@@ -253,23 +194,23 @@
   function confirm_delete() {
     const entry = entries[cursor_index];
     if (!entry) return;
-    handle_channel({
-      id: "explorer",
-      props: {
-        mode: "confirm",
-        icon: entry.entry_type === "dir" ? dir_icon() : file_icon(entry.name),
-        name: entry.name,
-        on_confirm: async () => {
-          const res = await fetch(`/api/fs/delete?path=${encodeURIComponent(entry.path)}`);
-          const json = await res.json();
-          if (json.ok) {
-            await load_dir(current_path);
-          } else {
-            error = json.error;
-          }
-        },
-        on_cancel: () => {},
-        on_close: handle_channel_close
+    dialog_open = true;
+    explorer_channel.signal({
+      type: "confirm",
+      icon: entry.entry_type === "dir" ? dir_icon() : file_icon(entry.name),
+      name: entry.name,
+      on_confirm: async () => {
+        const res = await fetch(`/api/fs/delete?path=${encodeURIComponent(entry.path)}`);
+        const json = await res.json();
+        if (json.ok) {
+          await load_dir(current_path);
+        } else {
+          error = json.error;
+        }
+      },
+      on_cancel: () => {},
+      on_close: () => {
+        dialog_open = false;
       }
     });
   }
@@ -386,18 +327,6 @@
       entry_name: entries[cursor_index]?.name ?? null
     };
     if (controller) controller.abort();
-    if (channel_timeout) {
-      clearTimeout(channel_timeout);
-      channel_timeout = null;
-    }
-    if (preview_timeout) {
-      clearTimeout(preview_timeout);
-      preview_timeout = null;
-    }
-    channel_obj = null;
-    preview_data = null;
-    active_channel = null;
-    is_distorting = false;
     show_projects = false;
     projects = [];
     pending_g = false;
@@ -461,7 +390,7 @@
       return;
     }
 
-    if (channel_active) {
+    if (dialog_open) {
       if (["h","l","j","k","ArrowLeft","ArrowRight","ArrowUp","ArrowDown","d","D","a","A","r","R","x","X","p","P","m","M","Enter"," ","Escape"].includes(e.key)) {
         e.preventDefault();
       }
@@ -505,17 +434,17 @@
           e.preventDefault();
           const entry = projects[cursor_index];
           if (!entry) break;
-          handle_channel({
-            id: "explorer",
-            props: {
-              mode: "confirm",
-              icon: "mdi:folder-open",
-              name: entry.name,
-              on_confirm: async () => {
-                await delete_project_entry(entry.path);
-              },
-              on_cancel: () => {},
-              on_close: handle_channel_close
+          dialog_open = true;
+          explorer_channel.signal({
+            type: "confirm",
+            icon: "mdi:folder-open",
+            name: entry.name,
+            on_confirm: async () => {
+              await delete_project_entry(entry.path);
+            },
+            on_cancel: () => {},
+            on_close: () => {
+              dialog_open = false;
             }
           });
           break;

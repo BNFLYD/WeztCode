@@ -1,18 +1,9 @@
 <script>
   import { onMount, tick } from "svelte";
   import Icon from "@iconify/svelte";
-  import ChatChannel from "../ui/channels/chat_channel.svelte";
-  // Reuso del diálogo de confirmación Si/No del canal del explorer (mismo
-  // cartel, mismo teclado) para eliminar conversaciones.
-  import ExplorerChannel from "../ui/channels/explorer_channel.svelte";
-
-  // Bindings del monitor (runes: bindable): el channel del chat dibuja el
-  // visual del agente activo según su estado (assets de su .md).
-  let {
-    active_section = "chat",
-    active_channel = $bindable(null),
-    is_distorting = $bindable(false),
-  } = $props();
+  // Canal del chat: la sección solo dispara signals; el canal es dueño
+  // de las vistas del monitor (visual del agente + cartel de borrado).
+  import * as chat_channel from "../ui/channels/chat_channel.js";
 
   const STORAGE_KEY = "weztcode_chat_messages";
 
@@ -23,50 +14,26 @@
   // Estado visual del agente para el channel del monitor:
   // standby | talking | thinking | confused (según el streaming de pi/lc).
   let agent_visual = $state("standby");
-  // Ownership del channel: solo lo soltamos si lo pusimos nosotros. Evita pisar
-  // el channel del explorer cuando el modelo streamea desde otra sección.
-  let channel_owned = $state(false);
 
   function set_visual(state) {
     if (agent_visual !== state) agent_visual = state;
   }
 
-  function flash_static(ms = 400) {
-    is_distorting = true;
-    setTimeout(() => (is_distorting = false), ms);
-  }
-
-  // Channel del monitor: visible SOLO en la sección chat y SOLO si el agente
-  // activo define assets. Nunca lee active_channel (evita loops de $effect).
-  // Fuera de la sección chat los cambios de estado visual son no-op: el canal
-  // de otra sección queda intacto.
+  // Visual del agente → signal al canal del chat. El canal decide: mismo
+  // agente = estado vivo (swap en caliente, sin estática); agente nuevo
+  // o visual que aparece/desaparece = update (estática → vista). Mientras
+  // el cartel de borrado está abierto, el canal guarda el estado fresco
+  // detrás del diálogo. La sección nunca escribe el monitor.
   $effect(() => {
-    const in_chat = active_section === "chat";
-
-    // El diálogo de confirmación (borrar conversación) vive en el MONITOR:
-    // mientras esté abierto, NO pisarlo con el visual del agente. Si el
-    // usuario se fue de la sección con el diálogo abierto, +page nuló el
-    // canal: cancelar la confirmación pendiente para no dejar estado huérfano.
-    if (conv_delete_confirm) {
-      if (!in_chat) conv_delete_confirm = null;
-      return;
-    }
-
     const agent = current_agent
       ? sub_agents.find(a => a.name === current_agent)
       : null;
-    const show = in_chat && !!agent?.assets;
-
-    if (show) {
-      active_channel = {
-        component: ChatChannel,
-        props: { state: agent_visual, agent_name: current_agent },
-      };
-      channel_owned = true;
-    } else if (channel_owned) {
-      active_channel = null;
-      channel_owned = false;
-    }
+    chat_channel.signal({
+      type: "agent",
+      name: current_agent,
+      has_assets: !!agent?.assets,
+      visual: agent_visual,
+    });
   });
 
   // Proyecto actual (viene del backend en /chat/active-agent). Key-ea el
@@ -603,25 +570,21 @@
         const c = conversations[conv_cursor];
         if (c) {
           conv_delete_confirm = c;
-          // El cartel Si/No vive en el MONITOR (mismo lugar y animación que
-          // los diálogos del explorer), no sobre la lista.
-          active_channel = {
-            component: ExplorerChannel,
-            props: {
-              mode: "confirm",
-              owner_section: "chat",
-              icon: "ri:chat-delete-line",
-              name: c.preview ?? c.id.slice(0, 12),
-              on_confirm: () => delete_conversation(c.id),
-              on_cancel: () => {},
-              on_close: () => {
-                conv_delete_confirm = null;
-                // El diálogo tenía el foco: devolvérselo al picker para
-                // poder seguir borrando sin tocar el mouse.
-                conversations_panel_ref?.focus();
-              },
+          // El cartel Si/No vive en el MONITOR (mismo lugar y animación
+          // que los diálogos del explorer), vía el canal del chat.
+          chat_channel.signal({
+            type: "confirm",
+            icon: "ri:chat-delete-line",
+            name: c.preview ?? c.id.slice(0, 12),
+            on_confirm: () => delete_conversation(c.id),
+            on_cancel: () => {},
+            on_close: () => {
+              conv_delete_confirm = null;
+              // El diálogo tenía el foco: devolvérselo al picker para
+              // poder seguir borrando sin tocar el mouse.
+              conversations_panel_ref?.focus();
             },
-          };
+          });
         }
         break;
       }
@@ -707,8 +670,8 @@
       real_context_window = null;
       await load_stats();
 
-      // Feedback visual del swap de contexto + foco en el input
-      flash_static();
+      // Foco en el input tras el swap de contexto (el monitor no cambia
+      // de estado al cambiar de conversación: mismo agente, mismo visual).
       await tick();
       input_ref?.focus();
     } catch (e) {
@@ -886,8 +849,8 @@
         messages = load_scope(active_scope);
         await sync_scope_view();
 
-        // Estática de cambio de agente + visual nuevo en el monitor
-        if (agent?.assets) flash_static();
+        // (La estática del cambio de agente la dispara el monitor: la key
+        // de la vista cambia agent:Viejo → agent:Nuevo → update → estática.)
         await tick();
         input_ref?.focus();
       } else {
@@ -1047,11 +1010,8 @@
     messages = load_scope(active_scope);
     await sync_scope_view();
 
-    // Aparición del agente al bootear: estática + visual en el monitor
-    const boot_agent = current_agent
-      ? sub_agents.find(a => a.name === current_agent)
-      : null;
-    if (boot_agent?.assets) flash_static();
+    // (La aparición del agente al bootear también la maneja el monitor:
+    // la vista agent:{nombre} entra como update → estática → visual.)
   }
 
   init();
