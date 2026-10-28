@@ -4,6 +4,7 @@ pnpm-lock.yaml
 .svelte-kit/
 .opencode/
 .pi/
+bitacora/
 
 frontend/dist/
 

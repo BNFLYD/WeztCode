@@ -37,11 +37,14 @@ pub struct MenuLayout {
     pub bottom: i32,
     pub right: i32,
     pub width: i32,
+    /// Margen izquierdo de la terminal (Phase 3): el viewer ancla Left acá
+    /// y llena el rectángulo libre al lado del menú.
+    pub left: i32,
 }
 
 impl Default for MenuLayout {
     fn default() -> Self {
-        Self { top: 1, bottom: 1, right: 0, width: 350 }
+        Self { top: 1, bottom: 1, right: 0, width: 350, left: 0 }
     }
 }
 

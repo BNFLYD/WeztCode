@@ -23,6 +23,10 @@ pub struct Gtk4Platform {
     window: Rc<RefCell<Option<ApplicationWindow>>>,
     webview: Rc<RefCell<Option<WebView>>>,
     monitor_geo: Rc<RefCell<Option<WindowGeometry>>>,
+    /// Ventana viewer de puertos (sección 表示): hoisted al platform para que
+    /// handle_wm_events la alcance — es hermana del menú y re-ancla en CADA
+    /// GeometryChanged, no solo con el snapshot de cuando se abrió.
+    viewer_state: Rc<RefCell<Option<ViewerWindow>>>,
 }
 
 impl Gtk4Platform {
@@ -36,43 +40,24 @@ impl Gtk4Platform {
             window: Rc::new(RefCell::new(None)),
             webview: Rc::new(RefCell::new(None)),
             monitor_geo: Rc::new(RefCell::new(None)),
+            viewer_state: Rc::new(RefCell::new(None)),
         }
+    }
+
+    /// Gdk::Monitor donde vive la ventana (None si aún no tiene surface).
+    /// La ventana viewer se pinea al monitor del menú: los márgenes de
+    /// layer-shell son relativos al monitor donde cae cada ventana.
+    fn monitor_at_window(window: &ApplicationWindow) -> Option<gdk::Monitor> {
+        let display = gdk::Display::default()?;
+        let surface = window.surface()?;
+        display.monitor_at_surface(&surface)
     }
 
     /// Detect monitor geometry using GTK4/GDK and return WindowGeometry
     fn detect_monitor_geometry(window: &ApplicationWindow) -> Option<WindowGeometry> {
-        if let Some(display) = gdk::Display::default() {
-            if let Some(surface) = window.surface() {
-                if let Some(monitor) = display.monitor_at_surface(&surface) {
-                    let geo = monitor.geometry();
-//                     println!("[GTK] Monitor detected: {}x{} at x={}, y={}",
-//                              geo.width(), geo.height(), geo.x(), geo.y());
-
-                    // Log additional monitor info
-//                     println!("[GTK] Monitor scale factor: {}", monitor.scale_factor());
-                    if let Some(manufacturer) = monitor.manufacturer() {
-//                         println!("[GTK] Monitor manufacturer: {}", manufacturer);
-                    }
-                    if let Some(model) = monitor.model() {
-//                         println!("[GTK] Monitor model: {}", model);
-                    }
-
-                    return Some(WindowGeometry::new(
-                        geo.x(),
-                        geo.y(),
-                        geo.width(),
-                        geo.height(),
-                    ));
-                } else {
-//                     println!("[GTK] WARNING: Could not detect monitor at surface");
-                }
-            } else {
-//                 println!("[GTK] WARNING: Window has no surface yet");
-            }
-        } else {
-//             println!("[GTK] WARNING: No default display available");
-        }
-        None
+        let monitor = Self::monitor_at_window(window)?;
+        let geo = monitor.geometry();
+        Some(WindowGeometry::new(geo.x(), geo.y(), geo.width(), geo.height()))
     }
 
     /// Calculate canvas margins based on monitor and terminal geometry
@@ -100,7 +85,11 @@ impl Gtk4Platform {
             - terminal_geo.width;
         let margin_right = margin_right.max(0); // Ensure non-negative
 
-        let margin_left = 0; // Phase 3: Will calculate for left-side positioning
+        // Phase 3 (viewer de puertos): margen izquierdo de la terminal. La
+        // ventana de visualización ancla Left con este margen y llena el
+        // rectángulo libre al lado del menú (sus 4 anclajes + márgenes
+        // heredados del canvas del menú).
+        let margin_left = (terminal_geo.x - monitor_geo.x).max(0);
 
 //         println!("[GTK] Canvas margins calculated: top={}, bottom={}, left={}, right={}",
 //                  margin_top, margin_bottom, margin_left, margin_right);
@@ -128,6 +117,7 @@ impl GuiPlatform for Gtk4Platform {
         let window_ref = self.window.clone();
         let webview_ref = self.webview.clone();
         let monitor_geo_ref = self.monitor_geo.clone();
+        let viewer_state_ref = self.viewer_state.clone();
         let url = url.to_string();
         let term_geometry_clone = term_geometry.clone();
 
@@ -178,7 +168,7 @@ impl GuiPlatform for Gtk4Platform {
             if let (Some(monitor), Some(term_geo)) = (monitor_geo, &term_geometry) {
                 // Calculate canvas margins using monitor geometry + terminal geometry + overlay width
                 let overlay_width = initial_width as i32;
-                let (margin_top, margin_bottom, _margin_left, margin_right) =
+                let (margin_top, margin_bottom, margin_left, margin_right) =
                     Self::calculate_canvas_margins(&monitor, term_geo, overlay_width);
 
 //                 println!("[GTK] Using monitor geometry for margins: {}x{} (top={}, bottom={}, right={})",
@@ -193,6 +183,7 @@ impl GuiPlatform for Gtk4Platform {
                     bottom: margin_bottom,
                     right: margin_right,
                     width: overlay_width,
+                    left: margin_left,
                 });
 
                 // Sync terminal padding with overlay width (non-blocking)
@@ -211,6 +202,7 @@ impl GuiPlatform for Gtk4Platform {
                     bottom: 0,
                     right: 0,
                     width: initial_width,
+                    left: geo.x.max(0),
                 });
             } else {
                 // Default values when no geometry available
@@ -222,6 +214,7 @@ impl GuiPlatform for Gtk4Platform {
                     bottom: 1,
                     right: 0,
                     width: initial_width,
+                    left: 0,
                 });
             }
 
@@ -278,20 +271,34 @@ impl GuiPlatform for Gtk4Platform {
             // Canal API → main loop: la ventana se crea/reemplaza/destruye acá,
             // en el thread de GTK. Ventana única: otro puerto reemplaza contenido.
             // El recv().await es un Future puro — glib lo maneja con spawn_local
-            // (event-driven, sin polling).
+            // (event-driven, sin polling). El estado vive en el PLATFORM
+            // (viewer_state), así handle_wm_events puede re-anclarla como
+            // hermana del menú en cada GeometryChanged.
             let viewer_app = app.clone();
-            let viewer_state: Rc<RefCell<Option<ViewerWindow>>> = Rc::new(RefCell::new(None));
+            let viewer_state = viewer_state_ref.clone();
+            let menu_window_ref = window_ref.clone();
             let mut viewer_rx = crate::gui::viewer::setup_channel();
             gtk4::glib::MainContext::default().spawn_local(async move {
                 while let Some(cmd) = viewer_rx.recv().await {
                     match cmd {
                         crate::gui::viewer::ViewerCmd::Open { port } => {
                             let layout = crate::gui::viewer::menu_layout();
-                            if let Some(ref st) = *viewer_state.borrow() {
-                                // Ventana ya abierta: mismo WebView, contenido nuevo
-                                st.webview.load_uri(&format!("http://127.0.0.1:{}/", port));
-                                st.window.present();
+                            // Ventana ya abierta: mismo WebView, contenido nuevo
+                            let existing = viewer_state
+                                .borrow()
+                                .as_ref()
+                                .map(|st| (st.window.clone(), st.webview.clone()));
+                            if let Some((win, webview)) = existing {
+                                webview.load_uri(&format!("http://127.0.0.1:{}/", port));
+                                win.present();
                             } else {
+                                // Mismo monitor que el menú: los márgenes de
+                                // layer-shell son relativos al monitor donde
+                                // cae la ventana.
+                                let menu_monitor = menu_window_ref
+                                    .borrow()
+                                    .as_ref()
+                                    .and_then(Self::monitor_at_window);
                                 let on_close = {
                                     let st = viewer_state.clone();
                                     Rc::new(move || {
@@ -299,7 +306,13 @@ impl GuiPlatform for Gtk4Platform {
                                         crate::gui::viewer::set_status(None);
                                     }) as Rc<dyn Fn()>
                                 };
-                                let win = Self::create_viewer_window(&viewer_app, port, layout, on_close);
+                                let win = Self::create_viewer_window(
+                                    &viewer_app,
+                                    port,
+                                    layout,
+                                    menu_monitor.as_ref(),
+                                    on_close,
+                                );
                                 *viewer_state.borrow_mut() = Some(win);
                             }
                             crate::gui::viewer::set_status(Some(port));
@@ -340,32 +353,42 @@ impl Gtk4Platform {
         self.app.run();
     }
 
-    /// Ventana viewer de puertos (sección 表示): layer-shell al lado del menú,
-    /// WebKit directo al puerto elegido y botón de cierre en la esquina.
+    /// Ventana viewer de puertos (sección 表示): hermana del menú. Reutiliza
+    /// los cálculos de canvas del menú (MenuLayout) para llenar el espacio
+    /// libre de la terminal al lado de la sidebar: los 4 anclajes + márgenes
+    /// hacen que el COMPOSITOR controle ambas dimensiones — right aterriza en
+    /// el borde IZQUIERDO del menú (right del menú + su ancho), left en el
+    /// borde izquierdo de la terminal. WebKit directo al puerto elegido y
+    /// botón de cierre en la esquina externa.
     fn create_viewer_window(
         app: &gtk4::Application,
         port: u16,
         layout: crate::gui::viewer::MenuLayout,
+        monitor: Option<&gdk::Monitor>,
         on_close: Rc<dyn Fn()>,
     ) -> ViewerWindow {
         let window = gtk4::ApplicationWindow::builder()
             .application(app)
             .title("WeztCode Viewer")
-            .default_width(layout.width.max(350))
-            .default_height(600)
+            .default_width(600)
+            .default_height(400)
             .build();
         window.set_css_classes(&[&"transparent-window"]);
 
         window.init_layer_shell();
         window.set_layer(Layer::Overlay);
         window.set_keyboard_mode(KeyboardMode::OnDemand);
-        // Al lado del menú: mismos márgenes top/bottom; el margen derecho se
-        // desplaza por el margen del menú + su ancho.
+        // Mismo monitor que el menú: los márgenes solo significan lo mismo
+        // si ambas hermanas caen en el mismo monitor.
+        window.set_monitor(monitor);
+        // Hermana del menú: llena el rectángulo libre al lado de la sidebar.
         window.set_anchor(Edge::Right, true);
         window.set_anchor(Edge::Top, true);
         window.set_anchor(Edge::Bottom, true);
+        window.set_anchor(Edge::Left, true);
         window.set_margin(Edge::Top, layout.top);
         window.set_margin(Edge::Bottom, layout.bottom);
+        window.set_margin(Edge::Left, layout.left);
         window.set_margin(Edge::Right, layout.right + layout.width);
         window.set_exclusive_zone(-1);
 
@@ -440,6 +463,7 @@ impl Gtk4Platform {
 
         let window_weak = self.window.clone();
         let monitor_geo_weak = self.monitor_geo.clone();
+        let viewer_state = self.viewer_state.clone();
 
         // Debounce trailing del padding reload: width pendiente + timer one-shot
         let pending_width: Rc<RefCell<Option<u32>>> = Rc::new(RefCell::new(None));
@@ -468,6 +492,8 @@ impl Gtk4Platform {
                         if let Ok(window_ref) = window_weak.try_borrow() {
                             if let Some(ref window) = *window_ref {
                                 Self::apply_geometry(window, &monitor_geo_weak, geometry, &pending_width, &debounce_src);
+                                // Hermana: el viewer re-ancla con los números frescos
+                                Self::apply_viewer_geometry(&viewer_state);
                             }
                         }
                     }
@@ -475,6 +501,8 @@ impl Gtk4Platform {
                         if let Ok(window_ref) = window_weak.try_borrow() {
                             if let Some(ref window) = *window_ref {
                                 Self::apply_geometry(window, &monitor_geo_weak, geometry, &pending_width, &debounce_src);
+                                // Hermana: el viewer re-ancla con los números frescos
+                                Self::apply_viewer_geometry(&viewer_state);
                             }
                         }
                     }
@@ -514,7 +542,7 @@ impl Gtk4Platform {
             .or_else(|| monitor_geo_weak.borrow().clone());
 
         if let Some(monitor) = monitor {
-            let (margin_top, margin_bottom, _margin_left, margin_right) =
+            let (margin_top, margin_bottom, margin_left, margin_right) =
                 Self::calculate_canvas_margins(&monitor, &geometry, overlay_width);
 
             window.set_margin(Edge::Top, margin_top);
@@ -527,6 +555,7 @@ impl Gtk4Platform {
                 bottom: margin_bottom,
                 right: margin_right,
                 width: overlay_width,
+                left: margin_left,
             });
         }
 
@@ -547,6 +576,22 @@ impl Gtk4Platform {
             glib::ControlFlow::Break
         });
         *debounce_src.borrow_mut() = Some(sid);
+    }
+
+    /// Re-ancla la ventana viewer con el layout fresco del menú (su hermana):
+    /// mismos top/bottom, left = borde izquierdo de la terminal, right =
+    /// borde izquierdo del menú. Se llama en cada GeometryChanged — el viewer
+    /// no es el snapshot de cuando se abrió, sigue viva como el menú.
+    fn apply_viewer_geometry(state: &Rc<RefCell<Option<ViewerWindow>>>) {
+        if let Ok(guard) = state.try_borrow() {
+            if let Some(ref vw) = *guard {
+                let layout = crate::gui::viewer::menu_layout();
+                vw.window.set_margin(Edge::Top, layout.top);
+                vw.window.set_margin(Edge::Bottom, layout.bottom);
+                vw.window.set_margin(Edge::Left, layout.left);
+                vw.window.set_margin(Edge::Right, layout.right + layout.width);
+            }
+        }
     }
 
 
