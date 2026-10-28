@@ -76,10 +76,12 @@
 
   onMount(() => on_monitor_event(handle_monitor_event));
 
-  // ── CRT: estática de transición (canvas) + onda idle (SVG/CSS) ──────
-  // La onda idle NO se pinta en canvas: es un SVG con animación CSS, o sea
-  // la mueve el compositor (GPU) y no JS. El canvas existe SOLO durante la
-  // ventana de transición (200ms): en idle el monitor no consume frames.
+  // ── Canvas CRT: fondo + estática de transición ──────────────────────
+  // La onda idle NO se pinta en canvas: es un SVG con animación CSS (la
+  // mueve el compositor, no JS). TODO lo demás del canvas es idéntico a
+  // la lógica de 55b5b5f: el canvas pinta el fondo y el ruido de la
+  // ventana de transición, y NUNCA se oculta (si se oculta, el
+  // IntersectionObserver lo marca invisible y la estática no se dibuja).
   let canvas_ref = $state(null);
   let ctx = $state(null);
   let animation_id = null;
@@ -91,12 +93,17 @@
       accent: get_colors('--color-accent', '#00ffdd'),
       detail: get_colors('--color-accent-detail', '#ffffff'),
     };
+    needs_background = true;
   };
 
   let is_visible = true;
 
   const FPS = 30;
   let last_frame = 0;
+  // El canvas se repinta solo cuando hace falta (montar, resize, cambio de
+  // tema, fin de la transición): en idle no hay repintado por frame.
+  let needs_background = true;
+  let was_active = false;
 
   // Onda idle: 3 períodos de 100 unidades sobre un viewBox de 200 → al
   // desplazar un período siempre hay trazo bajo la ventana visible.
@@ -111,20 +118,25 @@
 
   let show_wave = $derived(!current && !window_active);
 
-  // Estática: rayas blancas horizontales (mismo look de siempre, con
-  // fillRect en vez de re-asignar un ImageData completo por frame) +
-  // lavado blanco ocasional. Solo corre mientras la ventana está abierta.
-  function draw_static(timestamp) {
-    if (!window_active) {
-      animation_id = null;
+  // Fondo del monitor (el canvas es la única fuente del color: idle y
+  // estática comparten el MISMO fondo, como antes).
+  function paint_background() {
+    if (!ctx || !canvas_ref) return;
+    const dpr = devicePixelRatio || 1;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = colors.back;
+    ctx.fillRect(0, 0, canvas_ref.width / dpr, canvas_ref.height / dpr);
+    needs_background = false;
+  }
+
+  function draw_frame(timestamp) {
+    if (!is_visible) {
+      animation_id = requestAnimationFrame(draw_frame);
       return;
     }
-    if (!is_visible || !ctx) {
-      animation_id = requestAnimationFrame(draw_static);
-      return;
-    }
+
     if (timestamp - last_frame < 1000 / FPS) {
-      animation_id = requestAnimationFrame(draw_static);
+      animation_id = requestAnimationFrame(draw_frame);
       return;
     }
     last_frame = timestamp;
@@ -133,34 +145,40 @@
     const iw = canvas_ref.width;
     const ih = canvas_ref.height;
 
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.fillStyle = colors.back;
-    ctx.fillRect(0, 0, iw, ih);
-
-    ctx.fillStyle = "#ffffff";
-    for (let i = 0; i < 100; i++) {
-      const x = Math.random() * iw;
-      const y = Math.random() * ih;
-      const w = Math.random() * 20 * dpr + 5 * dpr;
-      ctx.fillRect(x, y, w, 1);
-    }
-
-    if (Math.random() < 0.1) {
-      ctx.fillStyle = `rgba(255, 255, 255, ${Math.random() * 0.3 + 0.1})`;
+    if (window_active) {
+      was_active = true;
+      // Estática de transición: rayas blancas horizontales (mismo look
+      // de siempre, ahora con fillRect en vez de re-asignar un
+      // ImageData completo por frame) + lavado blanco ocasional.
+      // Se dibuja en espacio de device px (mismo cálculo original).
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.fillStyle = colors.back;
       ctx.fillRect(0, 0, iw, ih);
+
+      ctx.fillStyle = "#ffffff";
+      for (let i = 0; i < 100; i++) {
+        const x = Math.random() * iw;
+        const y = Math.random() * ih;
+        const w = Math.random() * 20 * dpr + 5 * dpr;
+        ctx.fillRect(x, y, w, 1);
+      }
+
+      if (Math.random() < 0.1) {
+        ctx.fillStyle = `rgba(255, 255, 255, ${Math.random() * 0.3 + 0.1})`;
+        ctx.fillRect(0, 0, iw, ih);
+      }
+    } else {
+      // Terminó la ventana de transición: el canvas quedó con el ruido,
+      // se repinta el fondo (una vez).
+      if (was_active) {
+        was_active = false;
+        needs_background = true;
+      }
+      if (needs_background) paint_background();
     }
 
-    animation_id = requestAnimationFrame(draw_static);
+    animation_id = requestAnimationFrame(draw_frame);
   }
-
-  // La estática solo existe durante la ventana de transición: en idle el
-  // monitor no pide ningún frame (la onda la anima el compositor).
-  $effect(() => {
-    if (window_active && ctx && !animation_id) {
-      last_frame = 0;
-      animation_id = requestAnimationFrame(draw_static);
-    }
-  });
 
   onMount(() => {
     if (!canvas_ref) return;
@@ -178,6 +196,8 @@
       const rect = canvas_ref.parentElement.getBoundingClientRect();
       canvas_ref.width = rect.width * dpr;
       canvas_ref.height = rect.height * dpr;
+      // resizear el canvas limpia su bitmap → hay que repintar el fondo
+      needs_background = true;
     });
     ro.observe(canvas_ref.parentElement);
 
@@ -187,6 +207,11 @@
     observer.observe(canvas_ref);
 
     ctx = canvas_ref.getContext("2d");
+
+    // El loop corre siempre (como en 55b5b5f): así window_active se
+    // chequea en cada frame y la estática aparece en los mismos casos
+    // que antes. Solo el repintado se hace cuando hace falta.
+    animation_id = requestAnimationFrame(draw_frame);
 
     return () => {
       if (animation_id) cancelAnimationFrame(animation_id);
@@ -200,9 +225,11 @@
 <div class="w-full h-full relative rounded-2xl border border-accent-detail/40 bg-accent-detail">
   <div class="aspect-square m-1 relative rounded-[14px] bg-accent-detail overflow-hidden">
     <div class="w-full h-full bg-back relative">
-      <!-- Onda idle: SVG con animación CSS (la mueve el compositor, no JS) -->
+      <!-- Onda idle: SVG con animación CSS (la mueve el compositor, no JS).
+           opacity (y no hidden) para que la animación no se reinicie. -->
       <svg
-        class="absolute inset-0 w-full h-full {show_wave ? '' : 'hidden'}"
+        class="absolute inset-0 w-full h-full pointer-events-none transition-opacity duration-100
+               {show_wave ? 'opacity-100' : 'opacity-0'}"
         viewBox="0 0 200 100"
         preserveAspectRatio="none"
         aria-hidden="true"
@@ -217,10 +244,11 @@
         />
       </svg>
 
-      <!-- Estática de transición: el canvas solo existe durante los 200ms -->
+      <!-- El canvas NUNCA se oculta: si se oculta, el IntersectionObserver
+           lo marca invisible y la estática deja de dibujarse. -->
       <canvas
         bind:this={canvas_ref}
-        class="w-full h-full {window_active ? '' : 'hidden'}"
+        class="w-full h-full"
       ></canvas>
 
       {#if current && !window_active}
