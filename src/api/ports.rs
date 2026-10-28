@@ -69,14 +69,18 @@ pub async fn handle_ports_list() -> impl IntoResponse {
     ok_json(serde_json::json!({"ok": true, "data": ports}))
 }
 
-/// POST /ports/open {port} — abre/reemplaza la ventana viewer en ese puerto.
+/// POST /ports/open {url} — abre/reemplaza la ventana viewer en esa URL.
 pub async fn handle_port_open(Json(body): Json<serde_json::Value>) -> impl IntoResponse {
-    let port = match body.get("port").and_then(|v| v.as_u64()) {
-        Some(p) if p > 0 && p <= 65535 => p as u16,
-        _ => return err_json("Falta o es inválido el campo 'port'"),
+    let url = match body.get("url").and_then(|v| v.as_str()) {
+        Some(u) => u.trim().to_string(),
+        None => return err_json("Falta el campo 'url'"),
     };
-    match crate::gui::viewer::open_port(port) {
-        Ok(()) => ok_json(serde_json::json!({"ok": true, "data": {"port": port}})),
+    // Frontera de confianza: solo http(s) (nada de file:// ni javascript:).
+    if !(url.starts_with("http://") || url.starts_with("https://")) {
+        return err_json("URL inválida: debe empezar con http:// o https://");
+    }
+    match crate::gui::viewer::open_url(url.clone()) {
+        Ok(()) => ok_json(serde_json::json!({"ok": true, "data": {"url": url}})),
         Err(e) => err_json(&e),
     }
 }
@@ -89,7 +93,7 @@ pub async fn handle_port_close() -> impl IntoResponse {
     }
 }
 
-/// GET /ports/status — puerto que el viewer está mostrando (null = cerrada).
+/// GET /ports/status — URL que el viewer está mostrando (null = cerrada).
 pub async fn handle_port_status() -> impl IntoResponse {
-    ok_json(serde_json::json!({"ok": true, "data": {"port": crate::gui::viewer::status()}}))
+    ok_json(serde_json::json!({"ok": true, "data": {"url": crate::gui::viewer::status()}}))
 }

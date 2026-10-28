@@ -49,7 +49,7 @@
     {:else if active_section === "git"}
       <GitSection />
     {:else if active_section === "view"}
-      <ViewSection />
+      <ViewSection {active_section} />
     {:else if active_section === "term"}
       <TerminalSection {active_section} />
     {:else if active_section === "settings"}

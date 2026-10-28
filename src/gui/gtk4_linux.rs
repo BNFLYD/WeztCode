@@ -6,7 +6,7 @@ use gtk4_layer_shell::{Edge, KeyboardMode, Layer, LayerShell};
 use webkit6::prelude::*;
 use crate::terminal::TerminalProtocol;
 use webkit6::WebView;
-use webkit6::{UserContentInjectedFrames, UserStyleLevel, UserStyleSheet};
+use webkit6::{WebContext, UserContentInjectedFrames, UserStyleLevel, UserStyleSheet};
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::thread;
@@ -17,6 +17,10 @@ struct ViewerWindow {
     window: ApplicationWindow,
     webview: WebView,
 }
+
+/// Separación del viewer contra los bordes de la terminal (px): el aire
+/// que hace visible el redondeo y separa el viewer de la sidebar.
+const VIEWER_INSET: i32 = 1;
 
 pub struct Gtk4Platform {
     app: Application,
@@ -277,11 +281,15 @@ impl GuiPlatform for Gtk4Platform {
             let viewer_app = app.clone();
             let viewer_state = viewer_state_ref.clone();
             let menu_window_ref = window_ref.clone();
+            // Contexto PROPIO del viewer: pool de procesos separado del
+            // menú (la página testeada no compite con el monitor) y datos
+            // de sitio aislados (cookies/localStorage propios).
+            let viewer_context = WebContext::new();
             let mut viewer_rx = crate::gui::viewer::setup_channel();
             gtk4::glib::MainContext::default().spawn_local(async move {
                 while let Some(cmd) = viewer_rx.recv().await {
                     match cmd {
-                        crate::gui::viewer::ViewerCmd::Open { port } => {
+                        crate::gui::viewer::ViewerCmd::Open { url } => {
                             let layout = crate::gui::viewer::menu_layout();
                             // Ventana ya abierta: mismo WebView, contenido nuevo
                             let existing = viewer_state
@@ -289,7 +297,7 @@ impl GuiPlatform for Gtk4Platform {
                                 .as_ref()
                                 .map(|st| (st.window.clone(), st.webview.clone()));
                             if let Some((win, webview)) = existing {
-                                webview.load_uri(&format!("http://127.0.0.1:{}/", port));
+                                webview.load_uri(&url);
                                 // No resucitar la ventana si la app está oculta
                                 // (otro workspace / sin foco): el menú manda.
                                 if win.is_visible() {
@@ -319,15 +327,16 @@ impl GuiPlatform for Gtk4Platform {
                                 };
                                 let win = Self::create_viewer_window(
                                     &viewer_app,
-                                    port,
+                                    &url,
                                     layout,
                                     menu_monitor.as_ref(),
                                     menu_visible,
                                     on_close,
+                                    &viewer_context,
                                 );
                                 *viewer_state.borrow_mut() = Some(win);
                             }
-                            crate::gui::viewer::set_status(Some(port));
+                            crate::gui::viewer::set_status(Some(url));
                         }
                         crate::gui::viewer::ViewerCmd::Close => {
                             // take() FUERA del borrow: window.close() emite
@@ -379,11 +388,12 @@ impl Gtk4Platform {
     /// botón de cierre en la esquina externa.
     fn create_viewer_window(
         app: &gtk4::Application,
-        port: u16,
+        url: &str,
         layout: crate::gui::viewer::MenuLayout,
         monitor: Option<&gdk::Monitor>,
         visible: bool,
         on_close: Rc<dyn Fn()>,
+        context: &WebContext,
     ) -> ViewerWindow {
         let window = gtk4::ApplicationWindow::builder()
             .application(app)
@@ -404,10 +414,10 @@ impl Gtk4Platform {
         window.set_anchor(Edge::Top, true);
         window.set_anchor(Edge::Bottom, true);
         window.set_anchor(Edge::Left, true);
-        window.set_margin(Edge::Top, layout.top);
-        window.set_margin(Edge::Bottom, layout.bottom);
-        window.set_margin(Edge::Left, layout.left);
-        window.set_margin(Edge::Right, layout.right + layout.width);
+        window.set_margin(Edge::Top, layout.top + VIEWER_INSET);
+        window.set_margin(Edge::Bottom, layout.bottom + VIEWER_INSET);
+        window.set_margin(Edge::Left, layout.left + VIEWER_INSET);
+        window.set_margin(Edge::Right, layout.right + layout.width + VIEWER_INSET);
         window.set_exclusive_zone(-1);
 
         // Botón de cierre flotante (esquina superior externa)
@@ -428,9 +438,14 @@ impl Gtk4Platform {
             gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION,
         );
 
-        let webview = WebView::new();
-        // Fondo sólido oscuro: es un browser, no un overlay de vidrio
-        webview.set_background_color(&gdk::RGBA::new(0.05, 0.05, 0.05, 1.0));
+        let webview = WebView::builder()
+            .web_context(context)
+            .build();
+        // Mismo truco que el menú: webview con fondo TRANSPARENTE. El fondo
+        // lo pinta la propia página (su CSS), así el contenido se ve sobre
+        // una ventana transparente (y las esquinas quedan libres para el
+        // redondeo, que se resuelve aparte).
+        webview.set_background_color(&gdk::RGBA::new(0.0, 0.0, 0.0, 0.0));
         webview.set_can_focus(true);
         webview.set_focus_on_click(true);
         let wv = webview.clone();
@@ -439,7 +454,7 @@ impl Gtk4Platform {
             wv.grab_focus();
         });
         webview.add_controller(gesture);
-        webview.load_uri(&format!("http://127.0.0.1:{}/", port));
+        webview.load_uri(url);
 
         let overlay = gtk4::Overlay::new();
         overlay.set_child(Some(&webview));
@@ -447,8 +462,10 @@ impl Gtk4Platform {
         let close_btn = gtk4::Button::with_label("✕");
         close_btn.set_halign(gtk4::Align::Start);
         close_btn.set_valign(gtk4::Align::Start);
-        close_btn.set_margin_top(6);
-        close_btn.set_margin_start(6);
+        // El botón flota sobre la página (es overlay): con el radio que
+        // lleva la página necesita aire para no montarse sobre la curva.
+        close_btn.set_margin_top(12);
+        close_btn.set_margin_start(12);
         close_btn.add_css_class("viewer-close");
         // ✕ = MISMA vía que cualquier otro cierre: window.close() dispara
         // close-request → on_close() (limpia estado). Una sola fuente de
@@ -631,10 +648,10 @@ impl Gtk4Platform {
         if let Ok(guard) = state.try_borrow() {
             if let Some(ref vw) = *guard {
                 let layout = crate::gui::viewer::menu_layout();
-                vw.window.set_margin(Edge::Top, layout.top);
-                vw.window.set_margin(Edge::Bottom, layout.bottom);
-                vw.window.set_margin(Edge::Left, layout.left);
-                vw.window.set_margin(Edge::Right, layout.right + layout.width);
+                vw.window.set_margin(Edge::Top, layout.top + VIEWER_INSET);
+                vw.window.set_margin(Edge::Bottom, layout.bottom + VIEWER_INSET);
+                vw.window.set_margin(Edge::Left, layout.left + VIEWER_INSET);
+                vw.window.set_margin(Edge::Right, layout.right + layout.width + VIEWER_INSET);
             }
         }
     }

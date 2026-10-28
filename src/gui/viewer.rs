@@ -13,8 +13,8 @@ use std::sync::Mutex;
 /// Comandos que la API le manda al main loop de GTK.
 #[derive(Debug, Clone)]
 pub enum ViewerCmd {
-    /// Abrir el viewer en ese puerto (reemplaza el contenido si ya está abierto).
-    Open { port: u16 },
+    /// Abrir el viewer en esa URL (reemplaza el contenido si ya está abierto).
+    Open { url: String },
     /// Cerrar la ventana.
     Close,
 }
@@ -25,9 +25,9 @@ pub enum ViewerCmd {
 pub static VIEWER_TX: Lazy<Mutex<Option<tokio::sync::mpsc::UnboundedSender<ViewerCmd>>>> =
     Lazy::new(|| Mutex::new(None));
 
-/// Puerto que el viewer está mostrando (None = ventana cerrada).
+/// URL que el viewer está mostrando (None = ventana cerrada).
 /// Lo escribe el lado GTK; la API solo lo lee para /ports/status.
-pub static VIEWER_STATUS: Lazy<Mutex<Option<u16>>> = Lazy::new(|| Mutex::new(None));
+pub static VIEWER_STATUS: Lazy<Mutex<Option<String>>> = Lazy::new(|| Mutex::new(None));
 
 /// Layout del menú (márgenes + ancho), para posicionar la ventana viewer
 /// exactamente al lado de la interfaz.
@@ -66,20 +66,20 @@ pub fn setup_channel() -> tokio::sync::mpsc::UnboundedReceiver<ViewerCmd> {
     rx
 }
 
-pub fn set_status(port: Option<u16>) {
-    *VIEWER_STATUS.lock().unwrap() = port;
+pub fn set_status(url: Option<String>) {
+    *VIEWER_STATUS.lock().unwrap() = url;
 }
 
-pub fn status() -> Option<u16> {
-    *VIEWER_STATUS.lock().unwrap()
+pub fn status() -> Option<String> {
+    VIEWER_STATUS.lock().unwrap().clone()
 }
 
 // ---- lado API (cualquier thread) ----
 
-pub fn open_port(port: u16) -> Result<(), String> {
+pub fn open_url(url: String) -> Result<(), String> {
     let guard = VIEWER_TX.lock().map_err(|e| format!("Lock: {}", e))?;
     let tx = guard.as_ref().ok_or("Viewer no disponible (GTK no inició)")?;
-    tx.send(ViewerCmd::Open { port }).map_err(|_| "Canal de GTK cerrado".to_string())
+    tx.send(ViewerCmd::Open { url }).map_err(|_| "Canal de GTK cerrado".to_string())
 }
 
 pub fn close_port() -> Result<(), String> {

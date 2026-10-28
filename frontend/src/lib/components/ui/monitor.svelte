@@ -76,8 +76,12 @@
 
   onMount(() => on_monitor_event(handle_monitor_event));
 
-  // ── Canvas CRT: onda idle + estática de transición ──────────────────
+  // ── CRT: estática de transición (canvas) + onda idle (SVG/CSS) ──────
+  // La onda idle NO se pinta en canvas: es un SVG con animación CSS, o sea
+  // la mueve el compositor (GPU) y no JS. El canvas existe SOLO durante la
+  // ventana de transición (200ms): en idle el monitor no consume frames.
   let canvas_ref = $state(null);
+  let ctx = $state(null);
   let animation_id = null;
   let colors = {};
 
@@ -93,7 +97,70 @@
 
   const FPS = 30;
   let last_frame = 0;
-  let start_time = 0;
+
+  // Onda idle: 3 períodos de 100 unidades sobre un viewBox de 200 → al
+  // desplazar un período siempre hay trazo bajo la ventana visible.
+  const WAVE_PATH = (() => {
+    const pts = [];
+    for (let x = 0; x <= 300; x += 2) {
+      const y = 50 + 15 * Math.sin((x / 100) * Math.PI * 2);
+      pts.push(`${x},${y.toFixed(2)}`);
+    }
+    return `M${pts.join("L")}`;
+  })();
+
+  let show_wave = $derived(!current && !window_active);
+
+  // Estática: rayas blancas horizontales (mismo look de siempre, con
+  // fillRect en vez de re-asignar un ImageData completo por frame) +
+  // lavado blanco ocasional. Solo corre mientras la ventana está abierta.
+  function draw_static(timestamp) {
+    if (!window_active) {
+      animation_id = null;
+      return;
+    }
+    if (!is_visible || !ctx) {
+      animation_id = requestAnimationFrame(draw_static);
+      return;
+    }
+    if (timestamp - last_frame < 1000 / FPS) {
+      animation_id = requestAnimationFrame(draw_static);
+      return;
+    }
+    last_frame = timestamp;
+
+    const dpr = devicePixelRatio || 1;
+    const iw = canvas_ref.width;
+    const ih = canvas_ref.height;
+
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = colors.back;
+    ctx.fillRect(0, 0, iw, ih);
+
+    ctx.fillStyle = "#ffffff";
+    for (let i = 0; i < 100; i++) {
+      const x = Math.random() * iw;
+      const y = Math.random() * ih;
+      const w = Math.random() * 20 * dpr + 5 * dpr;
+      ctx.fillRect(x, y, w, 1);
+    }
+
+    if (Math.random() < 0.1) {
+      ctx.fillStyle = `rgba(255, 255, 255, ${Math.random() * 0.3 + 0.1})`;
+      ctx.fillRect(0, 0, iw, ih);
+    }
+
+    animation_id = requestAnimationFrame(draw_static);
+  }
+
+  // La estática solo existe durante la ventana de transición: en idle el
+  // monitor no pide ningún frame (la onda la anima el compositor).
+  $effect(() => {
+    if (window_active && ctx && !animation_id) {
+      last_frame = 0;
+      animation_id = requestAnimationFrame(draw_static);
+    }
+  });
 
   onMount(() => {
     if (!canvas_ref) return;
@@ -119,82 +186,7 @@
     });
     observer.observe(canvas_ref);
 
-    const ctx = canvas_ref.getContext("2d");
-
-    const animate = (timestamp) => {
-      if (!is_visible) {
-        animation_id = requestAnimationFrame(animate);
-        return;
-      }
-
-      if (timestamp - last_frame < 1000 / FPS) {
-        animation_id = requestAnimationFrame(animate);
-        return;
-      }
-      last_frame = timestamp;
-
-      if (!start_time) start_time = timestamp;
-      const elapsed = timestamp - start_time;
-
-      const dpr = devicePixelRatio || 1;
-      const iw = canvas_ref.width;
-      const ih = canvas_ref.height;
-
-      if (window_active) {
-        // Estática de transición: rayas blancas horizontales (mismo look
-        // de siempre, ahora con fillRect en vez de re-asignar un
-        // ImageData completo por frame) + lavado blanco ocasional.
-        // Se dibuja en espacio de device px (mismo cálculo original).
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.fillStyle = colors.back;
-        ctx.fillRect(0, 0, iw, ih);
-
-        ctx.fillStyle = "#ffffff";
-        for (let i = 0; i < 100; i++) {
-          const x = Math.random() * iw;
-          const y = Math.random() * ih;
-          const w = Math.random() * 20 * dpr + 5 * dpr;
-          ctx.fillRect(x, y, w, 1);
-        }
-
-        if (Math.random() < 0.1) {
-          ctx.fillStyle = `rgba(255, 255, 255, ${Math.random() * 0.3 + 0.1})`;
-          ctx.fillRect(0, 0, iw, ih);
-        }
-      } else {
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        const css_w = iw / dpr;
-        const css_h = ih / dpr;
-
-        ctx.fillStyle = colors.back;
-        ctx.fillRect(0, 0, css_w, css_h);
-
-        // Onda senoidal idle: la pantalla del CRT cuando no hay canal.
-        if (!current) {
-          ctx.strokeStyle = colors.detail;
-          ctx.lineWidth = 2;
-          ctx.beginPath();
-
-          const amplitude = css_h * 0.15;
-          const frequency = 0.04;
-          const center_y = css_h / 2;
-
-          for (let x = 0; x < css_w; x++) {
-            const y = center_y + Math.sin((x + elapsed * 0.12) * frequency) * amplitude;
-            if (x === 0) {
-              ctx.moveTo(x, y);
-            } else {
-              ctx.lineTo(x, y);
-            }
-          }
-          ctx.stroke();
-        }
-      }
-
-      animation_id = requestAnimationFrame(animate);
-    };
-
-    animate();
+    ctx = canvas_ref.getContext("2d");
 
     return () => {
       if (animation_id) cancelAnimationFrame(animation_id);
@@ -207,10 +199,28 @@
 
 <div class="w-full h-full relative rounded-2xl border border-accent-detail/40 bg-accent-detail">
   <div class="aspect-square m-1 relative rounded-[14px] bg-accent-detail overflow-hidden">
-    <div class="w-full h-full bg-back">
+    <div class="w-full h-full bg-back relative">
+      <!-- Onda idle: SVG con animación CSS (la mueve el compositor, no JS) -->
+      <svg
+        class="absolute inset-0 w-full h-full {show_wave ? '' : 'hidden'}"
+        viewBox="0 0 200 100"
+        preserveAspectRatio="none"
+        aria-hidden="true"
+      >
+        <path
+          d={WAVE_PATH}
+          fill="none"
+          stroke-width="2"
+          vector-effect="non-scaling-stroke"
+          style="stroke: var(--color-accent-detail);"
+          class="wave-path"
+        />
+      </svg>
+
+      <!-- Estática de transición: el canvas solo existe durante los 200ms -->
       <canvas
         bind:this={canvas_ref}
-        class="w-full h-full"
+        class="w-full h-full {window_active ? '' : 'hidden'}"
       ></canvas>
 
       {#if current && !window_active}
@@ -243,3 +253,20 @@
     </div>
   </div>
 </div>
+
+<style>
+  /* Un período de la onda por vuelta: el trazo es continuo (el path
+     cubre 3 períodos), así que el loop no se nota. */
+  .wave-path {
+    animation: wave-scroll 1.3s linear infinite;
+  }
+
+  @keyframes wave-scroll {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-100px);
+    }
+  }
+</style>
