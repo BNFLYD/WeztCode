@@ -290,7 +290,11 @@ impl GuiPlatform for Gtk4Platform {
                                 .map(|st| (st.window.clone(), st.webview.clone()));
                             if let Some((win, webview)) = existing {
                                 webview.load_uri(&format!("http://127.0.0.1:{}/", port));
-                                win.present();
+                                // No resucitar la ventana si la app está oculta
+                                // (otro workspace / sin foco): el menú manda.
+                                if win.is_visible() {
+                                    win.present();
+                                }
                             } else {
                                 // Mismo monitor que el menú: los márgenes de
                                 // layer-shell son relativos al monitor donde
@@ -299,6 +303,13 @@ impl GuiPlatform for Gtk4Platform {
                                     .borrow()
                                     .as_ref()
                                     .and_then(Self::monitor_at_window);
+                                // Nace con la visibilidad del menú: si la app está
+                                // en otro workspace, el viewer no debe aparecer.
+                                let menu_visible = menu_window_ref
+                                    .borrow()
+                                    .as_ref()
+                                    .map(|w| w.is_visible())
+                                    .unwrap_or(true);
                                 let on_close = {
                                     let st = viewer_state.clone();
                                     Rc::new(move || {
@@ -311,6 +322,7 @@ impl GuiPlatform for Gtk4Platform {
                                     port,
                                     layout,
                                     menu_monitor.as_ref(),
+                                    menu_visible,
                                     on_close,
                                 );
                                 *viewer_state.borrow_mut() = Some(win);
@@ -318,7 +330,12 @@ impl GuiPlatform for Gtk4Platform {
                             crate::gui::viewer::set_status(Some(port));
                         }
                         crate::gui::viewer::ViewerCmd::Close => {
-                            if let Some(st) = viewer_state.borrow_mut().take() {
+                            // take() FUERA del borrow: window.close() emite
+                            // close-request de forma sincrónica → el cleanup
+                            // re-entra y hace borrow_mut() sobre un RefCell ya
+                            // prestado → panic en el main loop de GTK.
+                            let taken = viewer_state.borrow_mut().take();
+                            if let Some(st) = taken {
                                 st.window.close();
                             }
                             crate::gui::viewer::set_status(None);
@@ -365,6 +382,7 @@ impl Gtk4Platform {
         port: u16,
         layout: crate::gui::viewer::MenuLayout,
         monitor: Option<&gdk::Monitor>,
+        visible: bool,
         on_close: Rc<dyn Fn()>,
     ) -> ViewerWindow {
         let window = gtk4::ApplicationWindow::builder()
@@ -432,9 +450,13 @@ impl Gtk4Platform {
         close_btn.set_margin_top(6);
         close_btn.set_margin_start(6);
         close_btn.add_css_class("viewer-close");
-        let btn_onclose = on_close.clone();
+        // ✕ = MISMA vía que cualquier otro cierre: window.close() dispara
+        // close-request → on_close() (limpia estado). Una sola fuente de
+        // limpieza; antes el botón solo limpiaba el estado y dejaba la
+        // ventana viva en pantalla.
+        let btn_win = window.clone();
         close_btn.connect_clicked(move |_| {
-            btn_onclose();
+            btn_win.close();
         });
         overlay.add_overlay(&close_btn);
 
@@ -446,7 +468,10 @@ impl Gtk4Platform {
         });
 
         window.set_child(Some(&overlay));
-        window.present();
+        window.set_visible(visible);
+        if visible {
+            window.present();
+        }
 
         ViewerWindow { window, webview }
     }
@@ -480,6 +505,8 @@ impl Gtk4Platform {
                                 window.present();
                             }
                         }
+                        // Hermana: el viewer vuelve con el menú (mismo workspace).
+                        Self::set_viewer_visible(&viewer_state, true);
                     }
                     WmEvent::WindowUnfocused { app_id: _ } => {
                         if let Ok(window_ref) = window_weak.try_borrow() {
@@ -487,6 +514,9 @@ impl Gtk4Platform {
                                 window.set_visible(false);
                             }
                         }
+                        // Hermana: el viewer se oculta con el menú — si no, queda
+                        // flotando sobre todo cuando la app está en otro workspace.
+                        Self::set_viewer_visible(&viewer_state, false);
                     }
                     WmEvent::GeometryChanged { app_id: _, geometry } => {
                         if let Ok(window_ref) = window_weak.try_borrow() {
@@ -576,6 +606,21 @@ impl Gtk4Platform {
             glib::ControlFlow::Break
         });
         *debounce_src.borrow_mut() = Some(sid);
+    }
+
+    /// El viewer es hermana del menú: comparte su visibilidad. Cuando la app
+    /// sale del workspace activo (o pierde el foco), sway avisa con
+    /// WindowUnfocused y el menú se oculta — el viewer se oculta con él y
+    /// reaparece con él en WindowFocused.
+    fn set_viewer_visible(state: &Rc<RefCell<Option<ViewerWindow>>>, visible: bool) {
+        if let Ok(guard) = state.try_borrow() {
+            if let Some(ref vw) = *guard {
+                vw.window.set_visible(visible);
+                if visible {
+                    vw.window.present();
+                }
+            }
+        }
     }
 
     /// Re-ancla la ventana viewer con el layout fresco del menú (su hermana):
