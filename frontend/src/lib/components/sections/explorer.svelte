@@ -5,6 +5,7 @@
 <script>
   import { afterUpdate, onDestroy } from "svelte";
   import Icon from "@iconify/svelte";
+  import NfIcon from "$lib/components/ui/nf_icon.svelte";
   // Canal del explorer: la sección solo detecta eventos y dispara
   // signals; las vistas del monitor (preview + cartel Si/No) viven en
   // el canal, y las transiciones (estática) en el monitor.
@@ -49,9 +50,8 @@
     const entry = show_projects ? null : entries[cursor_index];
     if (!dialog_open) {
       if (entry && entry.entry_type === "file") {
-        const icon = file_icon(entry.name);
-        if (icon === "garden:file-image-fill-12" || icon === "fluent:gif-16-filled") {
-          explorer_channel.signal({ type: "preview", path: entry.path, icon, name: entry.name });
+        if (is_image(entry.name)) {
+          explorer_channel.signal({ type: "preview", path: entry.path, icon: file_icon(entry.name), name: entry.name });
         } else {
           explorer_channel.signal({ type: "clear" });
         }
@@ -89,23 +89,33 @@
     if (!signal.aborted) loading = false;
   }
 
+  // Iconos de archivo/directorio: nombre de Nerd Font (Iconify nf-*).
+  // El glifo sale de nerd_glyphs.js; se renderiza como texto.
   function file_icon(name) {
-    if (name.endsWith(".rs")) return "devicon-plain:rust";
-    if (name.endsWith(".js") || name.endsWith(".ts")) return "devicon-plain:javascript";
-    if (name.endsWith(".svelte")) return "devicon-plain:svelte";
-    if (name.endsWith(".lua")) return "devicon-plain:lua";
-    if (name.endsWith(".css") || name.endsWith(".html")) return "devicon-plain:html5";
-    if (name.endsWith(".md")) return "devicon-plain:markdown";
-    if (name.endsWith(".json")) return "devicon-plain:json";
-    if (name.endsWith(".toml")) return "devicon-plain:toml";
-    if (name.endsWith(".py")) return "devicon-plain:python";
-    if (name.endsWith(".png") || name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".webp") || name.endsWith(".svg") || name.endsWith(".bmp") || name.endsWith(".ico")) return "garden:file-image-fill-12";
-    if (name.endsWith(".gif")) return "fluent:gif-16-filled";
-    return "tabler:file-filled";
+    if (name.endsWith(".rs")) return "nf-dev-rust";
+    if (name.endsWith(".js") || name.endsWith(".ts")) return "nf-dev-javascript";
+    if (name.endsWith(".svelte")) return "nf-dev-svelte";
+    if (name.endsWith(".lua")) return "nf-dev-lua";
+    if (name.endsWith(".css") || name.endsWith(".html")) return "nf-dev-html5";
+    if (name.endsWith(".md")) return "nf-dev-markdown";
+    if (name.endsWith(".json")) return "nf-dev-json";
+    if (name.endsWith(".toml")) return "nf-md-cog";
+    if (name.endsWith(".py")) return "nf-dev-python";
+    if (name.endsWith(".png") || name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".webp") || name.endsWith(".svg") || name.endsWith(".bmp") || name.endsWith(".ico")) return "nf-md-image";
+    if (name.endsWith(".gif")) return "nf-md-movie";
+    return "nf-fa-file";
   }
 
   function dir_icon() {
-    return "mdi:folder";
+    return "nf-cod-folder";
+  }
+
+  // Extensiones con preview en el monitor (imágenes y GIFs).
+  const IMAGE_EXTS = [".png", ".jpg", ".jpeg", ".webp", ".svg", ".bmp", ".ico", ".gif"];
+
+  function is_image(name) {
+    const lower = name.toLowerCase();
+    return IMAGE_EXTS.some(ext => lower.endsWith(ext));
   }
 
   async function open_file(path) {
@@ -437,7 +447,7 @@
           dialog_open = true;
           explorer_channel.signal({
             type: "confirm",
-            icon: "mdi:folder-open",
+            icon: "nf-cod-folder_opened",
             name: entry.name,
             on_confirm: async () => {
               await delete_project_entry(entry.path);
@@ -536,7 +546,7 @@
 <div class="flex flex-col gap-1 py-2 h-full relative">
   <div class="flex items-center gap-2 px-3 py-2 text-sm text-accent-detail/50 border-b border-accent-detail/20 mb-2 flex-shrink-0">
     <button on:click={show_projects ? exit_projects : go_up} class="hover:text-print transition-colors">
-      <Icon icon={show_projects ? "tabler:arrow-left" : "tabler:folder"} class="w-4 h-4" />
+      <NfIcon icon={show_projects ? "nf-cod-arrow_left" : "nf-cod-folder"} />
     </button>
     {#if show_projects}
       {#if creating}
@@ -625,7 +635,7 @@
             }}
           >
             <span class="text-accent-detail">
-              <Icon icon="mdi:folder-open" class="w-4 h-4" />
+              <NfIcon icon="nf-cod-folder_opened" />
             </span>
             <span class="text-print font-medium flex-shrink-0">{proj.name}</span>
             <span class="text-print/30 text-xs truncate ml-2">{proj.path}</span>
@@ -661,18 +671,18 @@
           {#if entry.entry_type === "dir"}
             <span class="text-accent-detail">
               {#if clipboard?.entry.path === entry.path}
-                <Icon icon="mdi:content-cut" class="w-4 h-4" />
+                <NfIcon icon="nf-fa-scissors" />
               {:else}
-                <Icon icon={dir_icon()} class="w-4 h-4" />
+                <NfIcon icon={dir_icon()} />
               {/if}
             </span>
             <span class="text-print font-medium">{entry.name}</span>
           {:else}
             <span class="text-accent-detail">
               {#if clipboard?.entry.path === entry.path}
-                <Icon icon="mdi:content-cut" class="w-4 h-4" />
+                <NfIcon icon="nf-fa-scissors" />
               {:else}
-                <Icon icon={file_icon(entry.name)} class="w-4 h-4" />
+                <NfIcon icon={file_icon(entry.name)} />
               {/if}
             </span>
             <span class="text-print/70 flex-1 truncate">{entry.name}</span>

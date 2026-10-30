@@ -218,6 +218,13 @@
         set_visual("confused");
         save();
         break;
+      case "retrying":
+        // pi reintenta el turno SOLO (error reintentable del proveedor:
+        // 429, 5xx, timeout de stream). El turno sigue vivo → el visual
+        // vuelve a "trabajando" y queda anotado en el bell de avisos.
+        set_visual("thinking");
+        warnings = [...warnings, data.message];
+        break;
       case "session_stats":
         try {
           const raw = JSON.parse(data.json);

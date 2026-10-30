@@ -85,7 +85,8 @@ pub async fn handle_chat_stream(
             let idle = Event::default().data("{\"type\":\"idle\"}");
             Ok(Sse::new(
                 Box::pin(futures::stream::iter(vec![Ok::<_, Infallible>(idle)])) as ChatStream,
-            ))
+            )
+            .keep_alive(KeepAlive::default()))
         }
         Some((agent, snapshot, live_rx)) => {
             // Primer evento: "attached" — la UI lo usa para decidir ANTES de
@@ -106,7 +107,10 @@ pub async fn handle_chat_stream(
             );
             let live = turn_sse_stream(live_rx);
             let chained = futures::stream::StreamExt::chain(replay, live);
-            Ok(Sse::new(Box::pin(chained) as ChatStream))
+            // Mismo keep-alive que /chat/send: un re-attach durante un
+            // tramo largo en silencio (pi reintentando tras un 429, o
+            // pensando) no debe morir por timeout del stack de red.
+            Ok(Sse::new(Box::pin(chained) as ChatStream).keep_alive(KeepAlive::default()))
         }
     }
 }

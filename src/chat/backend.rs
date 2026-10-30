@@ -395,6 +395,9 @@ pub enum SseEvent {
     ToolResult { name: String, status: String },
     Warning { message: String },
     Error { message: String },
+    /// El provider falló con un error reintentable (429, 5xx, timeout de
+    /// stream) y pi va a reintentar SOLO: el turno sigue vivo.
+    Retrying { message: String },
     SessionStats { json: String },
     Done,
 }
@@ -416,6 +419,9 @@ impl SseEvent {
             }
             SseEvent::Error { message } => {
                 serde_json::json!({"type":"error","message":message}).to_string()
+            }
+            SseEvent::Retrying { message } => {
+                serde_json::json!({"type":"retrying","message":message}).to_string()
             }
             SseEvent::SessionStats { json } => {
                 serde_json::json!({"type":"session_stats","json":json}).to_string()
@@ -906,8 +912,32 @@ impl AgentBackend for PiAgentBackend {
                                             let _ = tx.blocking_send(SseEvent::Error {
                                                 message: err.to_string(),
                                             });
-                                            break;
+                                            // Un comando fallido con id PROPIO
+                                            // (get_state, set_model…) NO corta el
+                                            // turno: solo el rechazo del PROMPT
+                                            // (que pi manda sin id) lo hace.
+                                            if json.get("id").is_none() {
+                                                break;
+                                            }
                                         }
+                                    }
+                                    "auto_retry_start" => {
+                                        // Error reintentable del provider (429,
+                                        // 5xx, timeout de stream): pi reintenta
+                                        // solo y el TURNO SIGUE VIVO. Se avisa a
+                                        // la UI para que no parezca colgado.
+                                        let reason = json.get("errorMessage")
+                                            .and_then(|v| v.as_str())
+                                            .unwrap_or("error del proveedor");
+                                        let attempt = json.get("attempt")
+                                            .and_then(|v| v.as_u64())
+                                            .unwrap_or(1);
+                                        let _ = tx.blocking_send(SseEvent::Retrying {
+                                            message: format!(
+                                                "Reintento {} del turno tras error del proveedor: {}",
+                                                attempt, reason
+                                            ),
+                                        });
                                     }
                                     "message_update" => {
                                         if let Some(ae) = json.get("assistantMessageEvent") {
@@ -962,8 +992,22 @@ impl AgentBackend for PiAgentBackend {
                                         });
                                     }
                                     "agent_end" => {
-                                        agent_ended = true;
-                                        break;
+                                        // pi puede terminar el run del agente y
+                                        // SEGUIR con auto-retry (errores
+                                        // reintentables). En ese caso pi manda
+                                        // willRetry=true y el turno NO terminó:
+                                        // si cortáramos acá, el backend marcaría
+                                        // el turno como terminado mientras pi
+                                        // sigue trabajando → el chat se congela
+                                        // y el mensaje siguiente choca con
+                                        // "Agent is already processing".
+                                        let will_retry = json.get("willRetry")
+                                            .and_then(|v| v.as_bool())
+                                            .unwrap_or(false);
+                                        if !will_retry {
+                                            agent_ended = true;
+                                            break;
+                                        }
                                     }
                                     "error" => {
                                         let msg = json.get("error")
@@ -1194,4 +1238,91 @@ impl AgentBackend for NullBackend {
     }
 
     fn shutdown(&mut self) {}
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+    use std::os::unix::fs::PermissionsExt;
+    use std::time::{Duration, Instant};
+
+    /// Fake de pi en modo RPC. Reproduce lo que pi hace frente a un error
+    /// REINTENTABLE del provider (429, 5xx, timeout de stream): termina el
+    /// run del agente (agent_end) pero sigue con auto-retry, por eso el
+    /// agent_end llega con willRetry=true y después llegan más eventos.
+    const FAKE_PI: &str = r#"#!/bin/sh
+first=1
+while IFS= read -r line; do
+  case "$line" in
+    *get_session_stats*)
+      id=$(printf '%s' "$line" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')
+      printf '{"type":"response","id":"%s","command":"get_session_stats","success":true,"data":{}}\n' "$id"
+      ;;
+    *)
+      if [ "$first" = "1" ]; then
+        first=0
+        printf '{"type":"message_update","assistantMessageEvent":{"type":"text_delta","delta":"uno"}}\n'
+        printf '{"type":"agent_end","messages":[],"willRetry":true}\n'
+        printf '{"type":"message_update","assistantMessageEvent":{"type":"text_delta","delta":"dos"}}\n'
+        printf '{"type":"agent_end","messages":[],"willRetry":false}\n'
+      fi
+      ;;
+  esac
+done
+"#;
+
+    /// El reader de stdout NO debe cortar el turno en un agent_end con
+    /// willRetry=true: si cortara, el backend marcaría el turno como
+    /// terminado mientras pi sigue trabajando (el chat se congela y el
+    /// mensaje siguiente choca con "Agent is already processing").
+    #[test]
+    fn agent_end_con_will_retry_no_corta_el_turno() {
+        let path = std::env::temp_dir()
+            .join(format!("weztcode-fake-pi-{}.sh", std::process::id()));
+        let mut f = std::fs::File::create(&path).unwrap();
+        f.write_all(FAKE_PI.as_bytes()).unwrap();
+        drop(f);
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        let cfg = ChatConfig {
+            provider: "test".to_string(),
+            model: "test-model".to_string(),
+            api_key: String::new(),
+            pi_path: path.to_string_lossy().to_string(),
+            thinking_level: None,
+            flavor: BackendFlavor::Pi,
+            lc_path: String::new(),
+        };
+        let mut backend = PiAgentBackend::new(cfg);
+        backend.spawn(None).unwrap();
+        let mut rx = backend.send_message("hola").unwrap();
+
+        let mut tokens: Vec<String> = Vec::new();
+        let mut saw_done = false;
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while Instant::now() < deadline {
+            match rx.try_recv() {
+                Ok(SseEvent::Token { content }) => tokens.push(content),
+                Ok(SseEvent::Done) => {
+                    saw_done = true;
+                    break;
+                }
+                Ok(_) => {}
+                Err(tokio::sync::mpsc::error::TryRecvError::Empty) => {
+                    std::thread::sleep(Duration::from_millis(20));
+                }
+                Err(_) => break,
+            }
+        }
+        backend.shutdown();
+        let _ = std::fs::remove_file(&path);
+
+        assert!(saw_done, "el stream debería cerrarse con done");
+        assert_eq!(
+            tokens,
+            vec!["uno".to_string(), "dos".to_string()],
+            "el token posterior al agent_end con willRetry=true tiene que llegar"
+        );
+    }
 }

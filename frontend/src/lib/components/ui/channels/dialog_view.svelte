@@ -1,6 +1,7 @@
 <script>
   import { onMount, onDestroy } from "svelte";
   import Icon from "@iconify/svelte";
+  import NfIcon from "$lib/components/ui/nf_icon.svelte";
 
   // Vista de diálogo Si/No compartida por los canales (explorer: borrar
   // archivo/carpeta/proyecto; chat: borrar conversación). Se renderiza en
@@ -71,7 +72,7 @@
     </button>
     <p class="mb-1">Vas a borrar</p>
     <div class="flex items-center gap-2 text-print mb-4 ml-2">
-      <Icon {icon} class="w-5 h-5 text-accent-detail" />
+      <NfIcon {icon} class="text-accent-detail" />
       <span class="font-bold truncate">{name}?</span>
     </div>
     <div class="flex px-2 gap-2 justify-between font-sans font-bold text-sm">
